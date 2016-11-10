@@ -1,0 +1,6 @@
+ &contrl runlen=60000, restrt=.true., &end
+ &tsteps dtts=24.0, dtuv=1.2, dtsf=3.0, &end
+ &mixing &end
+ &filter afb1=0.25, afc1=0.25, aft1=0.25, &end
+ &io     io_tsuvp=1, io_restr=100, &end
+ -Dasselin_b -Dasselin_c -Daccelerate -Diomth 

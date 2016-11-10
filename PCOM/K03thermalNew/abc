@@ -1,0 +1,30 @@
+in scalar.h:      real    am,ah,kappa_m,kappa_h(km),gamma_t,gamma_s,cdbot,gravr
+
+in set con.F      do k=1,km
+                    kappa_h(k) = 0.1
+                  enddo
+
+in tracer.F
+
+       call isopyc
+ c
+       do k=1,km
+       do j=1,jmt
+       do i=1,imt
+       wkb(i,j,k) = kappa_h(k) + ahisop*k3(i,k,j,3)
+       enddo
+       enddo
+       enddo
+
+      do j=2,jmm
+      do i=2,imm
+      if(k.eq.itn(i,j))then
+        flxb(i,j) = c0
+      else if(k.lt.itn(i,j))then
+        flxb(i,j) = (t(i,j,k,n,taum)-t(i,j,k+1,n,taum))*
+#ifdef gm90
+     &              gravr*wkb(i,j,k)*rdzw(k)
+#else
+     &              gravr*kappa_h(k)   *rdzw(k)
+#endif
+      else

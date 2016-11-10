@@ -1,0 +1,49 @@
+#===========================================================
+# run script for the p-sigma coordinate model
+#===========================================================
+set filepath   = ./FILE
+set targer     = ./a.out
+
+#set opt1 = '-Dasselin_b -Dasselin_c -Dasselin_t -Dsmth'
+#set opt2 = '-Dsnbc -Dunesco -Dboussinesq -Daccelerate'
+#set opt3 = '-Diomth -Ddaily'
+#set opt4 = '-Dgm90 -Dimplicitvmix'
+
+set opt1 = '-Dasselin_b -Dasselin_c'
+set opt2 = '-Daccelerate'
+set opt3 = ''
+set opt4 = '-Dimplicitvmix'
+
+set OPTIONS = "$opt1 $opt2 $opt3 $opt4"
+
+set monthes = 24000
+cat > namelist << NAMELIST
+ &contrl runlen=$monthes, restrt=.true., &end
+ &tsteps dtts=24.0, dtuv=1.2, dtsf=3.0, &end
+ &mixing &end
+ &filter afb1=0.25, afc1=0.25, aft1=0.25, &end
+ &io     io_tsuvp=10, io_restr=100, &end
+ $OPTIONS
+NAMELIST
+cat namelist
+echo $OPTIONS
+
+set COMPILE_ONLY = ""    #compile "x".F
+set COMPILER_OPTIONS = "-fast -r8"
+chdir $filepath
+/bin/rm $targer
+if("$COMPILE_ONLY" == "") then
+  /bin/rm *.[fo]
+  pgf77 $COMPILER_OPTIONS -F $OPTIONS *.[F]
+  pgf77 $COMPILER_OPTIONS -c *.f
+else
+  foreach file ($COMPILE_ONLY)
+  /bin/rm $file.o
+  pgf77 $COMPILER_OPTIONS -F $OPTIONS $file.F
+  pgf77 $COMPILER_OPTIONS -c $file.f
+  end
+endif
+  pgf77 $COMPILER_OPTIONS *.o -o $targer
+chdir ..
+
+$filepath/$targer
