@@ -1,0 +1,72 @@
+ &contrl 
+ imt=362, # 纬向格点数
+ jmt=162, # 经向格点数
+ km=60, # 垂直层数
+ nt=2, # tracer 数目(温、盐)
+ runlen_mon=120, # 积分月数
+ runlen_day=0, # 积分日数
+ runlen_sec=0, # 积分秒数（三者只可选一种）
+ restrt=.false., # 使用restart场
+ snbc=1, # 盐度自然恢复边界条件
+ tnbc=1, # 温度自然恢复边界条件
+ gm90=1, # GM90 沿等位密面混合
+ implicitvmix=1, # 隐式垂直混合
+ asselin_b=1, # 正压Asselin滤波
+ asselin_c=1, # 斜压Asselin滤波
+ asselin_t=1, # 温盐Asselin滤波
+ smtha=0, # 正压高纬平滑
+ smthb=0, # 斜压高纬平滑
+ smthc=0, # 温盐高纬平滑
+ smth_start_nlat=70.0, # 北半球滤波起始纬度
+ smth_start_slat=-70.0, # 南半球滤波起始纬度
+ fcof=0.25, # 高纬滤波系数
+ unesco=1, # UNESCO 计算密度
+ boussinesq=0, # Boussinesq 近似
+ monloop=1, # 使用月平均（1-12月）的强迫场(pcom_bcf_mn.nc)
+ yearloop=0, # 使用年平均的强迫场(pcom_bcf_yr.nc)
+ monlong=0, # 用逐月月平均强迫场(pcom_bcf_mn_re.nc)
+ daylong=0, # 用逐日日平均强迫场（尚未加入）
+ hourlong=0, # 用逐时平均强迫场（尚未加入）
+ /
+
+ &mpicontrl
+ ncpux=8, # 纬向cpu个数
+ ncpuy=4, # 经向cpu个数
+ /
+
+ &tsteps 
+ stager_t=1, # 交错时间积分
+ dtts=3600, # 温盐积分步长(秒)
+ dtuv=3600, # 斜压积分步长(秒)
+ dtsf=120, # 正压积分步长(秒)
+ /
+
+ &mixing
+ fam=0, # 读入am
+ fah=0, # 读入ah
+ fkm=0, # 读入km
+ fkh=0, # 读入kh
+ am_c=1.0e7, # 侧向摩擦系数
+ ah_c=1.0e7, # 侧向混合系数
+ sma_c=0.56, # 侧向摩擦Smagorinsky方案系数（公式中的C）
+ km_c=0.1, # 垂直摩擦系数
+ kh_c=0.1, # 垂直混合系数
+ cdbot=2.6e-3, # 海底摩擦系数
+ /
+
+ &filter 
+ afb1=0.25, # 正压Asselin滤波系数
+ afc1=0.25, # 斜压Asselin滤波系数
+ aft1=0.25, # 温盐Asselin滤波系数
+ /
+
+ &io
+ uvtshdiag=1, # 输出温盐流和海表面高度场
+ energydiag=0, # 输出能量诊断场
+ io_month=1, # 每1个月输出一次变量场
+ io_time=0, # 每XX秒输出一次变量场
+ restr_mon=60, # 每60个月输出一次restart场
+ restr_time=0, # 每XX秒输出一次变量场
+ infotime=1800, # 每1800秒输出一次模式运行概要信息
+ /
+

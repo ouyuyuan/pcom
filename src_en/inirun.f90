@@ -462,8 +462,7 @@
       if (myid==0) then
       open(22,file='restr.data',form='unformatted',status='old')
       read(22) month,t_stepu,st,pbts_st,sup,svp,supb,svpb,sadv_u,sadv_v,sam
-!      month = month + 1
-      month = 1
+      month = month + 1
       close(22)
       end if
       call dis_var_int(month,mat_myid,ncpux,ncpuy,myid)
@@ -499,8 +498,7 @@
       read(22) month,st,pbts,sup,svp,supb,svpb,spmtp,sump,svmp,sam
       close(22)
       end if
-!      month = month + 1
-      month = 1
+      month = month + 1
 !      month =  1  !this will print out, strating from month 1
       call dis_var_int(month,mat_myid,ncpux,ncpuy,myid)
       print *,"pro ",myid," restart from month ",month

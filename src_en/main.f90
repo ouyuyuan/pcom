@@ -3,6 +3,7 @@
 !    +             PCOM and BCOM in eta-coordinates                  +
 !    +===============================================================+
 !    +                                                               +
+program main
       implicit none
       include 'param.h'
       include 'pconst.h'
@@ -214,68 +215,68 @@
 !     read and distribute base parameters
 !-----------------------------------------------------------------------------
       if (myid == 0) then
-      namelist /contrl/ imt,jmt,km,nt,runlen_mon,runlen_day,runlen_sec,restrt,  &
-                        snbc,tnbc,gm90,implicitvmix,asselin_b,asselin_c,asselin_t,  &
-                        smtha,smthb,smthc,smth_start_nlat,smth_start_slat,fcof,unesco, &
-                        boussinesq,monloop,yearloop,monlong,daylong,hourlong
-      namelist /mpicontrl/ ncpux,ncpuy
-      namelist /tsteps/ stager_t,dtts,dtuv,dtsf
-      namelist /mixing/ fam,fah,fkm,fkh,kh_max,am_c,sma_c,ah_c,km_c,kh_c,athkdf_c,cdbot
-      namelist /filter/ afb1,afc1,aft1
-      namelist /io/     uvtshdiag,energydiag,io_month,io_time,restr_mon,restr_time,infotime
-!
-!     read in model's control parameters
-      open(15,file='namelist')
-      read(15,contrl)
-      read(15,mpicontrl)
-      read(15,tsteps)
-      read(15,mixing)
-      read(15,filter)
-      read(15,io)
-      close(15)
-!-----------------------------------------------------------------------------
-!     set mpi parameters and distribute base parameters
-!-----------------------------------------------------------------------------
-      allocate(mat_myid(ncpux+2,ncpuy),stat=istatus)
-      simt=imt
-      sjmt=jmt
-      k=1
-      do j=1,ncpuy
-      do i=2,ncpux+1
-        mat_myid(i,j)=k-1
-        k=k+1
-      end do
-        mat_myid(1,j)=mat_myid(ncpux+1,j)
-        mat_myid(ncpux+2,j)=mat_myid(2,j)
-      end do
-      
-      do j=1,ncpuy
-      do i=2,ncpux+1
-      if (mat_myid(i,j).gt.0) then      
-      call mpi_ssend(restrt,1,mpi_logical,mat_myid(i,j),10,mpi_comm_world,ierr)      
-      call mpi_ssend(ncpux,1,mpi_integer,mat_myid(i,j),11,mpi_comm_world,ierr)
-      call mpi_ssend(ncpuy,1,mpi_integer,mat_myid(i,j),12,mpi_comm_world,ierr)      
-      end if
-      end do
-      end do
-      
+         namelist /contrl/ imt,jmt,km,nt,runlen_mon,runlen_day,runlen_sec,restrt,  &
+                           snbc,tnbc,gm90,implicitvmix,asselin_b,asselin_c,asselin_t,  &
+                           smtha,smthb,smthc,smth_start_nlat,smth_start_slat,fcof,unesco, &
+                           boussinesq,monloop,yearloop,monlong,daylong,hourlong
+         namelist /mpicontrl/ ncpux,ncpuy
+         namelist /tsteps/ stager_t,dtts,dtuv,dtsf
+         namelist /mixing/ fam,fah,fkm,fkh,kh_max,am_c,sma_c,ah_c,km_c,kh_c,athkdf_c,cdbot
+         namelist /filter/ afb1,afc1,aft1
+         namelist /io/     uvtshdiag,energydiag,io_month,io_time,restr_mon,restr_time,infotime
+   !
+   !     read in model's control parameters
+         open(15,file='namelist')
+         read(15,contrl)
+         read(15,mpicontrl)
+         read(15,tsteps)
+         read(15,mixing)
+         read(15,filter)
+         read(15,io)
+         close(15)
+   !-----------------------------------------------------------------------------
+   !     set mpi parameters and distribute base parameters
+   !-----------------------------------------------------------------------------
+         allocate(mat_myid(ncpux+2,ncpuy),stat=istatus)
+         simt=imt
+         sjmt=jmt
+         k=1
+         do j=1,ncpuy
+         do i=2,ncpux+1
+           mat_myid(i,j)=k-1
+           k=k+1
+         end do
+           mat_myid(1,j)=mat_myid(ncpux+1,j)
+           mat_myid(ncpux+2,j)=mat_myid(2,j)
+         end do
+         
+         do j=1,ncpuy
+         do i=2,ncpux+1
+         if (mat_myid(i,j).gt.0) then      
+         call mpi_ssend(restrt,1,mpi_logical,mat_myid(i,j),10,mpi_comm_world,ierr)      
+         call mpi_ssend(ncpux,1,mpi_integer,mat_myid(i,j),11,mpi_comm_world,ierr)
+         call mpi_ssend(ncpuy,1,mpi_integer,mat_myid(i,j),12,mpi_comm_world,ierr)      
+         end if
+         end do
+         end do
+         
       end if
       
       if (myid.gt.0) then      
-      call mpi_recv(restrt,1,mpi_logical,0,10,mpi_comm_world,status,ierr)
-      call mpi_recv(ncpux,1,mpi_integer,0,11,mpi_comm_world,status,ierr)
-      call mpi_recv(ncpuy,1,mpi_integer,0,12,mpi_comm_world,status,ierr)
-      
-      allocate(mat_myid(ncpux+2,ncpuy),stat=istatus)      
-      k=1
-      do j=1,ncpuy
-      do i=2,ncpux+1
-        mat_myid(i,j)=k-1
-        k=k+1
-      end do
-        mat_myid(1,j)=mat_myid(ncpux+1,j)
-        mat_myid(ncpux+2,j)=mat_myid(2,j)
-      end do
+         call mpi_recv(restrt,1,mpi_logical,0,10,mpi_comm_world,status,ierr)
+         call mpi_recv(ncpux,1,mpi_integer,0,11,mpi_comm_world,status,ierr)
+         call mpi_recv(ncpuy,1,mpi_integer,0,12,mpi_comm_world,status,ierr)
+         
+         allocate(mat_myid(ncpux+2,ncpuy),stat=istatus)      
+         k=1
+         do j=1,ncpuy
+         do i=2,ncpux+1
+           mat_myid(i,j)=k-1
+           k=k+1
+         end do
+           mat_myid(1,j)=mat_myid(ncpux+1,j)
+           mat_myid(ncpux+2,j)=mat_myid(2,j)
+         end do
       end if
 
       call dis_var_int(imt,mat_myid,ncpux,ncpuy,myid)      
@@ -373,9 +374,9 @@
 !     open input and output file at myid=0 process
 !-----------------------------------------------------------------------------     
       if (myid == 0) then
-      open(66,file="diaginfo.txt",status='replace')
-      
-      write(66,*) 'Allocating arrays'      
+         open(66,file="diaginfo.txt",status='replace')
+         
+         write(66,*) 'Allocating arrays'      
       end if
 !-----------------------------------------------------------------------------
 !     initialization all mpi array in every process
@@ -627,7 +628,7 @@
       t_stepu     = 1
       
       if (myid == 0) then
-      write(66,*) 'Done allocating arrays'
+         write(66,*) 'Done allocating arrays'
       end if
 !-----------------------------------------------------------------------------
 !     initialization basic integral arrays
@@ -675,8 +676,8 @@
       end if
       
       if (myid==0) then
-      write(66,801) nss,ncc,nbb
-801   format(/1x,'nss=',i7,2x,'ncc=',i3,2x,'nbb=',i5/)
+         write(66,801) nss,ncc,nbb
+   801   format(/1x,'nss=',i7,2x,'ncc=',i3,2x,'nbb=',i5/)
       end if
       
 !-----------------------------------------------------------------------
@@ -697,7 +698,7 @@
       euler_back = .true.
 !
       if (monlong==1) then
-      call dismonbcf(month,runlen_mon,bcf,imt,jmt,simt,sjmt,myid,ncpux,ncpuy,mat_myid)
+         call dismonbcf(month,runlen_mon,bcf,imt,jmt,simt,sjmt,myid,ncpux,ncpuy,mat_myid)
       end if
 !
 !-----------------------------------------------------------------------
@@ -882,4 +883,4 @@
       
       end if
       call mpi_finalize(rc)
-      end
+end program main

@@ -53,117 +53,106 @@
 !      open (15,file='vprofile.data',status='old',form='formatted')
      if (myid==0) then
      
-     if (fam==1) then
-     open(15,file='am.data',form='unformatted',access='direct', &
-          recl=simt*sjmt*km*8,status='old')
-     read(15,rec=1) sam
-     close(15)
-     else
-     do k=1,km
-     do j=1,sjmt
-     do i=1,simt
-     sam(i,j,k)=am_c
-     end do
-     end do
-     end do
-     end if
-     
-     if (fah==1) then
-     open(15,file='ah.data',form='unformatted',access='direct', &
-          recl=simt*sjmt*km*8,status='old')
-     read(15,rec=1) sah
-     close(15)
-     else
-     do k=1,km
-     do j=1,sjmt
-     do i=1,simt
-     sah(i,j,k)=ah_c
-     end do
-     end do
-     end do
-     end if
-     
-     if (fkh==1) then
-     print *,"read vmix for tracer from vmix.nc"
-     call netcdf_read_var(vmncname,vmarname,vmix_temp,simt-2,sjmt,km,missvalue)
-     do k=1,km
-        do j=1,sjmt
-           do i=1,simt-2
-              if (vmix_temp(i,j,k).gt.missvalue-c1) then
-                 vmix_temp(i,j,k)=0.1
-              end if
-              if (vmix_temp(i,j,k).gt.kh_max) then
-                 vmix_temp(i,j,k)=kh_max
-              end if
+        if (fam==1) then
+           open(15,file='am.data',form='unformatted',access='direct', &
+                recl=simt*sjmt*km*8,status='old')
+           read(15,rec=1) sam
+           close(15)
+        else
+           do k=1,km
+           do j=1,sjmt
+           do i=1,simt
+           sam(i,j,k)=am_c
            end do
-        end do
-     end do
-     do k=1,km
-        do j=1,sjmt
-          do i=1,simt-2
-            skappa_h(i+1,j,k)=vmix_temp(i,j,k)
-          end do
-          skappa_h(1,j,k)=vmix_temp(simt-2,j,k)
-          skappa_h(simt,j,k)=vmix_temp(1,j,k)
-        end do
-     end do
+           end do
+           end do
+        end if
+        
+        if (fah==1) then
+           open(15,file='ah.data',form='unformatted',access='direct', &
+                recl=simt*sjmt*km*8,status='old')
+           read(15,rec=1) sah
+           close(15)
+        else
+           do k=1,km
+           do j=1,sjmt
+           do i=1,simt
+           sah(i,j,k)=ah_c
+           end do
+           end do
+           end do
+        end if
      
-     else
+        if (fkh==1) then
+           print *,"read vmix for tracer from vmix.nc"
+           call netcdf_read_var(vmncname,vmarname,vmix_temp,simt-2,sjmt,km,missvalue)
+           do k=1,km
+              do j=1,sjmt
+                 do i=1,simt-2
+                    if (vmix_temp(i,j,k).gt.missvalue-c1) then
+                       vmix_temp(i,j,k)=0.1
+                    end if
+                    if (vmix_temp(i,j,k).gt.kh_max) then
+                       vmix_temp(i,j,k)=kh_max
+                    end if
+                 end do
+              end do
+           end do
+           do k=1,km
+              do j=1,sjmt
+                do i=1,simt-2
+                  skappa_h(i+1,j,k)=vmix_temp(i,j,k)
+                end do
+                skappa_h(1,j,k)=vmix_temp(simt-2,j,k)
+                skappa_h(simt,j,k)=vmix_temp(1,j,k)
+              end do
+           end do
      
-     do k=1,km
-     do j=1,sjmt
-     do i=1,simt
-     skappa_h(i,j,k)=kh_c
-     end do
-     end do
-     end do
+        else
      
-     if (fkh==2) then
-     do i=1,simt
-       do j=1,sjmt
-         skappa_h(i,j,1)=50.0
-         skappa_h(i,j,2)=50.0
-         skappa_h(i,j,3)=50.0
-         skappa_h(i,j,4)=40.0
-         skappa_h(i,j,5)=20.0
-         skappa_h(i,j,6)=10.0
-         skappa_h(i,j,7)=5.0
-         skappa_h(i,j,8)=2.0
-         skappa_h(i,j,9)=1.0
-         skappa_h(i,j,10)=0.5
-         skappa_h(i,j,11)=0.2
-       end do
-     end do
-     end if
+           do k=1,km
+           do j=1,sjmt
+           do i=1,simt
+           skappa_h(i,j,k)=kh_c
+           end do
+           end do
+           end do
      
-     end if     
+           if (fkh==2) then
+              do i=1,simt
+                do j=1,sjmt
+                  skappa_h(i,j,1)=50.0
+                  skappa_h(i,j,2)=50.0
+                  skappa_h(i,j,3)=50.0
+                  skappa_h(i,j,4)=40.0
+                  skappa_h(i,j,5)=20.0
+                  skappa_h(i,j,6)=10.0
+                  skappa_h(i,j,7)=5.0
+                  skappa_h(i,j,8)=2.0
+                  skappa_h(i,j,9)=1.0
+                  skappa_h(i,j,10)=0.5
+                  skappa_h(i,j,11)=0.2
+                end do
+              end do
+           end if
+        
+        end if     
      
-     if (fkm==1) then
-     open(15,file='km.data',form='unformatted',access='direct', &
-          recl=simt*sjmt*km*8,status='old')
-     read(15,rec=1) skappa_m
-     close(15)
-     else
-     do k=1,km
-     do j=1,sjmt
-     do i=1,simt
-     skappa_m(i,j,k)=km_c
-!     skappa_m(i,j,k)=skappa_h(i,j,k)
-         skappa_m(i,j,1)=50.0
-         skappa_m(i,j,2)=50.0
-         skappa_m(i,j,3)=50.0
-         skappa_m(i,j,4)=40.0
-         skappa_m(i,j,5)=20.0
-         skappa_m(i,j,6)=10.0
-         skappa_m(i,j,7)=5.0
-         skappa_m(i,j,8)=2.0
-         skappa_m(i,j,9)=1.0
-         skappa_m(i,j,10)=0.5
-         skappa_m(i,j,11)=0.2
-     end do
-     end do
-     end do
-     end if
+        if (fkm==1) then
+           open(15,file='km.data',form='unformatted',access='direct', &
+                recl=simt*sjmt*km*8,status='old')
+           read(15,rec=1) skappa_m
+           close(15)
+        else
+           do k=1,km
+           do j=1,sjmt
+           do i=1,simt
+      !     skappa_m(i,j,k)=km_c
+           skappa_m(i,j,k)=skappa_h(i,j,k)
+           end do
+           end do
+           end do
+        end if
      
      end if
 
@@ -206,9 +195,9 @@
 !      cdbot   = 2.6e-3
 !
       if (boussinesq==1) then
-      gravr = grav
+         gravr = grav
       else
-      gravr = grav*rho_0
+         gravr = grav*rho_0
       end if
 !
 !     change the unit of pressure from dynes/cm**2 to decibars
