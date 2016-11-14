@@ -1,10 +1,10 @@
 !
 !     =================
-      subroutine readyc(umask,tmask,ivn,pmum,pmup,pbt,spbt,du,dv,dub,dvb,up,vp,cosu,  &
-                        rdxt,rdxu,rdyu,rdyt,sdxu,r1c,r1d,cv1,cv2,dz,rdz,rdzw,rzu,pn,  &
-                        w,pax,pay,diffu,diffv,am,kappa_m,gravr,cdbot,leapfrog_c,bcu,  &
-                        bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,south,snbc,emp,  &
-                        energydiag)
+      subroutine readyc_st(umask,tmask,ivn,pbt_st,du,dv,adv_u,adv_v,dub,  &
+                    dvb,up,vp,cosu,rdxt,rdxu,rdyu,rdyt,sdxu,r1c,r1d,cv1,cv2,dz,  &
+                    rdz,rdzw,rzu,pn,w,pax,pay,diffu,diffv,am,kappa_m,gravr,cdbot,  &
+                    bcu,bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,  &
+                    south,snbc,emp,t_stepu,energydiag,dke_bcf,dke_fri)
                         
 !     =================
 !     momentum advections, viscosities & atmpospheric pressure terms
@@ -14,7 +14,6 @@
       include 'mpif.h'
 !
       integer imt,jmt,km,imm,jmm,kmp1,i,j,k,snbc,energydiag
-      logical leapfrog_c
       real am(imt,jmt,km),kappa_m(imt,jmt,km),cdbot,gravr
       real ubar,vbar,abc,uvmag,t1,t2,t3
       real a(imt,jmt),b(imt,jmt),c(imt,jmt)
@@ -25,7 +24,7 @@
       real tmask(imt,jmt,km),umask(imt,jmt,km)
       integer ivn(imt,jmt)
       real bcu(imt,jmt),bcv(imt,jmt),emp(imt,jmt)
-      real pmup(imt,jmt),pmum(imt,jmt),pbt(imt,jmt,2),spbt(imt,jmt)
+      real pbt(imt,jmt,2),pbt_st(imt,jmt,4),spbt(imt,jmt)
       real du(imt,jmt,km),dv(imt,jmt,km),dub(imt,jmt),dvb(imt,jmt)
       real up(imt,jmt,km,2),vp(imt,jmt,km,2) 
       real z(km),dz(km),rdz(km),rdzw(km),pn(imt,jmt),rzu(imt,jmt)
@@ -34,19 +33,22 @@
       real diffu(imt,jmt,km),diffv(imt,jmt,km)
       real cv1(jmt),cv2(jmt),r1c(jmt),r1d(jmt),cosu(jmt)
       
-      integer west,east,north,south    
+      real adv_u(imt,jmt,km,3),adv_v(imt,jmt,km,3)
+      integer t_stepu
+      
+      integer west,east,north,south
+      
+      real dke_bcf(imt,jmt,2),dke_fri(imt,jmt,km,2)
 !
 !-----------------------------------------------------------------------
 !     initialize time-averaged pbt (used in baroclinic Eq)
 !-----------------------------------------------------------------------
 !
       do j=1,jmt
-      do i=1,imt
-      pmum(i,j) = pmup(i,j)
-      pmup(i,j) = pbt(i,j,tau)
-      enddo
-      enddo
-!
+         do i=1,imt
+            pbt(i,j,tau)=pbt_st(i,j,1)
+         end do
+      end do
 !
 !-----------------------------------------------------------------------
 !     calculate vertical mass advection (dz/dt * pbt)
@@ -209,21 +211,56 @@
 !     + advection + Pa + viscosities(t=taum)
 !-----------------------------------------------------------------------
 !
-      if(leapfrog_c)then
+      do j=2,jmm
+         do i=2,imm
+            du(i,j,k) = - ux(i,j)
+            dv(i,j,k) = - vx(i,j)
+         end do
+      end do
+
+      if (t_stepu.eq.1) then 
         do j=2,jmm
-        do i=2,imm
-        du(i,j,k) = - ux(i,j) - pax(i,j)*spbt(i,j) + diffu(i,j,k)
-        dv(i,j,k) = - vx(i,j) - pay(i,j)*spbt(i,j) + diffv(i,j,k)
-        enddo
-        enddo
-      else
+           do i=2,imm
+              adv_u(i,j,k,1)=du(i,j,k)
+              adv_v(i,j,k,1)=dv(i,j,k)
+              adv_u(i,j,k,2)=adv_u(i,j,k,1)
+              adv_v(i,j,k,2)=adv_v(i,j,k,1)
+              adv_u(i,j,k,3)=adv_u(i,j,k,2)
+              adv_v(i,j,k,3)=adv_v(i,j,k,2)
+           end do
+        end do
+      end if
+      if (t_stepu.eq.2) then 
         do j=2,jmm
-        do i=2,imm
-        du(i,j,k) = - ux(i,j) - pax(i,j)*spbt(i,j)
-        dv(i,j,k) = - vx(i,j) - pay(i,j)*spbt(i,j)
-        enddo
-        enddo
-      endif
+           do i=2,imm
+              adv_u(i,j,k,2)=adv_u(i,j,k,1)
+              adv_v(i,j,k,2)=adv_v(i,j,k,1)
+              adv_u(i,j,k,1)=du(i,j,k)
+              adv_v(i,j,k,1)=dv(i,j,k)
+              adv_u(i,j,k,3)=adv_u(i,j,k,2)
+              adv_v(i,j,k,3)=adv_v(i,j,k,2)
+           end do
+        end do
+      end if
+      if (t_stepu.gt.2) then 
+        do j=2,jmm
+           do i=2,imm
+              adv_u(i,j,k,3)=adv_u(i,j,k,2)
+              adv_v(i,j,k,3)=adv_v(i,j,k,2)
+              adv_u(i,j,k,2)=adv_u(i,j,k,1)
+              adv_v(i,j,k,2)=adv_v(i,j,k,1)
+              adv_u(i,j,k,1)=du(i,j,k)
+              adv_v(i,j,k,1)=dv(i,j,k)
+           end do
+        end do
+      end if
+
+      do j=2,jmm
+         do i=2,imm
+            du(i,j,k) = - ux(i,j) - pax(i,j)*spbt(i,j)
+            dv(i,j,k) = - vx(i,j) - pay(i,j)*spbt(i,j)
+         end do
+      end do
 !
 !
 !---------------------------------------------------------------------
@@ -268,6 +305,17 @@
 !     NOTE: u(i,j) & v(i,j) = u&v at bottom (k=ivn(i,j))
 !---------------------------------------------------------------------
 !
+      if (energydiag==1) then
+      do j=2,jmm
+         do i=2,imm
+            k=1
+            if (umask(i,j,k)==1) then
+               dke_bcf(i,j,1)=rdz(k)*bcu(i,j)*gravr/spbt(i,j)*rrho_0
+               dke_bcf(i,j,2)=rdz(k)*bcv(i,j)*gravr/spbt(i,j)*rrho_0
+            end if
+         end do
+      end do
+      end if
 !
 !---------------------------------------------------------------------
 !     calculate vertical viscosities in tau time level
@@ -294,7 +342,7 @@
         enddo
       endif
 !
-!------BUG ???-----------
+!------BUG ??-------------
       do j=2,jmm
       do i=2,imm
       if(umask(i,j,k).gt.c0)then
@@ -306,7 +354,7 @@
       endif
       enddo
       enddo
-!------BUG ???------------
+!-------------------------
       do j=2,jmm
       do i=2,imm
       if(k.eq.ivn(i,j))then
@@ -333,22 +381,38 @@
       diffv(i,j,k) = diffv(i,j,k) + rdz(k)*(wva(i,j)-wvb(i,j))
       enddo
       enddo
+      
 !
 !
 !-----------------------------------------------------------------------
 !     + diffusion (at tau time level) on euler forward time step
 !-----------------------------------------------------------------------
 !
-      if(.not.leapfrog_c)then
       do j=2,jmm
       do i=2,imm
       du(i,j,k) = du(i,j,k) + diffu(i,j,k)
       dv(i,j,k) = dv(i,j,k) + diffv(i,j,k)
       enddo
       enddo
-      endif
 !
 200   continue
+
+      if (energydiag==1) then
+      do j=2,jmm
+         do i=2,imm
+            do k=2,ivn(i,j)
+               dke_fri(i,j,k,1)=diffu(i,j,k)
+               dke_fri(i,j,k,2)=diffv(i,j,k)
+            end do
+            k=1
+            if (umask(i,j,k)==1) then
+               dke_fri(i,j,k,1)=diffu(i,j,k)-dke_bcf(i,j,1)
+               dke_fri(i,j,k,2)=diffv(i,j,k)-dke_bcf(i,j,2)
+            end if
+         end do
+      end do
+      end if
+
 !
 !-----------------------------------------------------------------------
 !     vertical integration of du&dv
@@ -358,4 +422,4 @@
       call vinteg(dv,dvb,ivn,dz,rzu,imt,jmt,km)
 !
       return
-      end
+      end subroutine readyc_st

@@ -14,7 +14,7 @@
       include 'mpif.h'
 !
       integer imt,jmt,km,kmp1,i,j,k,itn(imt,jmt),unesco,boussinesq
-      real p0,dens,undens,pres,decibar
+      real p0,dens,undens,pres,decibar,missvalue
       real pre(kmp1),denz(km)
       real t30(km),s30(km)
       real z0(km),dz0(km),z(km),dz(km),pn(imt,jmt),phib(imt,jmt)
@@ -26,9 +26,8 @@
 !     input global averaged TS stratification
 !---------------------------------------------------------------------
       if (myid==0) then
-      open(82,file='ts30.data',status='old',form='formatted')
-      read(82,*) t30,s30
-      close(82)
+      call netcdf_read_var1d(ncname,t30name,t30,km,missvalue)
+      call netcdf_read_var1d(ncname,s30name,s30,km,missvalue)
       end if
       call dis_var_real1d(t30,km,mat_myid,ncpux,ncpuy,myid)
       call dis_var_real1d(s30,km,mat_myid,ncpux,ncpuy,myid)

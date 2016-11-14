@@ -1,25 +1,27 @@
 !     =================
       subroutine inirun(afb1,afc1,aft1,afb2,afc2,aft2,dtts,dtuv,dtsf,nss,ncc,nbb,  &
-                        onbb,oncc,onbc,c2dtsf,c2dtuv,c2dtts,epea,epeb,epla,eplb,   &
-                        ebea,ebeb,ebla,eblb,bcf,pt,ps,t,pbt,up,vp,upb,vpb,spbt,w,  &
-                        dub,dvb,du,dv,diffu,diffv,pmup,pmtp,pmum,pmtm,ump,vmp,umm, &
-                        vmm,pax,pay,pbxn,pcxn,pdxn,pbxs,pcxs,pdxs,pbye,pcye,pdye,  &
-                        pbyw,pcyw,pdyw,rhodp,phibx,phiby,phib,rdxt,rdy,ff,month,   &
-                        restrt,rho,itn,imt,jmt,km,nt,phis,imm,jmm,kmp1,dz,decibar, &
-                        myid,ncpux,ncpuy,west,east,north,south,mat_myid,simt,sjmt, &
-                        unesco,boussinesq,fixp)
+                  onbb,oncc,onbc,c2dtsf,c2dtuv,c2dtts,epea,epeb,epla,eplb,   &
+                  ebea,ebeb,ebla,eblb,bcf,pt,ps,t,pbt,pbt_st,up,vp,upb,vpb,  &
+                  spbt,w,dub,dvb,du,dv,diffu,diffv,pmup,pmtp,pmum,pmtm,ump, &
+                  vmp,umm,vmm,pax,pay,pbxn,pcxn,pdxn,pbxs,pcxs,pdxs,pbye,  &
+                  pcye,pdye,pbyw,pcyw,pdyw,rhodp,phibx,phiby,phib,rdxt,rdy,   &
+                  ff,month,restrt,rho,fixp,itn,imt,jmt,km,nt,imm,jmm,kmp1, &
+                  dz,decibar,myid,ncpux,ncpuy,west,east,north,south,mat_myid, &
+                  simt,sjmt,unesco,boussinesq,monloop,yearloop,t_stepu,stager_t,  &
+                  adv_u,adv_v,am)
 !     =================
 !     initialization
 !
       implicit none
       include 'pconst.h'
       include 'mpif.h'
-!
+!      
       integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,n,i2,j2,unesco,boussinesq
-      real phis
+      integer stager_t,t_stepu
+      real missvalue
       real a(imt,jmt),b(imt,jmt),c(imt,jmt),d(imt,jmt,km),t0
       real fx(imt,jmt),fy(imt,jmt),fixp(imt,jmt,km)
-      integer   month
+      integer   month,monloop,yearloop
 
       real    afb1,afc1,aft1,afb2,afc2,aft2
       real    dtts,dtuv,dtsf,c2dtts,c2dtuv,c2dtsf
@@ -29,7 +31,7 @@
       real epea(jmt),epeb(jmt),epla(jmt),eplb(jmt)
       real bcf(imt,jmt,12,7)
       real t(imt,jmt,km,nt,2),up(imt,jmt,km,2),vp(imt,jmt,km,2) 
-      real pbt(imt,jmt,2),spbt(imt,jmt)
+      real pbt(imt,jmt,2),spbt(imt,jmt),pbt_st(imt,jmt,4)
       real upb(imt,jmt,2),vpb(imt,jmt,2),w(imt,jmt,kmp1)
       real du(imt,jmt,km),dv(imt,jmt,km),dub(imt,jmt),dvb(imt,jmt)
       real diffu(imt,jmt,km),diffv(imt,jmt,km),pt(imt,jmt,km),ps(imt,jmt,km)
@@ -53,10 +55,20 @@
       integer mat_myid(ncpux+2,ncpuy)
       real sbcf(simt,sjmt,12,7)
       real spt(simt,sjmt,km),sps(simt,sjmt,km)
+      real t_temp(simt-2,sjmt,km),s_temp(simt-2,sjmt,km)
+      real sbcu(simt-2,sjmt,12),sbcv(simt-2,sjmt,12),sbct(simt-2,sjmt,12)
+      real sbcp(simt-2,sjmt,12),sbcs(simt-2,sjmt,12),semp(simt-2,sjmt,12)
+      real sddd(simt-2,sjmt,12)
+      real sbcu2d(simt-2,sjmt),sbcv2d(simt-2,sjmt),sbct2d(simt-2,sjmt)
+      real sbcp2d(simt-2,sjmt),sbcs2d(simt-2,sjmt),semp2d(simt-2,sjmt)
+      real sddd2d(simt-2,sjmt)
       real st(simt,sjmt,km,nt,2),sup(simt,sjmt,km,2),svp(simt,sjmt,km,2)
-      real supb(simt,sjmt,2),svpb(simt,sjmt,2),pbts(simt,sjmt,2)
+      real supb(simt,sjmt,2),svpb(simt,sjmt,2),pbts(simt,sjmt,2),pbts_st(simt,sjmt,4)
       real sump(simt,sjmt,km),svmp(simt,sjmt,km),spmtp(simt,sjmt)
-
+      real adv_u(imt,jmt,km,3),adv_v(imt,jmt,km,3)
+      real sadv_u(simt,sjmt,km,3),sadv_v(simt,sjmt,km,3)
+      real sam(simt,sjmt,km),am(imt,jmt,km)
+      
 !
 !-----------------------------------------------------------------------
 !     asselin temporal filter parameter
@@ -69,26 +81,19 @@
 !-----------------------------------------------------------------------
 !     set contral parameter of integration
 !-----------------------------------------------------------------------
-      nss = int(24.0/dtts)
+      nss = int(86400.0/dtts)
       ncc = int(dtts/dtuv)
-      nbb = int(dtuv*c60/dtsf)
+      nbb = int(dtuv/dtsf)
 
       onbb = c1/real(nbb+1)
       oncc = c1/real(ncc+1)
       onbc = c1/real(nbb*ncc+1)
 !
-      if (myid==0) then
-      write(66,801) nss,ncc,nbb
-801   format(/1x,'nss=',i3,2x,'ncc=',i3,2x,'nbb=',i3/)
-      end if
 !
 !
 !-----------------------------------------------------------------------
 !     set time step to the unit of second
 !-----------------------------------------------------------------------
-      dtsf   = dtsf * c60
-      dtuv   = dtuv * c3600
-      dtts   = dtts * c3600
 !
       c2dtsf = dtsf * c2
       c2dtuv = dtuv * c2
@@ -130,6 +135,9 @@
       call swap_array_real1d(ebla,jmt,north,south)
       call swap_array_real1d(eblb,jmt,north,south)
 !
+      if (myid==0) then
+!
+!
 !-----------------------------------------------------------------------
 !     surface forcing fields
 !-----------------------------------------------------------------------
@@ -141,31 +149,132 @@
 !     bcf(i,j,12,6) :   rate of evaporation minus precipitation (cm/s)
 !     bcf(i,j,12,7) :   coefficient for calculation of HF (w/m2/c)
 !
-      if (myid==0) then
-!
+      if (monloop==1) then
+      call netcdf_read_var(bcfname,bcuname,sbcu,simt-2,sjmt,12,missvalue)
+      call netcdf_read_var(bcfname,bcvname,sbcv,simt-2,sjmt,12,missvalue)
+      call netcdf_read_var(bcfname,bctname,sbct,simt-2,sjmt,12,missvalue)
+      call netcdf_read_var(bcfname,bcpname,sbcp,simt-2,sjmt,12,missvalue)
+      call netcdf_read_var(bcfname,bcsname,sbcs,simt-2,sjmt,12,missvalue)
+      call netcdf_read_var(bcfname,empname,semp,simt-2,sjmt,12,missvalue)
+      call netcdf_read_var(bcfname,dddname,sddd,simt-2,sjmt,12,missvalue)
+      
+      do k=1,12
+        do j=1,sjmt
+          do i=1,simt-2
+            sbcf(i+1,j,k,1)=sbcu(i,j,k)
+            sbcf(i+1,j,k,2)=sbcv(i,j,k)
+            sbcf(i+1,j,k,3)=sbct(i,j,k)
+            sbcf(i+1,j,k,4)=sbcp(i,j,k)
+            sbcf(i+1,j,k,5)=sbcs(i,j,k)
+            sbcf(i+1,j,k,6)=semp(i,j,k)
+            sbcf(i+1,j,k,7)=sddd(i,j,k)
+          end do
+          sbcf(1,j,k,1)=sbcu(simt-2,j,k)
+          sbcf(1,j,k,2)=sbcv(simt-2,j,k)
+          sbcf(1,j,k,3)=sbct(simt-2,j,k)
+          sbcf(1,j,k,4)=sbcp(simt-2,j,k)
+          sbcf(1,j,k,5)=sbcs(simt-2,j,k)
+          sbcf(1,j,k,6)=semp(simt-2,j,k)
+          sbcf(1,j,k,7)=sddd(simt-2,j,k)
+          sbcf(simt,j,k,1)=sbcu(1,j,k)
+          sbcf(simt,j,k,2)=sbcv(1,j,k)
+          sbcf(simt,j,k,3)=sbct(1,j,k)
+          sbcf(simt,j,k,4)=sbcp(1,j,k)
+          sbcf(simt,j,k,5)=sbcs(1,j,k)
+          sbcf(simt,j,k,6)=semp(1,j,k)
+          sbcf(simt,j,k,7)=sddd(1,j,k)
+        end do
+      end do
+      
+      do j2=1,7
+        do k=1,12
+          do j=1,sjmt
+            do i=1,simt
+              if (sbcf(i,j,k,j2)==missvalue) then
+                sbcf(i,j,k,j2)=0
+              end if
+            end do
+          end do
+        end do
+      end do
+      print *,"MONTH LOOP RUN START!"
+      end if !(monloop==1)
+      
+      if (yearloop==1) then
+      call netcdf_read_var2d(bcfname,bcuname,sbcu2d,simt-2,sjmt,missvalue)
+      call netcdf_read_var2d(bcfname,bcvname,sbcv2d,simt-2,sjmt,missvalue)
+      call netcdf_read_var2d(bcfname,bctname,sbct2d,simt-2,sjmt,missvalue)
+      call netcdf_read_var2d(bcfname,bcpname,sbcp2d,simt-2,sjmt,missvalue)
+      call netcdf_read_var2d(bcfname,bcsname,sbcs2d,simt-2,sjmt,missvalue)
+      call netcdf_read_var2d(bcfname,empname,semp2d,simt-2,sjmt,missvalue)
+      call netcdf_read_var2d(bcfname,dddname,sddd2d,simt-2,sjmt,missvalue)
+      
+      k=1
+        do j=1,sjmt
+          do i=1,simt-2
+            sbcf(i+1,j,k,1)=sbcu2d(i,j)
+            sbcf(i+1,j,k,2)=sbcv2d(i,j)
+            sbcf(i+1,j,k,3)=sbct2d(i,j)
+            sbcf(i+1,j,k,4)=sbcp2d(i,j)
+            sbcf(i+1,j,k,5)=sbcs2d(i,j)
+            sbcf(i+1,j,k,6)=semp2d(i,j)
+            sbcf(i+1,j,k,7)=sddd2d(i,j)
+          end do
+          sbcf(1,j,k,1)=sbcu2d(simt-2,j)
+          sbcf(1,j,k,2)=sbcv2d(simt-2,j)
+          sbcf(1,j,k,3)=sbct2d(simt-2,j)
+          sbcf(1,j,k,4)=sbcp2d(simt-2,j)
+          sbcf(1,j,k,5)=sbcs2d(simt-2,j)
+          sbcf(1,j,k,6)=semp2d(simt-2,j)
+          sbcf(1,j,k,7)=sddd2d(simt-2,j)
+          sbcf(simt,j,k,1)=sbcu2d(1,j)
+          sbcf(simt,j,k,2)=sbcv2d(1,j)
+          sbcf(simt,j,k,3)=sbct2d(1,j)
+          sbcf(simt,j,k,4)=sbcp2d(1,j)
+          sbcf(simt,j,k,5)=sbcs2d(1,j)
+          sbcf(simt,j,k,6)=semp2d(1,j)
+          sbcf(simt,j,k,7)=sddd2d(1,j)
+        end do
+        
+      do j2=1,7
+          do j=1,sjmt
+            do i=1,simt
+              if (sbcf(i,j,k,j2)==missvalue) then
+                sbcf(i,j,k,j2)=0
+              end if
+            end do
+          end do
+      end do
+      print *,"YEAR LOOP RUN START!"
+      end if !(yearloop==1)
+      
 !-----------------------------------------------------------------------
 !     read Levitus annual mean temperature and salinity
 !-----------------------------------------------------------------------
-      open(81,file='tsobs.data',form='unformatted',access='direct', &
-           recl=simt*sjmt*km*8,status='old')
-      read(81,rec=1) spt
-      read(81,rec=2) sps
-      close(81)
-      end if
+      call netcdf_read_var(ncname,ctname,t_temp,simt-2,sjmt,km,missvalue)
+      call netcdf_read_var(ncname,saname,s_temp,simt-2,sjmt,km,missvalue)
+      do k=1,km
+        do j=1,sjmt
+          do i=1,simt-2
+            spt(i+1,j,k)=t_temp(i,j,k)
+            sps(i+1,j,k)=s_temp(i,j,k)
+          end do
+          spt(1,j,k)=t_temp(simt-2,j,k)
+          sps(1,j,k)=s_temp(simt-2,j,k)
+          spt(simt,j,k)=t_temp(1,j,k)
+          sps(simt,j,k)=s_temp(1,j,k)
+        end do
+      end do
       
+      end if !(myid==0)
+      if ((monloop==1).or.(yearloop==1)) then
+      call div_array_real4d(sbcf,bcf,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            12,7,imt,jmt,myid)
+      end if
       call div_array_real3d(spt,pt,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                             km,imt,jmt,myid)
       call div_array_real3d(sps,ps,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                             km,imt,jmt,myid)
-!
-!      do k=1,km
-!      do j=1,jmt
-!      pt(1  ,j,k) = pt(imm,j,k)
-!      pt(imt,j,k) = pt(2  ,j,k)
-!      ps(1  ,j,k) = ps(imm,j,k)
-!      ps(imt,j,k) = ps(2  ,j,k)
-!      enddo
-!      enddo
 !
       do k=1,km
       do j=1,jmt
@@ -189,6 +298,14 @@
       pbt(i,j,taum) = pbt(i,j,tau)
       enddo
       enddo
+      
+      do k=1,4
+         do j=1,jmt
+            do i=1,imt
+               pbt_st(i,j,k) = pbt(i,j,tau)
+            end do
+         end do
+      end do
 !
 !
 !-----------------------------------------------------------------------
@@ -332,14 +449,6 @@
       call swap_array_real2d(phibx,imt,jmt,west,east,north,south)
       call swap_array_real2d(phiby,imt,jmt,west,east,north,south)
 !
-!      do j=2,jmm
-!      phibx(1  ,j) = phibx(imm,j)
-!      phibx(imt,j) = phibx(2  ,j)
-!      phiby(1  ,j) = phiby(imm,j)
-!      phiby(imt,j) = phiby(2  ,j)
-!      enddo
-!
-!
 !-----------------------------------------------------------------------
 !     initialize the cumulative monthes of the integration
 !-----------------------------------------------------------------------
@@ -349,13 +458,52 @@
 !     read in data for restarting integration
 !-----------------------------------------------------------------------
       if(restrt) then
+      if (stager_t.eq.1) then
       if (myid==0) then
       open(22,file='restr.data',form='unformatted',status='old')
-      read(22) month,st,pbts,sup,svp,supb,svpb,spmtp,sump,svmp
+      read(22) month,t_stepu,st,pbts_st,sup,svp,supb,svpb,sadv_u,sadv_v,sam
+!      month = month + 1
+      month = 1
       close(22)
       end if
-!xin      month = month + 1
-      month =  1  !this will print out, strating from month 1
+      call dis_var_int(month,mat_myid,ncpux,ncpuy,myid)
+      call dis_var_int(t_stepu,mat_myid,ncpux,ncpuy,myid)
+      print *,"pro ",myid," restart from month ",month," for stager scheme"
+      call div_array_real5d(st,t,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,nt,2,imt,jmt,myid)
+      call div_array_real4d(sup,up,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,2,imt,jmt,myid)
+      call div_array_real4d(svp,vp,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,2,imt,jmt,myid)
+      call div_array_real4d(sadv_u,adv_u,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,3,imt,jmt,myid)
+      call div_array_real4d(sadv_v,adv_v,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,3,imt,jmt,myid)
+      call div_array_real3d(supb,upb,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            2,imt,jmt,myid)
+      call div_array_real3d(svpb,vpb,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            2,imt,jmt,myid)
+      call div_array_real3d(pbts_st,pbt_st,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            4,imt,jmt,myid)
+      call div_array_real3d(sam,am,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,imt,jmt,myid)
+      do j=1,jmt
+         do i=1,imt
+            pbt(i,j,tau)=pbt_st(i,j,3)
+         end do
+      end do
+      
+      else
+      if (myid==0) then
+      open(22,file='restr.data',form='unformatted',status='old')
+      read(22) month,st,pbts,sup,svp,supb,svpb,spmtp,sump,svmp,sam
+      close(22)
+      end if
+!      month = month + 1
+      month = 1
+!      month =  1  !this will print out, strating from month 1
+      call dis_var_int(month,mat_myid,ncpux,ncpuy,myid)
+      print *,"pro ",myid," restart from month ",month
       call div_array_real5d(st,t,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                             km,nt,2,imt,jmt,myid)
       call div_array_real4d(sup,up,mat_myid,ncpux,ncpuy,simt,sjmt,  &
@@ -374,8 +522,10 @@
                             2,imt,jmt,myid)
       call div_array_real2d(spmtp,pmtp,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                             imt,jmt,myid)
+      call div_array_real3d(sam,am,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                            km,imt,jmt,myid)
       end if
-      
+      end if
 !
       return
       end

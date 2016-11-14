@@ -4,7 +4,7 @@
                         ump,vmp,up,vp,cosu,rdxt,rdy,pax,pay,itn,ivn,pbxn,pbxs,pbye,  &
                         pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,km,nt,  &
                         imm,jmm,kmp1,decibar,west,east,north,south,unesco,boussinesq, &
-                        fixp)
+                        fixp,energydiag)
 !     =================
 !     calculate the variables depended on stratification
 !
@@ -12,7 +12,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,unesco,boussinesq
+      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,unesco,boussinesq,energydiag
       integer itn(imt,jmt),ivn(imt,jmt)
       real a,t1,t2,t3,rdens,decibar
       real tmask(imt,jmt,km)
@@ -55,10 +55,8 @@
       spbt(i,j) = p5*sqrt(pbt(i,j  ,tau) + pbt(i+1,j  ,tau) +  &
                           pbt(i,j+1,tau) + pbt(i+1,j+1,tau))
       enddo
-!      spbt(1  ,j) = spbt(imm,j)
-!      spbt(imt,j) = spbt(2  ,j)
-      
       enddo
+      
       call swap_array_real2d(spbt,imt,jmt,west,east,north,south)
 !
       do k=1,km

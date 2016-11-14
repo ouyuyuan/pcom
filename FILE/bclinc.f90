@@ -3,7 +3,7 @@
       subroutine bclinc(pmup,pmum,phib,spbt,pbt,rhodp,rho,rdxt,rdy,ump,vmp,upb,    &
                         vpb,up,vp,du,dv,epla,eplb,epea,epeb,ff,umask,ivn,z,dz,rzu, &
                         onbb,leapfrog_c,dtuv,c2dtuv,afc1,afc2,cosu,imt,jmt,km,imm, &
-                        jmm,west,east,north,south,asselin_c,boussinesq,itn)
+                        jmm,west,east,north,south,asselin_c,boussinesq,itn,energydiag)
 !     =================
 !
 !     compute up & vp at tau+1 time level
@@ -12,7 +12,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,i,j,k,asselin_c,boussinesq
+      integer imt,jmt,km,imm,jmm,i,j,k,asselin_c,boussinesq,energydiag
       integer ivn(imt,jmt),itn(imt,jmt)
       logical leapfrog_c
       real t1,t2
@@ -57,8 +57,6 @@
       spbt(i,j) = p5*sqrt(pbar(i,j  ) + pbar(i+1,j  ) +  &
                           pbar(i,j+1) + pbar(i+1,j+1))
       endif
-!      spbt(1  ,j) = spbt(imm,j)
-!      spbt(imt,j) = spbt(2  ,j)
       enddo
       enddo
       call swap_array_real2d(spbt,imt,jmt,west,east,north,south)
@@ -256,19 +254,6 @@
 !
 150   continue
 !
-!
-!      do k=1,km
-!      do j=2,jmm
-!      up(1  ,j,k,tau) = up(imm,j,k,tau)
-!      up(imt,j,k,tau) = up(2  ,j,k,tau)
-!      vp(1  ,j,k,tau) = vp(imm,j,k,tau)
-!      vp(imt,j,k,tau) = vp(2  ,j,k,tau)
-!      up(1  ,j,k,taum) = up(imm,j,k,taum)
-!      up(imt,j,k,taum) = up(2  ,j,k,taum)
-!      vp(1  ,j,k,taum) = vp(imm,j,k,taum)
-!      vp(imt,j,k,taum) = vp(2  ,j,k,taum)
-!      enddo
-!      enddo
       call swap_array_real4d(up,imt,jmt,km,2,west,east,north,south)
       call swap_array_real4d(vp,imt,jmt,km,2,west,east,north,south)
 !
@@ -281,8 +266,6 @@
       spbt(i,j) = p5*sqrt(pbt(i,j  ,tau) + pbt(i+1,j  ,tau) + &
                          pbt(i,j+1,tau) + pbt(i+1,j+1,tau))
       enddo
-!      spbt(1  ,j) = spbt(imm,j)
-!      spbt(imt,j) = spbt(2  ,j)
       enddo
       call swap_array_real2d(spbt,imt,jmt,west,east,north,south)
 !
@@ -294,10 +277,6 @@
       vmp(i,j,k) = vmp(i,j,k) + vp(i,j,k,tau)*spbt(i,j)*cosu(j)
       endif
       enddo
-!      ump(1  ,j,k) = ump(imm,j,k)
-!      ump(imt,j,k) = ump(2  ,j,k)
-!      vmp(1  ,j,k) = vmp(imm,j,k)
-!      vmp(imt,j,k) = vmp(2  ,j,k)
       enddo
       enddo
       call swap_array_real3d(ump,imt,jmt,km,west,east,north,south)

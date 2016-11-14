@@ -12,7 +12,7 @@
       integer ivn(imt,jmt)
       real dz(km),rzu(imt,jmt)
 !
-      wk2=0
+      wk2=c0
       do j=2,jmt-1
       do i=2,imt-1
 !      wk2(i,j)=c0

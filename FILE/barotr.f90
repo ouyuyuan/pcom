@@ -4,8 +4,9 @@
                         phiby,pbxn,pbxs,pbye,pbyw,pcxn,pcxs,pcye,pcyw,ff,ebla,     &
                         eblb,ebea,ebeb,pn,zu,cosu,rdxt,rdyt,leapfrog_b,euler_back, &
                         dtsf,c2dtsf,afb1,afb2,pmup,pmtp,nbb,imt,jmt,km,imm,jmm,    &
-                        west,east,north,south,asselin_b,snbc,emp,jstn,jedn,jsts,   &
-                        jeds,smth,umask,boussinesq,phib,pdxn,pdxs,pdye,pdyw)
+                        myid,west,east,north,south,asselin_b,snbc,emp,jstn,jedn,jsts,   &
+                        jeds,smtha,fcof,umask,boussinesq,phib,pdxn,pdxs,pdye,pdyw,  &
+                        lat,lon,energydiag)
 !     =================
 !     compute pbt, upb & vpb at "tau+1" time level
 !
@@ -13,12 +14,12 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer mode_b,nbb,asselin_b,snbc,boussinesq
+      integer mode_b,nbb,asselin_b,snbc,boussinesq,nannum,energydiag
       integer imt,jmt,km,imm,jmm,i,j,k
-      integer jstn,jedn,jsts,jeds,smth
+      integer jstn,jedn,jsts,jeds,smtha
       logical euler_back,leapfrog_b
       integer ivn(imt,jmt),itn(imt,jmt)
-      real t1,t2,t3,am(imt,jmt,km),afb1,afb2,dtsf,c2dtsf
+      real t1,t2,t3,am(imt,jmt,km),afb1,afb2,dtsf,c2dtsf,fcof
       real a(imt,jmt),b(imt,jmt),dp(imt,jmt)
       real adu(imt,jmt),adv(imt,jmt),etax(imt,jmt),etay(imt,jmt)
       real rdxt(jmt),rdyt(jmt),sdxu(jmt),umask(imt,jmt,km)
@@ -35,8 +36,9 @@
       real pmup(imt,jmt),pmtp(imt,jmt),pbt(imt,jmt,2),spbt(imt,jmt)
       real dub(imt,jmt),dvb(imt,jmt)
       real phibx(imt,jmt),phiby(imt,jmt),emp(imt,jmt)
+      real lat(jmt),lon(imt)
       
-      integer west,east,north,south
+      integer west,east,north,south,myid
 !
 !
       do 1000 mode_b = 1,nbb
@@ -83,11 +85,33 @@
       spbt(i,j) = p5*sqrt(pbt(i,j  ,tau) + pbt(i+1,j  ,tau) + &
                           pbt(i,j+1,tau) + pbt(i+1,j+1,tau))
       endif
-!      spbt(1  ,j) = spbt(imm,j)
-!      spbt(imt,j) = spbt(2  ,j)
       enddo
       enddo
       call swap_array_real2d(spbt,imt,jmt,west,east,north,south)
+!----check----
+!      if (myid==1) then
+!      i=3
+!      j=16
+!      print "(i4,4f7.2,5f9.2,5f9.2)",mode_b, &
+!      pbt(i,j,tau),pbt(i+1,j,tau),pbt(i,j+1,tau),pbt(i+1,j+1,tau), &
+!      upb(i,j,taum),upb(i+1,j,taum),upb(i-1,j,taum),upb(i,j+1,taum),upb(i,j-1,taum), &
+!      vpb(i,j,taum),vpb(i+1,j,taum),vpb(i-1,j,taum),vpb(i,j+1,taum),vpb(i,j-1,taum)
+!      end if
+	  nannum=0
+      do j=1,jmt
+        do i=1,imt
+          if (spbt(i,j).ne.spbt(i,j)) then
+            print "(a24,f7.2,a5,f7.2,a9,i4,a6,i4,a8,g4.1,4f7.2,2i4)", "Something Wrong at lat ", &
+            lat(j),"lon",lon(i),"mode_b =",mode_b,"pro =",myid,"spbt =",spbt(i,j), &
+            pbt(i,j,tau),pbt(i+1,j,tau),pbt(i,j+1,tau),pbt(i+1,j+1,tau),i,j
+            nannum=nannum+1
+          end if
+        end do
+      end do
+      
+      if (nannum.gt.0) then
+         stop
+      end if
 !
 !
 !-----------------------------------------------------------------------
@@ -233,15 +257,15 @@
       end if
 !
 !
-      if (smth==1) then
-      call swap_array_real2d(du2,imt,jmt,west,east,north,south)
-      call swap_array_real2d(dv2,imt,jmt,west,east,north,south)
-      call smths(du2,umask,jsts,jeds,imt,jmt,km)
-      call smths(dv2,umask,jsts,jeds,imt,jmt,km)
-      call smths(du2,umask,jstn,jedn,imt,jmt,km)
-      call smths(dv2,umask,jstn,jedn,imt,jmt,km)
-      call swap_array_real2d(du2,imt,jmt,west,east,north,south)
-      call swap_array_real2d(dv2,imt,jmt,west,east,north,south)
+      if (smtha==1) then
+         call swap_array_real2d(du2,imt,jmt,west,east,north,south)
+         call swap_array_real2d(dv2,imt,jmt,west,east,north,south)
+         call smths(du2,umask,jsts,jeds,imt,jmt,km,fcof)
+         call smths(dv2,umask,jsts,jeds,imt,jmt,km,fcof)
+         call smths(du2,umask,jstn,jedn,imt,jmt,km,fcof)
+         call smths(dv2,umask,jstn,jedn,imt,jmt,km,fcof)
+         call swap_array_real2d(du2,imt,jmt,west,east,north,south)
+         call swap_array_real2d(dv2,imt,jmt,west,east,north,south)
       end if
 !
 !
@@ -305,21 +329,6 @@
 !
 150   continue
 !
-!
-!      do j=2,jmm
-!      upb(1  ,j,tau) = upb(imm,j,tau)
-!      upb(imt,j,tau) = upb(2  ,j,tau)
-!      vpb(1  ,j,tau) = vpb(imm,j,tau)
-!      vpb(imt,j,tau) = vpb(2  ,j,tau)
-!      pbt(1  ,j,tau) = pbt(imm,j,tau)
-!      pbt(imt,j,tau) = pbt(2  ,j,tau)
-!      upb(1  ,j,taum) = upb(imm,j,taum)
-!      upb(imt,j,taum) = upb(2  ,j,taum)
-!      vpb(1  ,j,taum) = vpb(imm,j,taum)
-!      vpb(imt,j,taum) = vpb(2  ,j,taum)
-!      pbt(1  ,j,taum) = pbt(imm,j,taum)
-!      pbt(imt,j,taum) = pbt(2  ,j,taum)
-!      enddo
       call swap_array_real3d(upb,imt,jmt,2,west,east,north,south)
       call swap_array_real3d(vpb,imt,jmt,2,west,east,north,south)
       call swap_array_real3d(pbt,imt,jmt,2,west,east,north,south)

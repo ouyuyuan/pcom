@@ -1,5 +1,5 @@
 !     =================
-      subroutine isopyi(imt,jmt,km,kmp1,slmxr,ahisop,athkdf,fzisop,kref,rdz0,   &
+      subroutine isopyi(imt,jmt,km,kmp1,slmxr,ahisop,ah,fzisop,kref,rdz0,   &
                         dz0,z0,K1,K2,K3,adv_vetiso,adv_vntiso,rhoi,e,adv_vbtiso)
 !     =================
 !
@@ -39,10 +39,11 @@
       real dptmid,t1,t2
       
       integer i,j,k,m,imt,jmt,km,kmp1
-      real slmxr,ahisop,athkdf,fzisop(km),kref(km),rdz0(km),dz0(km),z0(km)
+      real slmxr,fzisop(km),kref(km),rdz0(km),dz0(km),z0(km)
       real K1(imt,km,jmt,3:3),K2(imt,km,jmt,3:3),K3(imt,km,jmt,1:3)
       real adv_vetiso(imt,km,jmt),adv_vntiso(imt,km,jmt)
       real rhoi(imt,km,jmt,xup:xlo),e(imt,kmp1,jmt,3),adv_vbtiso(imt,0:km,jmt)
+      real ah(imt,jmt,km),ahisop(imt,jmt,km)
 !
 !-----------------------------------------------------------------------
 !     USER INPUT
@@ -50,11 +51,17 @@
 !-----------------------------------------------------------------------
 !
       slmxr  = 100.0
-      ahisop = 1.e7
+      do i=1,imt
+        do j=1,jmt
+          do k=1,km
+            ahisop(i,j,k) = ah(i,j,k)
+          end do
+        end do
+      end do
 !
 !     define the isopycnal thickness diffusion coefficient
 !
-      athkdf = 1.0e7
+!      athkdf = 1.0e7
 !
 !     reference pressure level intervals are defined (see "isopyc.h").
 !     "dptlim" must have "nrpl+1" elements (see "param.h"). also,
@@ -284,7 +291,7 @@
       integer mm1,mm2
       
       integer itn(imt,jmt)
-      real slmxr,athkdf,rdy
+      real slmxr,athkdf(imt,jmt,km),rdy
       real fx(imt,jmt),fy(imt,jmt)
       real tmask(imt,jmt,km),rhoi(imt,km,jmt,xup:xlo),kref(km),fzisop(km)
       real e(imt,kmp1,jmt,3),adv_vbtiso(imt,0:km,jmt)
@@ -886,7 +893,7 @@
       integer jstrt
       real    fxa
 !
-      real athkdf
+      real athkdf(imt,jmt,km)
       integer itn(imt,jmt),rdxt(jmt),rdyt(jmt),dz(km),pn(imt,jmt)
       real fx(imt,jmt),fy(imt,jmt)
       real rdz0(km),cosu(jmt),tmask(imt,jmt,km)
@@ -904,9 +911,9 @@
 !
       do j=2,jmm
         do k=2,km-1
-          fxa = -p5*rdz0(k)*athkdf*cosu(j)
+!          fxa = -p5*rdz0(k)*athkdf*cosu(j)
           do i=1,imt
-            adv_vntiso(i,k,j) = fxa*tmask(i,j,k)*tmask(i,j+1,k)*( &
+            adv_vntiso(i,k,j) = -p5*rdz0(k)*athkdf(i,j,k)*cosu(j)*tmask(i,j,k)*tmask(i,j+1,k)*( &
                                 K2(i,k-1,j,3) - K2(i,k+1,j,3))
           enddo
         enddo
@@ -916,10 +923,10 @@
 !     at the ocean top and bottom.
 !
       k = 1
-      fxa = -p5*rdz0(k)*athkdf
+!      fxa = -p5*rdz0(k)*athkdf
       do j=2,jmm
         do i=1,imt
-          adv_vntiso(i,k,j) = -fxa*tmask(i,j,k)*tmask(i,j+1,k)*cosu(j) &
+          adv_vntiso(i,k,j) = p5*rdz0(k)*athkdf(i,j,k)*tmask(i,j,k)*tmask(i,j+1,k)*cosu(j) &
                               *(K2(i,k,j,3) + K2(i,k+1,j,3))
         enddo
       enddo
@@ -934,7 +941,7 @@
         do i=1,imt
           k = min(itn(i,j),itn(i,j+1))
           if (k .ne. 0) then
-            adv_vntiso(i,k,j) = -p5*rdz0(k)*athkdf*cosu(j)*tmask(i,j,k) &
+            adv_vntiso(i,k,j) = -p5*rdz0(k)*athkdf(i,j,k)*cosu(j)*tmask(i,j,k) &
                          *tmask(i,j+1,k)*(K2(i,k,j,3) + K2(i,k-1,j,3))
           endif
         enddo
@@ -961,9 +968,9 @@
 !
       do j=jstrt,jmm
         do k=2,km-1
-          fxa = -p5*rdz0(k)*athkdf
+!          fxa = -p5*rdz0(k)*athkdf
           do i=1,imm
-            adv_vetiso(i,k,j) = fxa*tmask(i,j,k)*tmask(i+1,j,k)  &
+            adv_vetiso(i,k,j) = -p5*rdz0(k)*athkdf(i,j,k)*tmask(i,j,k)*tmask(i+1,j,k)  &
                                 *(K1(i,k-1,j,3) - K1(i,k+1,j,3))
           enddo
         enddo
@@ -973,10 +980,10 @@
 !     at the ocean top and bottom.
 !
       k = 1
-      fxa = -p5*rdz0(k)*athkdf
+!      fxa = -p5*rdz0(k)*athkdf
       do j=jstrt,jmm
         do i=1,imm
-          adv_vetiso(i,k,j) = -fxa*tmask(i,j,k)*tmask(i+1,j,k) &
+          adv_vetiso(i,k,j) = p5*rdz0(k)*athkdf(i,j,k)*tmask(i,j,k)*tmask(i+1,j,k) &
                               *(K1(i,k,j,3)+K1(i,k+1,j,3))
         enddo
       enddo
@@ -991,7 +998,7 @@
         do i=1,imm
           k = min(itn(i,j),itn(i+1,j))
           if (k .ne. 0) then
-            adv_vetiso(i,k,j) = -p5*rdz0(k)*athkdf*tmask(i,j,k)  &
+            adv_vetiso(i,k,j) = -p5*rdz0(k)*athkdf(i,j,k)*tmask(i,j,k)  &
                            *tmask(i+1,j,k)*(K1(i,k,j,3)+K1(i,k-1,j,3))
           endif
         enddo

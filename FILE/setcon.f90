@@ -1,8 +1,8 @@
 !     =================
-      subroutine setcon(fam,fah,fkm,fkh,am_c,ah_c,km_c,kh_c,am,ah,kappa_m,kappa_h,    &
-                        gravr,decibar,deltap,deltat,deltas,rdeltap,rdeltat,rdeltas,   &
-                        gamma_t,gamma_s,imt,jmt,km,boussinesq,myid,ncpux,ncpuy,simt,  &
-                        sjmt,mat_myid)
+      subroutine setcon(fam,fah,fkm,fkh,kh_max,am_c,ah_c,km_c,kh_c,am,ah,kappa_m,kappa_h,   &
+                        athkdf_c,athkdf,gravr,decibar,deltap,deltat,deltas,rdeltap,  &
+                        rdeltat,rdeltas,gamma_t,gamma_s,imt,jmt,km,boussinesq,myid,  &
+                        ncpux,ncpuy,simt,sjmt,mat_myid)
                         
 !     =================
 !     set scalar quantities
@@ -14,17 +14,22 @@
 !---------------------------------------------------------------------
 !     calendar
 !---------------------------------------------------------------------
+
       integer imt,jmt,km,i,j,k,boussinesq
       integer fam,fah,fkm,fkh
-      real am_c,ah_c,km_c,kh_c
+      real am_c,ah_c,km_c,kh_c,athkdf_c
       real gravr,decibar,deltap,rdeltap,deltat,deltas
       real rdeltat,rdeltas,gamma_t,gamma_s
       real kappa_h(imt,jmt,km),kappa_m(imt,jmt,km),am(imt,jmt,km),ah(imt,jmt,km)
+      real athkdf(imt,jmt,km)
       
       integer myid,ncpux,ncpuy,simt,sjmt
       integer mat_myid(ncpux+2,ncpuy)
       real skappa_h(simt,sjmt,km),skappa_m(simt,sjmt,km)
-      real sam(simt,sjmt,km),sah(simt,sjmt,km)
+      real sam(simt,sjmt,km),sah(simt,sjmt,km),sath(simt,sjmt,km)
+      
+      real missvalue,kh_max
+      real vmix_temp(simt-2,sjmt,km)
 
 !      data monname /'jan','feb','mar','apr','may','jun', &
 !                    'jul','aug','sep','oct','nov','dec'/
@@ -78,6 +83,61 @@
      end do
      end if
      
+     if (fkh==1) then
+     print *,"read vmix for tracer from vmix.nc"
+     call netcdf_read_var(vmncname,vmarname,vmix_temp,simt-2,sjmt,km,missvalue)
+     do k=1,km
+        do j=1,sjmt
+           do i=1,simt-2
+              if (vmix_temp(i,j,k).gt.missvalue-c1) then
+                 vmix_temp(i,j,k)=0.1
+              end if
+              if (vmix_temp(i,j,k).gt.kh_max) then
+                 vmix_temp(i,j,k)=kh_max
+              end if
+           end do
+        end do
+     end do
+     do k=1,km
+        do j=1,sjmt
+          do i=1,simt-2
+            skappa_h(i+1,j,k)=vmix_temp(i,j,k)
+          end do
+          skappa_h(1,j,k)=vmix_temp(simt-2,j,k)
+          skappa_h(simt,j,k)=vmix_temp(1,j,k)
+        end do
+     end do
+     
+     else
+     
+     do k=1,km
+     do j=1,sjmt
+     do i=1,simt
+     skappa_h(i,j,k)=kh_c
+     end do
+     end do
+     end do
+     
+     if (fkh==2) then
+     do i=1,simt
+       do j=1,sjmt
+         skappa_h(i,j,1)=50.0
+         skappa_h(i,j,2)=50.0
+         skappa_h(i,j,3)=50.0
+         skappa_h(i,j,4)=40.0
+         skappa_h(i,j,5)=20.0
+         skappa_h(i,j,6)=10.0
+         skappa_h(i,j,7)=5.0
+         skappa_h(i,j,8)=2.0
+         skappa_h(i,j,9)=1.0
+         skappa_h(i,j,10)=0.5
+         skappa_h(i,j,11)=0.2
+       end do
+     end do
+     end if
+     
+     end if     
+     
      if (fkm==1) then
      open(15,file='km.data',form='unformatted',access='direct', &
           recl=simt*sjmt*km*8,status='old')
@@ -88,21 +148,18 @@
      do j=1,sjmt
      do i=1,simt
      skappa_m(i,j,k)=km_c
-     end do
-     end do
-     end do
-     end if
-     
-     if (fkh==1) then
-     open(15,file='kh.data',form='unformatted',access='direct', &
-          recl=simt*sjmt*km*8,status='old')
-     read(15,rec=1) skappa_h
-     close(15)
-     else
-     do k=1,km
-     do j=1,sjmt
-     do i=1,simt
-     skappa_h(i,j,k)=kh_c
+!     skappa_m(i,j,k)=skappa_h(i,j,k)
+         skappa_m(i,j,1)=50.0
+         skappa_m(i,j,2)=50.0
+         skappa_m(i,j,3)=50.0
+         skappa_m(i,j,4)=40.0
+         skappa_m(i,j,5)=20.0
+         skappa_m(i,j,6)=10.0
+         skappa_m(i,j,7)=5.0
+         skappa_m(i,j,8)=2.0
+         skappa_m(i,j,9)=1.0
+         skappa_m(i,j,10)=0.5
+         skappa_m(i,j,11)=0.2
      end do
      end do
      end do
@@ -113,6 +170,8 @@
      call div_array_real3d(sam,am,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                            km,imt,jmt,myid)
      call div_array_real3d(sah,ah,mat_myid,ncpux,ncpuy,simt,sjmt,  &
+                           km,imt,jmt,myid)
+     call div_array_real3d(sath,athkdf,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                            km,imt,jmt,myid)
      call div_array_real3d(skappa_m,kappa_m,mat_myid,ncpux,ncpuy,simt,sjmt,  &
                            km,imt,jmt,myid)

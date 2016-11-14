@@ -9,11 +9,16 @@
 !     nt  = number of tracers (temperature, salinity, ...)
 !                                                                       
       integer imt,jmt,km,nt,imm,jmm,kmp1,kmm1,i,j,k,n,m
-      real dlam,dphi,phis
-      integer simt,sjmt,bcfrec
-      integer snbc,gm90,implicitvmix,asselin_b,asselin_c,asselin_t,smth,unesco
-      integer boussinesq
-      real slmxr,ahisop,athkdf,smth_start_nlat,smth_start_slat
+      real dlam,dphi
+      integer simt,sjmt
+      integer snbc,tnbc,gm90,implicitvmix,asselin_b,asselin_c,asselin_t
+      integer unesco,boussinesq,smtha,smthb,smthc
+      integer monloop,yearloop,monlong,daylong,hourlong
+      real slmxr,smth_start_nlat,smth_start_slat,fcof
+      real sa_ini,ma_ini,ke_ini,in_ini,po_ini
+      integer sa_first
+      integer t_stepu,stager_t
+      !,ahisop,athkdf
 !
 !      parameter (imt=362,jmt=141,km=60)
 !      parameter (nt=2)
@@ -73,13 +78,14 @@
 !
       integer nss,ncc,nbb,jstn,jedn,jsts,jeds
       real    onbb,oncc,onbc
-      real    dtts,dtuv,dtsf,c2dtts,c2dtuv,c2dtsf
+      real    runlen_mon,runlen_day,runlen_sec,restr_time,io_time
+      real    dtts,dtuv,dtsf,c2dtts,c2dtuv,c2dtsf,runtime,infotime
       real    afb1,afc1,aft1,afb2,afc2,aft2
       real    decibar,deltap,rdeltap,deltat,deltas,rdeltat,rdeltas
       integer fam,fah,fkm,fkh
-      real    am_c,ah_c,km_c,kh_c,gamma_t,gamma_s,cdbot,gravr
-      real    runlen
-      integer io_tsuvp,io_restr
+      real    kh_max
+      real    am_c,sma_c,ah_c,km_c,kh_c,athkdf_c,gamma_t,gamma_s,cdbot,gravr
+      integer uvtshdiag,energydiag,io_month,restr_mon
       logical euler_back,leapfrog_b,leapfrog_c,leapfrog_t
       logical restrt
       
