@@ -1,0 +1,11 @@
+source $MODULESHOME/init/csh
+module use -a /snfs01/ou/coded/modulefiles
+module purge
+
+module load ou/pgi
+module load ou/openmpi-pgi
+module load ou/netcdf-pgi
+
+module list
+
+setenv mpirunCommand "mpirun -n"

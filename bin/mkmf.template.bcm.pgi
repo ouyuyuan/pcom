@@ -1,0 +1,6 @@
+
+FC = mpif90
+FFLAGS = -Kieee -fast -r8 -I${NETCDF}/include -L${NETCDF}/lib -lnetcdf -lnetcdff
+
+LD = mpif90
+LDFLAGS = -L${NETCDF}/lib -lnetcdf -lnetcdff

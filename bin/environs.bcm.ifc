@@ -1,0 +1,11 @@
+#source $MODULESHOME/init/csh
+source $MODULESHOME/init/bash
+module use -a /snfs01/ou/modulefiles
+module purge
+
+module load sge
+module load ou/ifort
+module load ou/impi
+module load ou/netcdf-ifc
+
+module list

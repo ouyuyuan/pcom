@@ -1,9 +1,7 @@
 
-v1.1 by Zhangyu
-for study engergy balance
-copy from Zhangyu on 2013-05-15
-This is the version on which I based when do the
-rewrittening.
+This version is modify from pcom1.0, 
+in order to test the code stability by comparing with
+pcom_en (git tag v1.1). 
 
-Ou
-2016-11-14
+Ou 
+2016
