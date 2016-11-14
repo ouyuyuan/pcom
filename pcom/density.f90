@@ -1,6 +1,15 @@
 !     ==================
+!BOP
+!
+! !MODULE: density.f90
+! !DESCRIPTION: \input{sections/code-density}
+!
+! !INTERFACE:
+!
       subroutine density(tmask,z,t,pbt,bcp,rho,decibar,imt,jmt,km,nt,imm,jmm,fixp,  &
-                         west,east,north,south,unesco,boussinesq)
+                         west,east,north,south)
+!EOP
+!-------------------------------------------------------------------------------
 !     ==================
 !     calculate density/rho_0(BCOM) or reciprocal of density(PCOM)
 !
@@ -8,7 +17,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,nt,imm,jmm,i,j,k,unesco,boussinesq
+      integer imt,jmt,km,nt,imm,jmm,i,j,k
       real t0,s0,p0,dens,rdens,unrdens,undens,decibar
       real tmask(imt,jmt,km),z(km),pbt(imt,jmt,2),rho(imt,jmt,km),fixp(imt,jmt,km)
       real t(imt,jmt,km,nt,2)
@@ -18,39 +27,7 @@
 !
 !     calculate density/rho_0 or reciprocal of density
 !
-      if (boussinesq==1) then
       
-      if (unesco==1) then
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-      t0         = t(i,j,k,1,tau)
-      s0         = t(i,j,k,2,tau)
-      p0         = fixp(i,j,k)
-      rho(i,j,k) = undens(t0,s0,p0)*rrho_0
-      endif
-      enddo
-      enddo
-      enddo
-      else
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-      t0         = t(i,j,k,1,tau)
-      s0         = t(i,j,k,2,tau)
-      p0         = fixp(i,j,k)
-      rho(i,j,k) = dens(t0,s0,p0)*rrho_0
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-      
-      else
-      
-      if (unesco==1) then
       do k=1,km
       do j=2,jmm
       do i=2,imm
@@ -63,22 +40,6 @@
       enddo
       enddo
       enddo
-      else
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-      t0         = t(i,j,k,1,tau)
-      s0         = t(i,j,k,2,tau)
-      p0         = (pbt(i,j,tau)*z(k) + bcp(i,j))*decibar
-      rho(i,j,k) = rdens(t0,s0,p0)
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-      
-      end if
       
       call swap_array_real3d(rho,imt,jmt,km,west,east,north,south)
 !
@@ -87,8 +48,17 @@
 !
 !
 !     ==================
+!BOP
+!
+! !IROUTINE: rho_ref
+! !DESCRIPTION: \input{sections/code-rho_ref}
+!
+! !INTERFACE:
+!
       subroutine rho_ref(tmask,t,z,pbt,pt,ps,deltat,deltas,rdeltat,rdeltas,decibar,fixp, &
-                         imt,jmt,km,nt,imm,jmm,west,east,north,south,unesco,boussinesq)
+                         imt,jmt,km,nt,imm,jmm,west,east,north,south)
+!EOP
+!-------------------------------------------------------------------------------
 !     ==================
 !
 !     pt = {partial rho} over {partial temperature}
@@ -103,7 +73,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,nt,imm,jmm,i,j,k,i_id,j_id,unesco,boussinesq
+      integer imt,jmt,km,nt,imm,jmm,i,j,k,i_id,j_id
       real t1,s1,p1,dens,undens
       real rhop,rhoq,decibar,deltas,rdeltat,rdeltas,deltat
       real tmask(imt,jmt,km),z(km),pbt(imt,jmt,2),pt(imt,jmt,km),ps(imt,jmt,km)
@@ -111,49 +81,6 @@
       
       integer west,east,north,south
 !
-      if (boussinesq==1) then
-      
-      if (unesco==1) then
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-        t1        = t(i,j,k,1,tau)
-        s1        = t(i,j,k,2,tau)
-        p1        = fixp(i,j,k)
-        rhop      = undens(t1+deltat,s1,p1)
-        rhoq      = undens(t1-deltat,s1,p1)
-        pt(i,j,k) = (rhop-rhoq)*rdeltat
-        rhop      = undens(t1,s1+deltas,p1)
-        rhoq      = undens(t1,s1-deltas,p1)
-        ps(i,j,k) = (rhop-rhoq)*rdeltas
-      endif
-      enddo
-      enddo
-      enddo
-      else
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-        t1        = t(i,j,k,1,tau)
-        s1        = t(i,j,k,2,tau)
-        p1        = fixp(i,j,k)
-        rhop      = dens(t1+deltat,s1,p1)
-        rhoq      = dens(t1-deltat,s1,p1)
-        pt(i,j,k) = (rhop-rhoq)*rdeltat
-        rhop      = dens(t1,s1+deltas,p1)
-        rhoq      = dens(t1,s1-deltas,p1)
-        ps(i,j,k) = (rhop-rhoq)*rdeltas
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-      
-      else
-      
-      if (unesco==1) then
       do k=1,km
       do j=2,jmm
       do i=2,imm
@@ -171,27 +98,6 @@
       enddo
       enddo
       enddo
-      else
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-        t1        = t(i,j,k,1,tau)
-        s1        = t(i,j,k,2,tau)
-        p1        = pbt(i,j,tau)*z(k)*decibar
-        rhop      = dens(t1+deltat,s1,p1)
-        rhoq      = dens(t1-deltat,s1,p1)
-        pt(i,j,k) = (rhop-rhoq)*rdeltat
-        rhop      = dens(t1,s1+deltas,p1)
-        rhoq      = dens(t1,s1-deltas,p1)
-        ps(i,j,k) = (rhop-rhoq)*rdeltas
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-      
-      end if
       
       call swap_array_real3d(pt,imt,jmt,km,west,east,north,south)
       call swap_array_real3d(ps,imt,jmt,km,west,east,north,south)
@@ -202,7 +108,7 @@
 !
 !     ==================
       subroutine rho_ref_st(tmask,t,z,pbt_st,pt,ps,deltat,deltas,rdeltat,rdeltas,decibar,fixp, &
-                         imt,jmt,km,nt,imm,jmm,west,east,north,south,unesco,boussinesq)
+                         imt,jmt,km,nt,imm,jmm,west,east,north,south)
 !     ==================
 !
 !     pt = {partial rho} over {partial temperature}
@@ -217,7 +123,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,nt,imm,jmm,i,j,k,i_id,j_id,unesco,boussinesq
+      integer imt,jmt,km,nt,imm,jmm,i,j,k,i_id,j_id
       real t1,s1,p1,dens,undens
       real rhop,rhoq,decibar,deltas,rdeltat,rdeltas,deltat
       real tmask(imt,jmt,km),z(km),pbt_st(imt,jmt,4),pt(imt,jmt,km),ps(imt,jmt,km)
@@ -225,49 +131,6 @@
       
       integer west,east,north,south
 !
-      if (boussinesq==1) then
-      
-      if (unesco==1) then
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-        t1        = t(i,j,k,1,tau)
-        s1        = t(i,j,k,2,tau)
-        p1        = fixp(i,j,k)
-        rhop      = undens(t1+deltat,s1,p1)
-        rhoq      = undens(t1-deltat,s1,p1)
-        pt(i,j,k) = (rhop-rhoq)*rdeltat
-        rhop      = undens(t1,s1+deltas,p1)
-        rhoq      = undens(t1,s1-deltas,p1)
-        ps(i,j,k) = (rhop-rhoq)*rdeltas
-      endif
-      enddo
-      enddo
-      enddo
-      else
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-        t1        = t(i,j,k,1,tau)
-        s1        = t(i,j,k,2,tau)
-        p1        = fixp(i,j,k)
-        rhop      = dens(t1+deltat,s1,p1)
-        rhoq      = dens(t1-deltat,s1,p1)
-        pt(i,j,k) = (rhop-rhoq)*rdeltat
-        rhop      = dens(t1,s1+deltas,p1)
-        rhoq      = dens(t1,s1-deltas,p1)
-        ps(i,j,k) = (rhop-rhoq)*rdeltas
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-      
-      else
-      
-      if (unesco==1) then
       do k=1,km
       do j=2,jmm
       do i=2,imm
@@ -285,27 +148,6 @@
       enddo
       enddo
       enddo
-      else
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      if(tmask(i,j,k).gt.c0)then
-        t1        = t(i,j,k,1,tau)
-        s1        = t(i,j,k,2,tau)
-        p1        = pbt_st(i,j,4)*z(k)*decibar
-        rhop      = dens(t1+deltat,s1,p1)
-        rhoq      = dens(t1-deltat,s1,p1)
-        pt(i,j,k) = (rhop-rhoq)*rdeltat
-        rhop      = dens(t1,s1+deltas,p1)
-        rhoq      = dens(t1,s1-deltas,p1)
-        ps(i,j,k) = (rhop-rhoq)*rdeltas
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-      
-      end if
       
       call swap_array_real3d(pt,imt,jmt,km,west,east,north,south)
       call swap_array_real3d(ps,imt,jmt,km,west,east,north,south)
@@ -314,7 +156,17 @@
       end subroutine rho_ref_st
 
 !     ====================
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+!BOP
+!
+! !IROUTINE: undens
+! !DESCRIPTION: \input{sections/code-undens}
+!
+! !INTERFACE:
+!
       function undens(t,s,p0)
+!EOP
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 !     ====================
 !     this function calculates the density of seawater using the
 !     standard equation of state recommended by unesco(1981).

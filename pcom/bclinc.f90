@@ -1,10 +1,20 @@
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+!
+!BOP
+!
+! !MODULE: bclinc.f90
+! !DESCRIPTION: \input{sections/code-bclinc}
+!
+! !INTERFACE:
 !
 !     =================
       subroutine bclinc(pmup,pmum,phib,spbt,pbt,rhodp,rho,rdxt,rdy,ump,vmp,upb,    &
                         vpb,up,vp,du,dv,epla,eplb,epea,epeb,ff,umask,ivn,z,dz,rzu, &
                         onbb,leapfrog_c,dtuv,c2dtuv,afc1,afc2,cosu,imt,jmt,km,imm, &
-                        jmm,west,east,north,south,asselin_c,boussinesq,itn,energydiag)
+                        jmm,west,east,north,south,asselin_c,itn)
 !     =================
+!EOP
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 !
 !     compute up & vp at tau+1 time level
 !
@@ -12,7 +22,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,i,j,k,asselin_c,boussinesq,energydiag
+      integer imt,jmt,km,imm,jmm,i,j,k,asselin_c
       integer ivn(imt,jmt),itn(imt,jmt)
       logical leapfrog_c
       real t1,t2
@@ -70,32 +80,6 @@
 !     calculate pressure gradients  * spbt
 !-----------------------------------------------------------------------
 !
-      if (boussinesq==1) then
-!
-!     a  = geopotential
-!     b  = pressure
-!     px = (rho)xbar*(a)x + (b)x
-!     py = (rho)ybar*(a)y + (b)y
-!
-      do k=1,km
-      do j=1,jmt
-      do i=1,imt
-      a(i,j) = phib(i,j)-pbar(i,j)*(z(k)+phib(i,j))
-      b(i,j) = pbar(i,j)*rhodp(i,j,k)
-      enddo
-      enddo
-      do j=2,jmm
-      do i=2,imm
-      px(i,j,k) = ( (rho(i,j,k)+rho(i+1,j,k))*p5*(a(i+1,j)-a(i,j)) + &
-                  (b(i+1,j)-b(i,j)) )*rdxt(j)
-      py(i,j,k) = ( (rho(i,j,k)+rho(i,j+1,k))*p5*(a(i,j+1)-a(i,j)) + &
-                  (b(i,j+1)-b(i,j)) )*rdy
-      enddo
-      enddo
-      end do
-      
-      else
-      
 !     a  = geopotential
 !     b  = pressure
 !     px = (a)x + (rho)xbar*(b)x
@@ -118,7 +102,6 @@
       enddo
       enddo
       end do
-      end if
       
       call swap_ns_real3d(px,imt,jmt,km,north,south)
       call swap_ew_real3d(py,imt,jmt,km,west,east)

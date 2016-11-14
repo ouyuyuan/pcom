@@ -103,7 +103,3 @@
       common /vprsg/ pdye(imt,jmt),pdyw(imt,jmt)
       common /vprsg/ phibx(imt,jmt),phiby(imt,jmt)
 !
-!#ifdef boussinesq
-      real           fixp
-      common /vprsg/ fixp(imt,jmt,km)
-!#endif

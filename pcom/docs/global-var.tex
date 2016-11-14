@@ -1,0 +1,287 @@
+% this file contain some of the global variables that defined in mod_arrays
+% this arrays are better comment with formulas, so I created this seperated file
+
+\section{Some Global Variables in the Code}
+
+\bd
+\ii{up} - $U$ in (\ref{eq:44})
+\ii{vp} - $V$ in (\ref{eq:44})
+\ii{pbt\_st} - Set to 1 in |inirun.f90|
+\ii{pt} - $\fp{\rho}{T}$, calc. at |density.f90| of |rho_ref| subroutine
+\ii{ps} - $\fp{\rho}{S}$
+\ii{secday} - $\f{1}{24*60*60}$, how many days in 1 second.
+\ii{deltap} - 1.0e-2
+\ii{deltat} - 1.0e-2
+\ii{deltas} - 1.0e-3
+\ii{rdeltap} - $\frac{1}{2\var{deltap}}$
+\ii{rdeltat} - $\frac{1}{2\var{deltat}}$
+\ii{rdeltas} - $\frac{1}{2\var{deltas}}$
+\ii{decibar} - change the unit of pressure from $dynes/cm^2$ to decibar
+1 dynes/cm**2 = 0.1 N/m**2 = 1.0e-3 mbar = 1.0e-5 decibar, so decibar = 1.0e-5
+\ii{gravr} - |grav|*|rho_0| = $g \rho_0$
+\ii{rho\_0} - reference density of the water, $1.029 g/cm^3$
+\ii{grav} - earth's gravitational acceleration, $980 cm/s^2$
+\ii{mat\_myid} - mat\_myid(ncpux+2, ncpuy), 243-251, main.f90. Say, ncpux=8, ncpuy=4, then
+\begin{verbatim}
+7      15      23      31
+
+0      8       16      24
+1      9       17      25
+2      10      18      26
+3      11      19      27
+4      12      20      28
+5      13      21      29
+6      14      22      30
+7      15      23      31
+
+0      8       16      24
+\end{verbatim}
+
+Note that the first and last row is for wrap up
+\ii{runtime} - calc. running time using MPI
+\ii{sa\_first} - ?
+\ii{t\_stepu} - ?
+\ii{ump} - set to 0 in the initial step
+\ii{vmp} - set to 0 in the initial step
+\ii{umm} - set to 0 in the initial step
+\ii{vmm} - set to 0 in the initial step
+\ii{tau} - 1, stand for previous time step
+\ii{taum} - 2
+\ii{pmup} - set to pbt(:,:,1) at initial step
+\ii{pmum} -  set to pbt(:,:,1) at initial step
+\ii{pmtp} - set to pbt(:,:,1) at initial step
+\ii{pmtm} -  set to pbt(:,:,1) at initial step
+\ii{spbt} - $\spbt$ in (\ref{eq:44}), |(imt,jmt)|, set to 1.0 in initial step
+\ii{pbt} - normalized pressure in middle of each layer, set to 1 initial state, the
+last dim. is for time integration.
+\be
+\var{pbt(t)} = \f{p(t) - p_a(t)}{\var{z(k)}}
+\ee
+where $p(t)$ is the pressure at the middle of the layer at $t$ time, $p_a(t)$ is
+atmosphere pressure, |z(k)| is the initial pressure at the middle of the layer
+(already minus initial atmospheric pressure). So |pbt| is 1 for every layers in
+the initial state, and fluctuate with time. And we have
+\be
+p(t) = \var{pbt(t)} \var{z(k)} + p_a(t)
+\ee
+\ii{rho} - initial density calculated from initial field, $g/cm^3$,
+    then set to reciprocal of density, 
+    may be should give a different name in future.
+\ii{t} - tracers(potential temperature, salinity), in two time steps. 5D, the
+  last 2 dimension is both 2. 
+  \bi
+  \item When read in the initial field, 
+  t(:,:,:,1,1) = t(:,:,:,1,2) store temperature,
+  t(:,:,:,2,1) = t(:,:,:,2,2) store salinity.
+  \ei
+\ii{area} - global sea area, for "T" grid
+   \be
+   area = \iint a^2 \cos\v \um{tmask(\l, \v)} d\l d\v
+   \ee
+\ii{acfl} - CFL criteria
+   \be
+   acfl(\jh) = \f{(a \cosfjh \dl)^2 + (a \df)^2}{8\d t_{ts}}
+   \ee
+   where $\d t_{ts}$ is time step for tracers.
+\ii{bcp} - boundary condition, forcing, surface pressure, $dyn/cm^2$
+\ii{bcf} - surface forcing fields, at ihjhk-grid
+\begin{verbatim}
+    !     bcf(i,j,12,1) :   sea surface zonal wind stress       (dynes/cm**2)
+    !     bcf(i,j,12,2) :   sea surface meridional wind stress  (dynes/cm**2)
+    !     bcf(i,j,12,3) :   sea surface air temperature       (Celsius)
+    !     bcf(i,j,12,4) :   sea surface air pressure           (dynes/cm**2)
+    !     bcf(i,j,12,5) :   sea surface salinity              (psu)
+    !     bcf(i,j,12,6) :   rate of evaporation minus precipitation (cm/s)
+    !     bcf(i,j,12,7) :   coefficient for calculation of Heat Flux (w/m2/c)
+    !     bcf(i,j,12,7) :   heat flux, positive is into ocean (w/m^2) (overwritten)
+\end{verbatim}
+\ii{bottom\_h} - sea bottom height relative to the deepest sea in the model, positive
+\ii{cost} - $\cos \varphi$, for "T" grid
+\ii{cosu} - $\cos \varphi$, for "U" grid
+\ii{cv1}  - metric term, for "U" grid
+   \be
+   cv1(\varphi) = \frac{1-\tan^2 \varphi}{a^2}
+   \ee
+\ii{cv2}  - for "U" grid
+   \be
+   cv2(\varphi) = \frac{\tan \varphi}{a^2 \cos\varphi d\lambda}
+   \ee
+\ii{ddd}
+   \be
+   ddd(\l,\v) = g \frac{H(\l,\v)}{C_p} 10^{-1}
+   \ee
+   where $g=980cm/s^2$, $H(\l,\v)$ is heat flux into the ocean, read from
+   forcing file(in $W/m^2$), and $C_p$ is specific heat capacity of sea water, 
+   $3901 J/kg/K$, $10^{-1}$ is unit change ( change $H$ to $W/cm^2$ and
+   $C_p$ to $J/g/K$)
+\ii{dxdyt} - for "T" grid
+   \be
+   dxdyt(\varphi) = a^2 \cos\varphi d\lambda d\varphi 
+   \ee
+\ii{dxdyu} - analogous to \textbf{dxdyt}, but for "U" grid
+\ii{dz} - pressure of increment for each layer, positive, k-grid.
+\ii{dz0} - thickness of each layer, k-grid
+
+\ii{ebea}
+   \be
+   \idjh{ebea} = \frac{1}{1+(\Omega \sinfjh \dtb)^2}
+   \ee
+\ii{ebeb}
+   \be
+   \idjh{ebeb} = \frac{\Omega \sinfjh \dtb}{1+(\Omega \sinfjh \dtb)^2}
+   \ee
+\ii{ebla}
+   \be
+   \idjh{ebla} = \frac{1}{1+(2\Omega \sinfjh \dtb)^2}
+   \ee
+\ii{eblb}
+   \be
+   \idjh{eplb} = \frac{2\Omega \sinfjh \dtb}{1+(2\Omega \sinfjh \dtb)^2}
+   \ee
+\ii{epea} - parameter used for semi-implicitly handle of Coriolis term, 
+   at jh-grid. And epeb, ..., eblb are all at jh-grid.
+   \be
+   \idjh{epea} = \frac{1}{1+(\Omega \sinfjh \dtc)^2}
+   \ee
+\ii{epeb}
+   \be
+   \idjh{epeb} = \frac{\Omega \sinfjh \dtc}{1+(\Omega \sinfjh \dtc)^2}
+   \ee
+\ii{epla}
+   \be
+   \idjh{epla} = \frac{1}{1+(2\Omega \sinfjh \dtc)^2}
+   \ee
+\ii{eplb}
+   \be
+   \idjh{eplb} = \frac{2\Omega \sinfjh \dtc}{1+(2\Omega \sinfjh \dtc)^2}
+   \ee
+\ii{ff} - Coriolis term, at jh-grid
+   \be
+   \idjh{ff} = 2 \Omega \sin \varphi
+   \ee
+\ii{h} - depth of the sea bottom on ijk cell, positive, in "cm"
+\ii{itn} - get number of layers for each ijk grid
+\ii{lat} - latitude, jh-grid
+   \be
+     \idjh{lat} = \text{read in from NetCDF file}
+   \ee
+\ii{lon} - longitude, j-grid
+   \be
+     \idi{lon} = \text{read in from NetCDF file}
+   \ee
+\ii{phib} - $\phi_b$, geopotential height at sea bottom, for "T" grid
+   \be
+   \idij{phib} = - g h
+   \ee
+   where $h$ is the depth of the sea bottom, positive, in $cm$, and $h=0$ at
+   land.
+\ii{phibx} - ihjh-grid
+   \be
+   \idihjh{phibx} = 2\avgjh{\fdppx{\var{phib}}}
+   \ee
+\ii{phiby} - ihjh-grid
+   \be
+   \idihjh{phiby} = 2\avgih{\fdppy{\var{phib}}}
+   \ee
+   \ii{pn} - sea bottom pressure, $\pbt$ in Eq.\ref{eq:def-sig}, in $dyne/cm^2$,
+   for "T" grid
+   \be
+   \idij{pn} = \rho g h
+   \ee
+   |pn| set to 1 in land, $h$ is the sea bottom depth, positive.
+   Notice that the above formula has excluded the atmospheric pressure
+   already.
+\ii{pre} - initial pressure at the bottom of each layer, units: $dyn/cm^2$,
+   positive, ijkh-grid
+   \be
+     \idkh{pzb} = \rho g z, \,\,k=1,2,..km,km+1
+   \ee
+     0 on sea surface (when k=1)
+\ii{r1a}
+  \bese
+   \begin{align}
+   r1a(j) &= \rdys \cdot \f{\cosfjh}{\cosfj} \quad \text{for (j>1)},\\
+   r1a(1) &=r1a(2)
+   \end{align}
+   \ense
+\ii{r1b}
+  \bese
+   \begin{align}
+   r1b(j) &= \rdys \cdot \f{\cosfjhm}{\cosfj} \quad \text{for (j>1)},\\
+   r1b(1) &=r1a(2)
+   \end{align}
+   \ense
+\ii{r1c}
+  \bese
+   \begin{align}
+   r1c(\jh) &= \f{1}{2} \cdot \rdys \cdot \f{\cosfjp}{\cosfjh} \quad 
+   \text{(for j<M)}\\
+   r1c(M+\fh) &= r1c(M-1+\fh)
+   \end{align}
+ \ense
+   
+\ii{r1d}
+  \bese
+   \begin{align}
+   r1d(\jh) &= \f{1}{2} \cdot \rdys \cdot \f{\cosfj}{\cosfjh} \quad 
+   \text{(for j<M)}\\
+   r1d(M+\fh) &= r1c(M-1+\fh)
+   \end{align}
+ \ense
+\ii{rdx} 
+ \be
+ rdx(\lambda) = \frac{1}{a \dl}
+ \ee
+\ii{rdxt} - in Eq.\ref{eq:33} of
+  \be
+  \idj{rdxt} = \racosfjdl
+  \ee
+\ii{rdxu} - in Eq.\ref{eq:39} of
+  \be
+  \idjh{rdxu} = \racosfjhdl
+  \ee
+\ii{rdy} 
+ \be
+ \idj{rdy} = \frac{1}{\adf}
+ \ee
+ \ii{rdyt} - in Eq.\ref{eq:33} of
+   \be
+   \idj{rdyt} = \racosfjdf
+   \ee
+\ii{rdyu} - in Eq.\ref{eq:40} of
+   \be
+   \idjh{rdyu} = \racosfjhdf
+   \ee
+\ii{rdz} - $\f{1}{\var{dz}}$
+\ii{rdzw} - 1/(distance of the neighbor middle layers), and |w(km)| = |w(km-1)|
+\ii{rzu} - $\f{1}{\var{zu}}$
+\ii{sdxt} - in Eq.\ref{eq:41} of
+   \be
+   \idj{sdxt} = \sracosfjdl
+   \ee
+\ii{sdxu} - in Eq.\ref{eq:42} of
+   \be
+   \idjh{sdxu} = \frac{1}{2\sacosfjhdl}
+   \ee
+\ii{tmask} 
+ \be
+ tmask(\lambda, \varphi) = 
+ \begin{cases}
+ 1 &, \text{if "T" grid is water}\\
+ 0 &, \text{if "T" grid is land}
+ \end{cases}
+ \ee
+\ii{umask} - analogous to \textbf{tmask}, but for "U" grid
+\ii{z} - pressure at the middle of each layer, $dyn/cm^2$, positive, k-grid
+   \be
+     \idk{z} = \rho g z_0
+   \ee
+   where $z_0$ is the depth of the middle layer. 
+\ii{z0} - depth of the middle of each layer, in 'cm'
+   \be
+     z0(\eta) = \text{read in from NetCDF file}
+   \ee
+\ii{zb} - depth of the bottom of each layer, determined by \textbf{z0}
+\ii{zu} - similar to |pn|, but at U grid
+
+\ed

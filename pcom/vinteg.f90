@@ -1,5 +1,13 @@
 !     ==========================
+!BOP
+!
+! !MODULE: vinteg
+! !DESCRIPTION: \input{sections/code-vinteg}
+!
+! !INTERFACE:
+!
       subroutine vinteg(wk3,wk2,ivn,dz,rzu,imt,jmt,km)
+!EOP
 !     ==========================
 !     calculate vertical integration at "u" grid
 !
@@ -29,7 +37,16 @@
 !
 !
 !     ==============================
+!BOP
+!
+! !IROUTINE: vinteg_ns
+! !DESCRIPTION: \input{sections/code-vinteg_ns}
+!
+! !INTERFACE:
+!
       subroutine vinteg_ns(wk,an,as,ivn,dz,rzu,imt,jmt,km,imm,jmm)
+!EOP
+!-------------------------------------------------------------------------------
 !     ==============================
 !     calculate vertical integration at "u" grid
 !

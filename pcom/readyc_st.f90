@@ -1,10 +1,19 @@
 !
 !     =================
+!BOP
+!
+! !MODULE: readyc_st.f90
+! !DESCRIPTION: \input{sections/code-readyc_st}
+!
+! !INTERFACE:
+!
       subroutine readyc_st(umask,tmask,ivn,pbt_st,du,dv,adv_u,adv_v,dub,  &
                     dvb,up,vp,cosu,rdxt,rdxu,rdyu,rdyt,sdxu,r1c,r1d,cv1,cv2,dz,  &
                     rdz,rdzw,rzu,pn,w,pax,pay,diffu,diffv,am,kappa_m,gravr,cdbot,  &
                     bcu,bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,  &
-                    south,snbc,emp,t_stepu,energydiag,dke_bcf,dke_fri)
+                    south,snbc,emp,t_stepu,dke_bcf,dke_fri)
+!EOP
+!-------------------------------------------------------------------------------
                         
 !     =================
 !     momentum advections, viscosities & atmpospheric pressure terms
@@ -13,7 +22,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,kmp1,i,j,k,snbc,energydiag
+      integer imt,jmt,km,imm,jmm,kmp1,i,j,k,snbc
       real am(imt,jmt,km),kappa_m(imt,jmt,km),cdbot,gravr
       real ubar,vbar,abc,uvmag,t1,t2,t3
       real a(imt,jmt),b(imt,jmt),c(imt,jmt)
@@ -184,6 +193,7 @@
         enddo
       endif
 !
+      bookmark
       do j=2,jmm
       do i=2,imm
       if(k.ge.ivn(i,j))then
@@ -305,18 +315,6 @@
 !     NOTE: u(i,j) & v(i,j) = u&v at bottom (k=ivn(i,j))
 !---------------------------------------------------------------------
 !
-      if (energydiag==1) then
-      do j=2,jmm
-         do i=2,imm
-            k=1
-            if (umask(i,j,k)==1) then
-               dke_bcf(i,j,1)=rdz(k)*bcu(i,j)*gravr/spbt(i,j)*rrho_0
-               dke_bcf(i,j,2)=rdz(k)*bcv(i,j)*gravr/spbt(i,j)*rrho_0
-            end if
-         end do
-      end do
-      end if
-!
 !---------------------------------------------------------------------
 !     calculate vertical viscosities in tau time level
 !---------------------------------------------------------------------
@@ -397,23 +395,6 @@
 !
 200   continue
 
-      if (energydiag==1) then
-      do j=2,jmm
-         do i=2,imm
-            do k=2,ivn(i,j)
-               dke_fri(i,j,k,1)=diffu(i,j,k)
-               dke_fri(i,j,k,2)=diffv(i,j,k)
-            end do
-            k=1
-            if (umask(i,j,k)==1) then
-               dke_fri(i,j,k,1)=diffu(i,j,k)-dke_bcf(i,j,1)
-               dke_fri(i,j,k,2)=diffv(i,j,k)-dke_bcf(i,j,2)
-            end if
-         end do
-      end do
-      end if
-
-!
 !-----------------------------------------------------------------------
 !     vertical integration of du&dv
 !-----------------------------------------------------------------------

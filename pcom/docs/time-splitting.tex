@@ -1,0 +1,156 @@
+
+\section{Time Splitting Integration Method}
+
+Since the model includes an explicit free surface, we therefore choose
+to solve the full equations by means of a time-splitting integration
+method (Zeng) to overcome the time step limit imposed by the gravity
+wave processes. In other words, we may use a short time step to integrate
+the geostrophic adjustment processes (mode-\mbox{I}) which involves
+inertia external gravity wave, while apply a longer time step to the
+quasi-geostrophic process (mode-\mbox{II}) which involves advection
+and dissipation. Furthermore, a more longer time step is used to solve
+the thermodynamic processes (mode-\mbox{III}).
+
+(1) Mode-\mbox{I}: geostrophic adjustment process. It allows for the
+momentum derivative associated with the pressure gradient and Coriolis
+forces, as well as the surface pressure derivative associated with
+the convergence or divergence of the mass flux, while the potential
+temperature and the salinity are unchanged. 
+
+Assume there is no water flux during the fast adjustment process, according to
+(\ref{eq:33}), the prediction equation for surface pressure of \modo is
+\begin{equation}
+  \tnbpo{\pbt} = \tnbmof{\pbt} + 2\dtb \tnb{ -\racosfj \grp{\fdppi{\avgj{PU_B}} +
+  \uol{PV_B\cosf}{i}{j}} }
+\end{equation}
+
+Neglect the advective terms $\mm(\mu)$ and the viscous terms $\md$ in the
+horizontal momentum equations (\ref{eq:34}), we get the prediction equations for
+horizontal velocity in \modo
+\bese
+\begin{align}
+  \tnbpo{U} &= \tnbmof{U} + 2\dtb \grppp{ f^{*}\tavgnb{V} -\tnb{\f{P}{a\cosfjh} \grp{
+  \ajpi{\phi} + \avgij{\ga}\ajpi{P} } }},\\
+  \tnbpo{V} &= \tnbmof{V} + 2\dtb \grppp{ -f^{*}\tavgnb{U} -\tnb{\f{P}{a} \grp{
+  \aipj{\phi} + \avgij{\ga}\aipj{P} } }},
+\end{align}
+\ense
+where the superscript $n_{b}$ denotes the $n$-th time level of mode-\mbox{I};
+$\gD t_{b}$ is the time step; the bar symbol represents temporal
+filter \citep{Asselin1972} which would be used to remove the computational
+mode associated with the standard leapfrog scheme.
+Here a semi-implicit scheme is adopted to deal with the Coriolis terms.
+
+From the definition of $\gs$ in (\ref{eq:def-sig}), we get the diagnostic equation
+for pressure
+\begin{equation}
+[p]^{n_{b}}=\gs[p_{bt}]^{n_{b}}+[p_{t}]^{n_{t}},
+\end{equation}
+ where $n_{t}$ represents the current time levels of mode-\mbox{III}.
+
+Since the calculation of the density is prohibitively expensive, on
+the other hand, both the potential temperature and salinity are actually
+held unchanged during the integration of mode-\mbox{I}, therefore,
+instead of using the standard density formula, here the density is
+taken the one calculated in $n_{t}$ time level by adding a perturbation
+term due to change of the pressure. Thus the diagnostic equation of density is
+\begin{equation}
+[\rho]^{n_{b}}=[\rho(T,S,p)]^{n_{t}}+\left[\frac{\partial\rho}{\partial p}\right]^{n_{t}}([p]^{n_{b}}-[p]^{n_{t}})
+\end{equation}
+
+From (\ref{eq:18}), we have the diagnostic equation for geopotential height
+\begin{equation}
+[\phi]^{n_{b}}=gz_{b}+\int_{_{\gs}}^{1}\left[\frac{p_{bt}}{\rho}\right]^{n_{b}}d\gs
+\end{equation}
+
+(2) mode-\mbox{II}: advection and dissipation process. 
+Only account the advective terms $\mm(\mu)$ and the viscous terms $\md$ in the
+horizontal momentum equations (\ref{eq:34}), we get the prediction equations for
+horizontal velocity in \modt
+\bese \label{eq:43}
+\begin{align}
+  [U]^{n_{c}+1} &=U'+2\gD t_{c}\left([-\mm(U)]^{n_{c}}+P[\mdu]^{n_{c}-1}\right)\\
+  [V]^{n_{c}+1} &=V'+2\gD t_{c}\left([-\mm(V)]^{n_{c}}+P[\mdv]^{n_{c}-1}\right)
+\end{align}
+\ense
+where the superscript $n_{t}$ denotes the $n$-th time level of \modt;
+$\gD t_{c}$ is the time step; $U'$ and $V'$ are the intermediate results of
+$U$ and $V$ produced by integration of \modo at $(n_{c}+1)\gD t_{c}$ time levels.
+The velocities used in the advection and dissipation operator are given by
+\bese \label{eq:44}
+\begin{align}
+  [u]^{n_{c}} &=\left[\frac{U}{\sqrt{p_{bt}}}\right]^{n_{c}}\\
+  [v]^{n_{c}} &=\left[\frac{V}{\sqrt{p_{bt}}}\right]^{n_{c}}
+\end{align}
+\ense
+
+The diagnostic equation for vertical velocity is
+(see appendix \ref{der:sig-w} for derivation)
+\begin{equation}
+[\pbt\dgs]^{n_{c}} = \racosf\int_{0}^{\gs} 
+\left\{ \ppl\grpp{{\sqrt{p_{bt}}(U_{b}-U)}} + 
+\ppf\grpp{\sqrt{p_{bt}}(V_{b}-V)\cosf}\right\}^{n_{c}}d\gs 
+- (1-\gs)\rho_{0}gF_{E-P}
+\end{equation}
+
+ In addition, the Asselin temporal filter is applied to both $U$
+and $V$ at $n_{c}\gD t_{c}$ time levels, i.e., 
+\begin{equation}
+[\mu]^{n_{c}}=\alpha_{t}[\mu]^{n_{c}}+(1-\alpha_{t})\left([\mu]^{n_{c}+1}+[\mu]^{n_{c}-1}\right)
+\end{equation}
+ where $\mu$ represents $U$ and $V$ , $\alpha_{t}$ is the temporal
+filter coefficient.
+
+The integrations of mode-\mbox{I} and mode-\mbox{II} are synchronous.
+For example, when mode-\mbox{II} is integrated from $(n_{c}-1)\gD t_{c}$
+time levels to $(n_{c}+1)\gD t_{c}$ time levels on a normal
+leapfrog time step, mode-\mbox{I} will be therefore integrated $2\gD t_{c}/\gD t_{b}$
+steps, of which the Euler backward scheme is applied to the first
+time step and the leapfrog scheme applied to the rest.
+
+(3)mode-\mbox{III}: thermodynamic process. The prediction equations
+for the potential temperature and salinity may be written as
+\bese
+\begin{align}
+  [p_{bt}T]^{n_{t}+1}&=[p_{bt}T]^{n_{t}-1}+2\gD
+  t_{t}\left(-[\gn\cdot(\pbt T)]^{n_{t}}+[p_{bt}\mqt]^{n_{t}-1}\right)\\
+  [p_{bt}S]^{n_{t}+1}&=[p_{bt}S]^{n_{t}-1}+2\gD
+  t_{t}\left(-[\gn\cdot(\pbt S)]^{n_{t}}+[p_{bt}\mqs]^{n_{t}-1}\right)
+\end{align}
+\ense
+ where $\gD t_{t}$ represents the time step for tracers. The
+integrations of mode-\mbox{III} may be asynchronous with mode-\mbox{II}
+if accelerated time steps are applied (Bryan, 1984).
+
+Note that the prognostic variables of mode-\mbox{III} are $p_{bt}T$
+and $p_{bt}S$ rather than $T$ and $S$ themselves. Correspondingly,
+the advection terms in tracers equations are taken the flux form so
+it is easy to keep the total tracers conserved.
+
+The horizontal advection velocities for tracers may take the time
+averaged velocities of mode-\mbox{I}, which can satisfy the continuity
+equation (\ref{eq:8})
+\begin{equation}
+-2\gD t_{c}[\divpv]^{n_{t}}=[p_{bt}]^{n_{t}+1}-[p_{bt}]^{n_{t}-1}
+\end{equation}
+
+ In fact, if we set tracers be constant and discard the mixing terms,
+the tracers equation will be just the continuity equation.
+
+If the accelerated time steps are applied to the integration of tracers
+equations, however, it will introduce a minor computational error
+because $\gD t_{t}\neq\gD t_{c}$ thereby the continuity
+equation (\ref{eq:8}) is no longer satisfied.
+
+$T$ and $S$ may be calculated by 
+\bese
+\begin{align}
+  [T]^{n_{t}+1} &=\frac{[p_{bt}T]^{n_{t}+1}}{[p_{bt}]^{n_{t}+1}}\\
+  [S]^{n_{t}+1} &=\frac{[p_{bt}S]^{n_{t}+1}}{[p_{bt}]^{n_{t}+1}}
+\end{align}
+\ense
+ And the density will be calculated according to the updated potential
+temperature, salinity, as well as the pressure
+\begin{equation}
+[\rho]^{n_{t}+1}=\rho\left([T]^{n_{t}+1},[S]^{n_{t}+1},[p]^{n_{t}+1}\right)
+\end{equation}

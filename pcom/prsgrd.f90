@@ -1,8 +1,17 @@
 !
 !     =================
+!BOP
+!
+! !MODULE: prsgrd.f90
+! !DESCRIPTION: \input{sections/code-prsgrd}
+!
+! !INTERFACE:
+!
       subroutine prsgrd(bcp,rdxt,rdy,pax,pay,itn,ivn,rho,rhodp,z,dz,rzu,pbxn,pbxs,  &
                         pbye,pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,  &
-                        km,imm,jmm,kmp1,west,east,north,south,boussinesq)
+                        km,imm,jmm,kmp1,west,east,north,south)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !
 !     pressure gradient terms
@@ -29,7 +38,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,kmp1,i,j,k,boussinesq
+      integer imt,jmt,km,imm,jmm,kmp1,i,j,k
       real wka(imt,jmt),wkb(imt,jmt),wkc(imt,jmt),wk3(imt,jmt,km)
 !
       real wkz(kmp1)
@@ -76,19 +85,6 @@
 !     PCOM: rhodp(i,j,k) = int(1/density) from z to pn at T grids
 !     BCOM: rhodp(i,j,k) = int(density)   from 0 to z  at T grids
 !-----------------------------------------------------------------------
-      if (boussinesq==1) then
-      do j=2,jmm
-      do i=2,imm
-        wkz(1)   = c0
-        do k=1,itn(i,j)
-        wkz(k+1) = wkz(k) + rho(i,j,k)*dz(k)
-        enddo
-        do k=1,itn(i,j)
-        rhodp(i,j,k) = (wkz(k+1)+wkz(k))*p5
-        enddo
-      enddo
-      enddo
-      else
       do j=2,jmm
       do i=2,imm
         wkz(1)   = c0
@@ -100,7 +96,6 @@
         enddo
       enddo
       enddo
-      end if
 !
 !      do k=1,km
 !      do j=2,jmm
@@ -114,16 +109,6 @@
 !-----------------------------------------------------------------------
 !     (rhodp)xbar & (rho)xbar*z at (i+1/2,j,k)
 !-----------------------------------------------------------------------
-      if (boussinesq==1) then
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      wk3(i,j,k) = (rhodp(i+1,j,k)+rhodp(i,j,k))*p5 &
-                 - (rho(i,j,k)+rho(i+1,j,k))*p5*z(k)
-      enddo
-      enddo
-      enddo
-      else
       do k=1,km
       do j=2,jmm
       do i=2,imm
@@ -132,7 +117,6 @@
       enddo
       enddo
       enddo
-      end if
       call vinteg_ns(wk3,pbxn,pbxs,ivn,dz,rzu,imt,jmt,km,imm,jmm)
 !
 !-----------------------------------------------------------------------
@@ -150,16 +134,6 @@
 !-----------------------------------------------------------------------
 !     (rhodp)ybar & (rho)ybar at (i,j+1/2,k)
 !-----------------------------------------------------------------------
-      if (boussinesq==1) then
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      wk3(i,j,k) = (rhodp(i,j+1,k)+rhodp(i,j,k))*p5  &
-                 - (rho(i,j,k)+rho(i,j+1,k))*p5*z(k)
-      enddo
-      enddo
-      enddo
-      else
       do k=1,km
       do j=2,jmm
       do i=2,imm
@@ -168,7 +142,6 @@
       enddo
       enddo
       enddo
-      end if
       call vinteg_ew(wk3,pbye,pbyw,ivn,dz,rzu,imt,jmt,km,imm,jmm)
 !
 !-----------------------------------------------------------------------
@@ -185,26 +158,6 @@
 !
 !
 !
-      if (boussinesq==1) then
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      wk3(i,j,k) = (rho(i,j,k)+rho(i+1,j,k))*p5
-      enddo
-      enddo
-      enddo
-      call vinteg_ns(wk3,pdxn,pdxs,ivn,dz,rzu,imt,jmt,km,imm,jmm)
-!
-      do k=1,km
-      do j=2,jmm
-      do i=2,imm
-      wk3(i,j,k) = (rho(i,j,k)+rho(i,j+1,k))*p5
-      enddo
-      enddo
-      enddo
-      call vinteg_ew(wk3,pdye,pdyw,ivn,dz,rzu,imt,jmt,km,imm,jmm)
-      end if
-      
       
       do j=2,jmm
       do i=2,imm

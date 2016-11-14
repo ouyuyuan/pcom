@@ -1,7 +1,16 @@
 !
 !     =================
+!BOP
+!
+! !MODULE: interp.f90
+! !DESCRIPTION: \input{sections/code-interp}
+!
+! !INTERFACE:
+!
       subroutine interp(day,daymd,daypm,mth,bcf,bcu,bcv,bct,bcp,bcs,emp,ddd,imt,jmt,  &
                         simt,sjmt,myid,ncpux,ncpuy,mat_myid,monloop,yearloop,monlong)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !
 !     interpolates monthly mean forcing fileds

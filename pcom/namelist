@@ -9,7 +9,6 @@
  restrt=.true.,
  snbc=1,
  tnbc=0,
- gm90=1,
  implicitvmix=1,
  asselin_b=1,
  asselin_c=1,
@@ -20,8 +19,6 @@
  smth_start_nlat=70.0,
  smth_start_slat=-70.0,
  fcof=0.25,
- unesco=1,
- boussinesq=0,
  monloop=0,
  yearloop=0,
  monlong=1,
@@ -63,7 +60,6 @@
 
  &io
  uvtshdiag=1,
- energydiag=1,
  io_month=1,
  io_time=0,
  restr_mon=120,

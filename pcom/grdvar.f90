@@ -1,11 +1,20 @@
 !
 !     =================
+!BOP
+!
+! !MODULE: grdvar.f90
+! !DESCRIPTION: \input{sections/code-grdvar}
+!
+! !INTERFACE:
+!
       subroutine grdvar(z,z0,dz0,pn,itn,ivn,tmask,umask,phib,dz,rdz,rdzw,zu,rzu,   &
                         jstn,jedn,jeds,jsts,lat,lon,cost,cosu,ff,rdxt,rdxu,rdyt,rdyu,  &
                         sdxt,sdxu,r1a,r1b,r1c,r1d,cv1,cv2,dxdyt,dxdyu,area,rdy,    &
-                        decibar,imt,jmt,km,dlam,dphi,imm,jmm,kmp1,kmm1,unesco, &
+                        decibar,imt,jmt,km,dlam,dphi,imm,jmm,kmp1,kmm1, &
                         myid,ncpux,ncpuy,west,east,north,south,mat_myid,simt,sjmt,  &
-                        smth_start_nlat,smth_start_slat,boussinesq,bottom_h,acfl,dtts)
+                        smth_start_nlat,smth_start_slat,bottom_h,acfl,dtts)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !
 !     set resolution, t/u mask and the j,k-depended parameters
@@ -14,7 +23,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,kmp1,kmm1,i,j,k,n,m,unesco,boussinesq
+      integer imt,jmt,km,imm,jmm,kmp1,kmm1,i,j,k,n,m
       real dlam,dphi,dtts
       real rdx,rdy,t1,area,decibar,smth_start_nlat,smth_start_slat
       real lat(jmt),cost(jmt),cosu(jmt),ff(jmt),lon(imt)
@@ -130,7 +139,7 @@
 !     z  = eta at the center of T grids
 !     dz = thinkness of T grids
 !      
-      call setpn(dz0,z0,dz,z,pn,imt,jmt,km,kmp1,itn,decibar,unesco,boussinesq,   &
+      call setpn(dz0,z0,dz,z,pn,imt,jmt,km,kmp1,itn,decibar,   &
                  phib,myid,ncpux,ncpuy,mat_myid,west,east,north,south)
 !
 	  bottom_h=c0

@@ -1,10 +1,20 @@
 !
+!
 !     =================
+!BOP
+!
+! !MODULE: readyt.f90
+! !DESCRIPTION: \input{sections/code-readyt}
+!
+! !INTERFACE:
+!
       subroutine readyt(tmask,z,dz,rzu,t,pbt,spbt,pmtm,pmtp,bcp,rho,rhodp,umm,vmm,   &
                         ump,vmp,up,vp,cosu,rdxt,rdy,pax,pay,itn,ivn,pbxn,pbxs,pbye,  &
                         pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,km,nt,  &
-                        imm,jmm,kmp1,decibar,west,east,north,south,unesco,boussinesq, &
-                        fixp,energydiag)
+                        imm,jmm,kmp1,decibar,west,east,north,south, &
+                        fixp)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !     calculate the variables depended on stratification
 !
@@ -12,7 +22,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,unesco,boussinesq,energydiag
+      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k
       integer itn(imt,jmt),ivn(imt,jmt)
       real a,t1,t2,t3,rdens,decibar
       real tmask(imt,jmt,km)
@@ -37,7 +47,7 @@
 !     calculate density/rho_0 (BCOM) or 1/density (PCOM)
 !-----------------------------------------------------------------------
       call density(tmask,z,t,pbt,bcp,rho,decibar,imt,jmt,km,nt,imm,jmm,fixp,  &
-                   west,east,north,south,unesco,boussinesq)
+                   west,east,north,south)
 !
 !
 !-----------------------------------------------------------------------
@@ -76,7 +86,7 @@
 !-----------------------------------------------------------------------
       call prsgrd(bcp,rdxt,rdy,pax,pay,itn,ivn,rho,rhodp,z,dz,rzu,pbxn,pbxs, &
                   pbye,pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,  &
-                  km,imm,jmm,kmp1,west,east,north,south,boussinesq)
+                  km,imm,jmm,kmp1,west,east,north,south)
 !
 !
       return

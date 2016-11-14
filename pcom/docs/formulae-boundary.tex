@@ -1,0 +1,41 @@
+
+\subsection{The Boundary Conditions}
+
+At all side walls and bottom, the velocity is zero and there is no
+heat and salt flux cross bottom and lateral boundary. At the free
+surface ($\gs=0$), the kinematic boundary conditions are
+\begin{align} \label{eq:27}
+  \pbt\dgs &= -\rho_{0}gF_{E-P},\\
+  \rsgp A_{v}\pups &= -\tau_{\gl},\\
+  \rsgp A_{v}\pvps &= -\tau_{\gf},
+\end{align}
+ where $F_{E-P}$ is the rate of evaporation minus precipitation;
+$\rho_{0}$ is the density of fresh water; $\tau_{\lambda}$ and $\tau_{\gf}$
+represent the zonal and meridional component wind stress, respectively.
+Note that the river runoff may be taken into account by combined with
+evaporation minus precipitation.
+
+The turbulent mixing for temperature at sea surface is 
+\begin{equation}
+  \rsgp \gk_{v} \fp{T}{\gs} = -\frac{F_{h}}{C_{p}},
+\end{equation}
+where $F_{h}$ is the air-sea heat flux, $C_{p}$ is the heat capacity
+of sea water.
+
+The restoring boundary condition may be written as
+\begin{equation}
+\rsgp \gk_{v} \fp{S}{\gs} = -\f{\pbt\gd\gs_{1}}{g\tau_{s}}(S^{*}-S_{1}),
+\end{equation}
+ where $\tau_{s}$ is the restoring time scale, $\delta\gs_{1}$
+is the upper layer resolution in the pressure-$\gs$ coordinates,
+$S^{*}$ is the observed sea surface salinity, and $S_{1}$ is the
+salinity in the upper layer.
+
+The natural boundary condition \citep{Huang1993} is
+\begin{equation}
+\rsgp\fp{S}{\gs}=-S_{1}\rho_{0}F_{E-P}.
+\end{equation}
+ Note the turbulent salt flux at the sea surface exactly balances
+the vertical advection flux induced by the imbalance of evaporation
+minus precipitation, so that the total salt flux cross the air-sea
+interface is zero.

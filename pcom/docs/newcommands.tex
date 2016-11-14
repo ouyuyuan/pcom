@@ -1,0 +1,309 @@
+
+\def\fh{\frac{1}{2}}
+\def\mAi{\mathtt{Ai}}
+\def\mAj{\mathtt{Aj}}
+\def\mDi{\mathtt{Di}}
+\def\mDj{\mathtt{Dj}}
+\def\mAih{\mathtt{Aih}}
+\def\mAjh{\mathtt{Ajh}}
+\def\mPih{\mathtt{Pih}}
+\def\mPjh{\mathtt{Pjh}}
+\def\op{\overline}
+\def\l{\lambda}
+\def\v{\varphi}
+\def\d{\Delta}
+\def\jh{j+\frac{1}{2}}
+\def\jhm{j-\frac{1}{2}}
+\def\dl{\Delta \lambda}
+\def\df{\Delta \varphi}
+\def\dfs{\Delta^2 \varphi}
+\def\dtb{\Delta t_b}
+\def\dtc{\Delta t_c}
+\def\dtt{\Delta t_t}
+
+\def\rdys{\frac{1}{(a d\gf)^2}}
+
+\newcommand{\um}[1]{\underline{\mathbf{#1}}}
+\newcommand{\ii}[1]{\item[\verb|#1|]\index{#1}}
+\newcommand{\idjh}[1]{{\mathtt{#1}}_{j+\frac{1}{2}}}
+\newcommand{\idi}[1]{{\mathtt{#1}}_{i}}
+\newcommand{\idj}[1]{{\mathtt{#1}}_{j}}
+\newcommand{\idk}[1]{{\mathtt{#1}}_{k}}
+\newcommand{\idkh}[1]{{\mathtt{#1}}_{k+\frac{1}{2}}}
+\newcommand{\idij}[1]{{\mathtt{#1}}_{i,j}}
+\newcommand{\idijp}[1]{{\mathtt{#1}}_{i,j+1}}
+\newcommand{\idihjh}[1]{{\mathtt{#1}}_{i+\frac{1}{2},j+\frac{1}{2}}}
+\newcommand{\idipj}[1]{{\mathtt{#1}}_{i+1,j}}
+\newcommand{\idipjp}[1]{{\mathtt{#1}}_{i+1,j+p}}
+\newcommand{\fdppx}[1]{\widetilde{#1}^{i+\frac{1}{2}}}
+\newcommand{\fdppy}[1]{\widetilde{#1}^{j+\frac{1}{2}}}
+\newcommand{\var}[1]{\mathtt{#1}}
+\newcommand{\ft}[1]{{\tt{#1}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% vector symbols
+\newcommand{\vi}{\, \mathbf{i}}
+\newcommand{\vj}{\, \mathbf{j}}
+\newcommand{\vk}{\, \mathbf{k}}
+
+\newcommand{\vef}{\,\mathbf{e}_{\varphi}}
+\newcommand{\vel}{\,\mathbf{e}_{\lambda}}
+\newcommand{\ver}{\,\mathbf{e}_{r}}
+\newcommand{\ves}{\,\mathbf{e}_{\sigma}}
+
+\newcommand{\vr}{\mathbf{r}}
+\newcommand{\vv}{\mathbf{v}}
+\newcommand{\vV}{\mathbf{V}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Greek symbols
+\newcommand{\ga}{\alpha}
+\newcommand{\gd}{\delta}
+\newcommand{\gD}{\Delta}
+\newcommand{\gf}{\varphi}
+\newcommand{\gl}{\lambda}
+\newcommand{\gn}{\nabla}
+\newcommand{\gs}{\sigma}
+\newcommand{\gsk}{\sigma_k}
+\newcommand{\gskh}{\sigma_{k+\frac{1}{2}}}
+\newcommand{\gm}{\mu}
+\newcommand{\gk}{\kappa}
+\newcommand{\grrz}{\frac{1}{\rho_0}}
+\newcommand{\gkh}{\kappa_h}
+\newcommand{\gkm}{\kappa_m}
+\newcommand{\gkv}{\kappa_v}
+\newcommand{\ggt}{\gamma_t}
+\newcommand{\ggs}{\gamma_s}
+\newcommand{\rz}{\rho_0}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% short cuts with arguments
+\newcommand{\f}[2]{\frac{#1}{#2}}
+\newcommand{\fp}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\fd}[2]{\frac{d #1}{d #2}}
+\newcommand{\grp}[1]{\left(#1\right)}
+\newcommand{\grpp}[1]{\left[#1\right]}
+\newcommand{\grppp}[1]{\left\{#1\right\}}
+\newcommand{\cooz}[1]{\left(#1\right)_z}
+\newcommand{\coos}[1]{\left(#1\right)_\sigma}
+\newcommand{\ol}[2]{\overline{#1}^{#2}}
+%\newcommand{\ul}[2]{\underline{#1}_{#2}}
+\newcommand{\ul}[2]{\widetilde{#1}^{#2}}
+\newcommand{\uol}[3]{\widetilde{ \overline{#1}^{#2} }^{#3}}
+\newcommand{\ratijk}[1]{\left[#1\right]_{i,j,k}}
+\newcommand{\ratihjhk}[1]{\left[#1\right]_{i+\frac{1}{2},j+\frac{1}{2},k}}
+\newcommand{\atihjhk}[1]{\underbrace{#1}_{i+\frac{1}{2},j+\frac{1}{2},k}}
+\newcommand{\atihjhkh}[1]{\underbrace{#1}_{i+\frac{1}{2},j+\frac{1}{2},k+\frac{1}{2}}}
+\newcommand{\atijhk}[1]{\underbrace{#1}_{i,j+\frac{1}{2},k}}
+\newcommand{\atihjk}[1]{\underbrace{#1}_{i+\frac{1}{2},j,k}}
+\newcommand{\atijkh}[1]{\underbrace{#1}_{i,j,k+\frac{1}{2}}}
+\newcommand{\tnb}[1]{\left[#1\right]^{n_b}}
+\newcommand{\tavgnb}[1]{\frac{\left[#1\right]^{n_b+1}+\overline{\left[#1\right]}^{nb-1}}{2}}
+\newcommand{\tnbpo}[1]{\left[#1\right]^{n_b+1}}
+\newcommand{\tnbmof}[1]{\overline{\left[#1\right]}^{n_b-1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% difference
+\newcommand{\dudt}{\frac{du}{dt}}
+\newcommand{\pUpt}{\frac{\partial U}{\partial t}}
+\newcommand{\pVpt}{\frac{\partial V}{\partial t}}
+\newcommand{\dfdtz}{\left( \frac{dF}{dt} \right)_z}
+\newcommand{\dfdts}{\left( \frac{dF}{dt} \right)_\sigma}
+\newcommand{\dsdtz}{\left( \frac{d\sigma}{dt} \right)_z}
+\newcommand{\pfptz}{\left( \frac{\partial F}{\partial t} \right)_z}
+\newcommand{\pfplz}{\left( \frac{\partial F}{\partial \lambda} \right)_z}
+\newcommand{\pfpfz}{\left( \frac{\partial F}{\partial \varphi} \right)_z}
+\newcommand{\pfpts}{\left( \frac{\partial F}{\partial t} \right)_\sigma}
+\newcommand{\pfpls}{\left( \frac{\partial F}{\partial \lambda} \right)_\sigma}
+\newcommand{\pfpfs}{\left( \frac{\partial F}{\partial \varphi} \right)_\sigma}
+
+\newcommand{\pfpz}{\frac{\partial F}{\partial z}}
+\newcommand{\pspz}{\frac{\partial \sigma}{\partial z}}
+\newcommand{\pfps}{\frac{\partial F}{\partial \sigma}}
+\newcommand{\pupl}{\frac{\partial u}{\partial \lambda}}
+\newcommand{\pupf}{\frac{\partial u}{\partial \varphi}}
+\newcommand{\pups}{\frac{\partial u}{\partial \sigma}}
+\newcommand{\pvps}{\frac{\partial v}{\partial \sigma}}
+\newcommand{\pvpl}{\frac{\partial v}{\partial \lambda}}
+\newcommand{\ptps}{\frac{\partial T}{\partial \sigma}}
+\newcommand{\psps}{\frac{\partial S}{\partial \sigma}}
+\newcommand{\psptz}{\left( \frac{\partial \sigma}{\partial t} \right)_z}
+\newcommand{\psplz}{\left( \frac{\partial \sigma}{\partial \lambda} \right)_z}
+\newcommand{\pspfz}{\left( \frac{\partial \sigma}{\partial \varphi} \right)_z}
+
+\newcommand{\adl}{a\Delta\lambda}
+\newcommand{\adf}{a\Delta\varphi}
+\newcommand{\rdsk}{\frac{1}{\Delta\sigma_k}}
+\newcommand{\rdskh}{\frac{1}{\Delta\sigma_{k+\frac{1}{2}}}}
+\newcommand{\racosf}{\frac{1}{a\cos \varphi}}
+\newcommand{\racosfj}{\frac{1}{a\cos \varphi_j}}
+\newcommand{\racosfjdl}{\frac{1}{a\cos \varphi_j\Delta\lambda}}
+\newcommand{\sracosfjdl}{\frac{1}{a^2\cos^2 \varphi_j\Delta^2\lambda}}
+\newcommand{\sacosfjhdl}{a^2\cos^2 \varphi_{j+\frac{1}{2}}\Delta^2\lambda}
+\newcommand{\racosfjdf}{\frac{1}{a\cos \varphi_j\Delta\varphi}}
+\newcommand{\racosfjhdl}{\frac{1}{a\cos \varphi_{j+\frac{1}{2}}\Delta\lambda}}
+\newcommand{\racosfjhdf}{\frac{1}{a\cos \varphi_{j+\frac{1}{2}}\Delta\varphi}}
+\newcommand{\acosfjhdl}{a\cos \varphi_{j+\frac{1}{2}}\Delta\lambda}
+\newcommand{\acosfjhdf}{a\cos \varphi_{j+\frac{1}{2}}\Delta\varphi}
+\newcommand{\racosfjh}{\frac{1}{a\cos \varphi_{j+\frac{1}{2}}}}
+\newcommand{\pptz}{\left(\frac{\partial}{\partial t}\right)_z}
+\newcommand{\pspzb}{\left(\frac{\partial \sigma}{\partial z}\right)}
+\newcommand{\pplz}{\left(\frac{\partial}{\partial \lambda}\right)_z}
+\newcommand{\ppfz}{\left(\frac{\partial}{\partial \varphi}\right)_z}
+\newcommand{\pppt}{\frac{\partial p_{bt}}{\partial t}}
+\newcommand{\ppptz}{\left(\frac{\partial p_{bt}}{\partial t}\right)_z}
+\newcommand{\pppts}{\left(\frac{\partial p_{bt}}{\partial t}\right)_\sigma}
+\newcommand{\ppls}{\left(\frac{\partial}{\partial \lambda}\right)_\sigma}
+\newcommand{\ppfs}{\left(\frac{\partial}{\partial \varphi}\right)_\sigma}
+\newcommand{\ppps}{\frac{\partial p_{bt}}{\partial \sigma}}
+\newcommand{\ppz}{\frac{\partial}{\partial z}}
+\newcommand{\pps}{\frac{\partial}{\partial \sigma}}
+\newcommand{\ppl}{\frac{\partial}{\partial \lambda}}
+\newcommand{\ppf}{\frac{\partial}{\partial \varphi}}
+\newcommand{\prgapupps}{\frac{\partial}{\partial \sigma}\left(\frac{\rho^2
+g^2}{p_{bt}}\kappa_m\frac{\partial u}{\partial \sigma}\right)}
+\newcommand{\prgapvpps}{\frac{\partial}{\partial \sigma}\left(\frac{\rho^2
+g^2}{p_{bt}}\kappa_m\frac{\partial v}{\partial \sigma}\right)}
+\newcommand{\ppupl}{\frac{\partial (p_{bt}u)}{\partial \lambda}}
+\newcommand{\ppvcpf}{\frac{\partial (p_{bt}v\cos\varphi)}{\partial \varphi}}
+\newcommand{\ppsps}{\frac{\partial (p_{bt}\dot{\sigma})}{\partial \sigma}}
+\newcommand{\pupps}{\frac{\partial (up_{bt})}{\partial \sigma}}
+\newcommand{\pvpcps}{\frac{\partial (vp_{bt}\cos\varphi)}{\partial \sigma}}
+\newcommand{\pptpt}{\frac{\partial (p_{bt}T)}{\partial t}}
+\newcommand{\dptdt}{\frac{d(p_{bt}T)}{dt}}
+\newcommand{\ppspt}{\frac{\partial (p_{bt}S)}{\partial t}}
+\newcommand{\dtdts}{\left(\frac{dT}{dt}\right)_\sigma}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% finite difference
+\newcommand{\fdpupl}{\underline{\overline{u}^{i}}_{i}}
+\newcommand{\fdpvpl}{\underline{\overline{v}^{i}}_{i}}
+\newcommand{\fdpppl}{\underline{\overline{p}^{j}}_{i}}
+\newcommand{\fdpfpl}{\underline{\overline{\phi}^{j}}_{i}}
+\newcommand{\fdpfpf}{\underline{\overline{\phi}^{i}}_{j}}
+\newcommand{\fdpppf}{\underline{\overline{p}^{i}}_{j}}
+\newcommand{\fdpUupl}{\underline{\overline{U}^{i}\overline{u}^{i}}_{i}}
+\newcommand{\fdpUvcpf}{\underline{\overline{U}^{j}\overline{v\cos\varphi_{j+\frac{1}{2}}}^{j}}_{j}}
+\newcommand{\fdpvcpf}{\underline{\overline{v\cos\varphi_{j+\frac{1}{2}}}^{j}}_{j}}
+\newcommand{\fdpUsps}{\underline{\overline{U}^{k}\overline{\dot{\sigma}}^{i,j}}_{k}}
+\newcommand{\fdpsps}{\underline{\overline{\dot{\sigma}}^{i,j}}_{k}}
+\newcommand{\fdpups}{\underline{\overline{u}^{k}}_{k}}
+\newcommand{\fdpvps}{\underline{\overline{v}^{k}}_{k}}
+\newcommand{\fdppi}[1]{\underline{#1}_{i}}
+\newcommand{\fdppj}[1]{\underline{#1}_{j}}
+\newcommand{\fdppk}[1]{\underline{#1}_{k}}
+\newcommand{\aipj}[1]{\underline{\overline{#1}^{i}}_{j}}
+\newcommand{\ajpi}[1]{\underline{\overline{#1}^{j}}_{i}}
+\newcommand{\avgi}[1]{\overline{#1}^{i}}
+\newcommand{\avgih}[1]{\overline{#1}^{i+\frac{1}{2}}}
+\newcommand{\avgj}[1]{\overline{#1}^{j}}
+\newcommand{\avgjh}[1]{\overline{#1}^{j+\frac{1}{2}}}
+\newcommand{\avgij}[1]{\overline{#1}^{i,j}}
+\newcommand{\avgk}[1]{\overline{#1}^{k}}
+\newcommand{\opAih}[1]{\op{#1}^{\mAih}}
+\newcommand{\opAjh}[1]{\op{#1}^{\mAjh}}
+\newcommand{\opPih}[1]{\op{#1}^{\mPih}}
+\newcommand{\opPjh}[1]{\op{#1}^{\mPjh}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% integration
+\newcommand{\intso}{\int_{\sigma}^{1}}
+\newcommand{\intzs}{\int_{0}^{\sigma}}
+\newcommand{\intzo}{\int_{0}^{1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% other short cuts
+\newcommand{\cosf}{\cos \varphi}
+\newcommand{\cosfj}{\cos \varphi_j}
+\newcommand{\cosfjp}{\cos \varphi_{j+1}}
+\newcommand{\cosfjs}{\cos^2 \varphi_j}
+\newcommand{\cosfjh}{\cos \varphi_{j+\frac{1}{2}}}
+\newcommand{\cosfjhm}{\cos \varphi_{j-\frac{1}{2}}}
+\newcommand{\cosfjhs}{\cos^2 \varphi_{j+\frac{1}{2}}}
+\newcommand{\cosfs}{\cos^2 \varphi}
+\newcommand{\cosl}{\cos \lambda}
+\newcommand{\sinf}{\sin \varphi}
+\newcommand{\sinfjh}{\sin \varphi_{j+\frac{1}{2}}}
+\newcommand{\sinl}{\sin \lambda}
+\newcommand{\tanf}{\tan \varphi}
+\newcommand{\tanfs}{\tan^2 \varphi}
+\newcommand{\tanfjhs}{\tan^2 \varphi_{j+\frac{1}{2}}}
+\newcommand{\tanfjh}{\tan \varphi_{j+\frac{1}{2}}}
+
+\newcommand{\beeq}{\begin{equation}}
+\newcommand{\eneq}{\end{equation}}
+\newcommand{\bese}{\begin{subequations}}
+\newcommand{\ense}{\end{subequations}}
+\newcommand{\been}{\begin{enumerate}}
+\newcommand{\enen}{\end{enumerate}}
+
+\newcommand{\p}{\partial}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\xra}{\xrightarrow}
+\newcommand{\ub}{\underbrace}
+\newcommand{\ob}{\overbrace}
+\newcommand{\divv}{\nabla \cdot \mathbf{v}}
+\newcommand{\divUv}{\nabla \cdot (U\mathbf{v})}
+\newcommand{\divpv}{\nabla \cdot (p_{bt}\mathbf{v})}
+\newcommand{\divptv}{\nabla \cdot (p_{bt}T\mathbf{v})}
+\newcommand{\divpsv}{\nabla \cdot (p_{bt}S\mathbf{v})}
+\newcommand{\haru}{\nabla_\sigma\cdot(p_{bt}A_m\nabla_\sigma u)}
+\newcommand{\harv}{\nabla_\sigma\cdot(p_{bt}A_m\nabla_\sigma v)}
+\newcommand{\hart}{\nabla_\sigma\cdot(p_{bt}A_h\nabla_\sigma T)}
+\newcommand{\hars}{\nabla_\sigma\cdot(p_{bt}A_h\nabla_\sigma S)}
+\newcommand{\md}{\mathcal{D}}
+\newcommand{\ml}{\mathcal{L}}
+\newcommand{\mlnm}{\mathcal{L}_{n}(\mu)}
+\newcommand{\mlom}{\mathcal{L}_{1}(\mu)}
+\newcommand{\mltm}{\mathcal{L}_{2}(\mu)}
+\newcommand{\mlrm}{\mathcal{L}_{3}(\mu)}
+\newcommand{\mm}{\mathcal{M}}
+\newcommand{\mdu}{\mathcal{D}_u}
+\newcommand{\mdv}{\mathcal{D}_v}
+\newcommand{\mq}{\mathcal{Q}}
+\newcommand{\mqt}{\mathcal{Q}_T}
+\newcommand{\mqs}{\mathcal{Q}_S}
+\newcommand{\pbt}{p_{bt}}
+\newcommand{\spbt}{\sqrt{p_{bt}}}
+\newcommand{\rpbt}{\frac{1}{p_{bt}}}
+\newcommand{\dgs}{\dot{\sigma}}
+\newcommand{\rsgp}{\frac{\rho^2 g}{p_{bt}}}
+\newcommand{\fep}{F_{E-P}}
+\newcommand{\pbtu}{\overline{p_{bt}}^{i,j}}
+\newcommand{\sumkzk}{\underset{k=0}{\overset{k}{\sum}}}
+\newcommand{\pilo}{\pi_\lambda^{(1)}}
+\newcommand{\pilt}{\pi_\lambda^{(2)}}
+\newcommand{\pifo}{\pi_\varphi^{(1)}}
+\newcommand{\pift}{\pi_\varphi^{(2)}}
+\newcommand{\ijhk}{i,j+\frac{1}{2},k}
+\newcommand{\ihjhk}{i+\frac{1}{2},j+\frac{1}{2},k}
+\newcommand{\gau}{\overline{\alpha}^{i,j}}
+\newcommand{\fdrsgsp}{\frac{{\overline{\rho}^{k}}^2 g^2}{\overline{p_{bt}}^{k}}}
+
+\newcommand{\modo}{mode-\mbox{I }}
+\newcommand{\modt}{mode-\mbox{II }}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% snippets
+\def\mathaa{\f{1}{Pa^2\cos^2\gf_{\jh}\gD^2\gl}}
+\def\mathab{\op{\op{\pbt}^{\mAj}A_m\op{u}^{\mDi}}^{\mDi}}
+\def\mathac{\f{1}{Pa^2\cosfjh\gD^2\gf}}
+\def\mathad{\op{\op{\pbt}^{\mAi}A_m\cos\gf\op{u}^{\mDj}}^{\mDj}}
+\def\mathae{\f{1-\tan^2\gf_{\jh}}{a^2}}
+\def\mathaf{\f{2P\tan\gf_{\jh}}{a^2\cosfjh\gD\gl}}
+\def\mathag{\op{\op{v}^{\mAi}}^{\mDi}}
+\def\mathah{\op{\op{\pbt}^{\mAj}A_m\op{v}^{\mDi}}^{\mDi}}
+\def\mathai{\op{\op{\pbt}^{\mAi}A_m\cos\gf\op{v}^{\mDj}}^{\mDj}}
+\def\mathaj{\op{\op{u}^{\mAi}}^{\mDi}}
+\def\mathak{\f{\cos\gf_{j+1}}{Pa^2\cosfjh\gD^2\gf}}
+\def\mathal{\left(\op{\pbt}^{\mAi}A_m\op{u}^{\mDj}\right)_{j+1}}
+\def\matham{\f{\cosfj}{Pa^2\cosfjh\gD^2\gf}}
+\def\mathan{\left(\op{\pbt}^{\mAi}A_m\op{u}^{\mDj}\right)_{j}}
+\def\mathao{\left(\op{\pbt}^{\mAi}A_m\op{v}^{\mDj}\right)_{j+1}}
+\def\mathap{\left(\op{\pbt}^{\mAi}A_m\op{v}^{\mDj}\right)_{j}}
+\def\mathaq{\f{1}{a^2\cos^2\gf_j\gD^2\gl}}
+\def\mathar{\op{\op{\pbt}^{\mAi}A_h\op{T}^{\mDi}}^{\mDi}}
+\def\mathas{\f{\cosfjh}{a^2\cosfj\gD^2\gf}}
+\def\mathat{\left(\op{\pbt}^{\mAj}A_h\op{T}^{\mDj}\right)_{\jh}}
+\def\mathau{\f{\cosfjhm}{a^2\cosfj\gD^2\gf}}
+\def\mathav{\left(\op{\pbt}^{\mAj}A_h\op{T}^{\mDj}\right)_{\jhm}}

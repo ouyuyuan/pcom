@@ -3,10 +3,10 @@
       subroutine tracer_st(imt,jmt,km,nt,imm,jmm,kmp1,dtts,t,w,ump,vmp,sdxt,rdxt,  &
                     rdxu,rdyt,rdy,rdz,rdzw,r1a,r1b,lat,cosu,tmask,itn,dz,dz0,z0,z,  &
                     pn,bct,bcs,ddd,emp,bcp,gamma_t,gamma_s,du,dv,ah,am,sma_c,acfl,kappa_h,  &
-                    kappa_m,gravr,west,east,north,south,myid,gm90,implicitvmix,snbc,  &
+                    kappa_m,gravr,west,east,north,south,myid,implicitvmix,snbc,  &
                     tnbc,K1,K2,K3,adv_vetiso,adv_vntiso,adv_vbtiso,rhoi,e,slmxr,ahisop,  &
-                    athkdf,fzisop,kref,rdz0,unesco,umn,vmn,wmn,pmn,pbt_st,rho,phib, &
-                    gr_mass,energydiag,dpo_adv,dpo_hdif,dpo_vdif,dpo_bc,dpo_imp,dpo_ice,  &
+                    athkdf,fzisop,kref,rdz0,umn,vmn,wmn,pmn,pbt_st,rho,phib, &
+                    gr_mass,dpo_adv,dpo_hdif,dpo_vdif,dpo_bc,dpo_imp,dpo_ice,  &
                     dpo_bar,dpo_bcp,din_adv,din_hdif,din_vdif,din_bc,din_imp,din_ice,  &
                     din_bar,p,pbar,mass_up,total_in,gr_mass2)
 !     =================
@@ -17,7 +17,7 @@
 !      include 'isopyc.h'
       include 'mpif.h'
       integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,n,kk
-      integer implicitvmix,gm90,snbc,tnbc,unesco,bous,energydiag
+      integer implicitvmix,snbc,tnbc,bous
       real abc,aidif,dtts2
       real decibar,t0,s0,p0,unrdens,gsw_internal_energy
       real a(imt,jmt),b(imt,jmt),c(imt,jmt),wa(imt,jmt),wb(imt,jmt)
@@ -63,11 +63,7 @@
       real bcp(imt,jmt),z(km),p(imt,jmt,km),total_in(imt,jmt,km)
       real rho_temp,dz_temp,ini_temp,wka_temp(imt,jmt,km)
 !
-      if ((gm90==1).or.(implicitvmix==1)) then
       aidif = p5
-      else
-      aidif = c1
-      end if
       
       decibar = 1.0e-5
 !
@@ -82,32 +78,6 @@
             end do
          end do
       end do
-      
-      if (energydiag==1) then
-      do j=2,jmm
-         do i=2,imm
-            do k=1,itn(i,j)
-               p0=(pbt_st(i,j,4)*z(k) + bcp(i,j))*decibar
-               t0=t(i,j,k,1,tau)
-               s0=t(i,j,k,2,tau)
-               din_bar(i,j,k)=gsw_internal_energy(s0,t0,p0)
-               
-               rho_temp=unrdens(t0,s0,p0)
-               dz_temp=dz(k)*pbt_st(i,j,4)*rho_temp/grav
-               
-               p0=(pbt_st(i,j,2)*z(k) + bcp(i,j))*decibar
-               din_bar(i,j,k)=gsw_internal_energy(s0,t0,p0)-din_bar(i,j,k)
-               
-               rho_temp=unrdens(t0,s0,p0)
-               dpo_bar(i,j,k)=dz(k)*pbt_st(i,j,2)*rho_temp/grav-dz_temp
-               
-               p0=pbt_st(i,j,4)*z(k)*decibar
-               rho_temp=unrdens(t0,s0,p0)
-               dpo_bcp(i,j,k)=dz(k)*pbt_st(i,j,4)*rho_temp/grav-dz_temp
-            end do
-         end do
-      end do
-      end if
       
 !
 !---------------------------------------------------------------------
@@ -176,22 +146,6 @@
         end do
       end do
       
-      if (energydiag.eq.1) then
-         mass_up=c0
-         do j=1,jmt
-            do i=1,imt
-               do k=1,itn(i,j)
-                  do kk=1,k-1
-                     mass_up(i,j,k)=mass_up(i,j,k)+gr_mass(i,j,kk)
-                  end do
-                  mass_up(i,j,k)=mass_up(i,j,k)+p5*gr_mass(i,j,k)
-                  dpo_bar(i,j,k)=dpo_bar(i,j,k)*mass_up(i,j,k)*grav
-                  dpo_bcp(i,j,k)=dpo_bcp(i,j,k)*mass_up(i,j,k)*grav
-               end do
-            end do
-         end do
-      end if
-      
 !---------------------------------------------------------------------
 !     calculate new am by Smagorinsky Scheme
 !---------------------------------------------------------------------
@@ -244,11 +198,10 @@
 !---------------------------------------------------------------------
 !     diffusion coefficients
 !---------------------------------------------------------------------
-      if (gm90==1) then
       call isopyc(imt,jmt,km,kmp1,imm,jmm,nt,itn,tmask,kref,fzisop,rdz0,dz0,z0,  &
                   rdxt,rdyt,rdy,rdzw,dz,pn,cosu,t,slmxr,athkdf,K1,K2,K3,  &
                   adv_vetiso,adv_vntiso,adv_vbtiso,rhoi,e,fx,fy,west,east,north, &
-                  south,unesco)
+                  south)
 !
       do k=1,km
       do j=1,jmt
@@ -257,7 +210,6 @@
       enddo
       enddo
       enddo
-      end if
 !
       dtts2 = dtts
 !
@@ -318,14 +270,6 @@
       enddo
       enddo
       
-      if (energydiag.eq.1) then
-         do j=2,jmm
-            do i=2,imm
-               ts_adv(i,j,k,n)=ts_ini(i,j,k,n)+wka(i,j,k)/pbar(i,j)*tmask(i,j,k)*dtts2
-            end do
-         end do
-      end if
-!
 100   continue
 !
 !-----------------------------------------------------------------------
@@ -336,82 +280,10 @@
 !     xz and yz isopycnal diffusive flux are solved explicitly;
 !     while zz component will be solved implicitly.
 !
-      if (gm90==1) then
-      
-      if (energydiag.eq.1) then
-      do j=2,jmm
-      do i=2,imm
-      do k=1,itn(i,j)
-      wka_temp(i,j,k) = wka(i,j,k)
-      end do
-      end do
-      end do
-      end if
-      
       call isoflux(wka,n,imt,jmt,imm,jmm,nt,km,kmp1,itn,gravr,rdz0,dz0,rdz,     &
                    rdzw,rdxt,rdyt,rdy,cosu,tmask,t,ah,K1,K2,K3,adv_vetiso,  &
                    adv_vntiso,adv_vbtiso,fx,fy)
 
-      if (energydiag.eq.1) then
-      do j=2,jmm
-      do i=2,imm
-      do k=1,itn(i,j)
-      wka_temp(i,j,k) = wka(i,j,k)-wka_temp(i,j,k)
-      end do
-      end do
-      end do
-      end if
-      
-      else
-!
-!
-!     horizontal diffusion
-!
-      do 200 k=1,km
-      do j=2,jmm
-      do i=2,imt
-      a(i,j) = fx(i,j)*(t(i,j,k,n,taum)-t(i-1,j,k,n,taum))* &
-               tmask(i,j,k)*tmask(i-1,j,k)
-      enddo
-      enddo
-!
-      do j=2,jmt
-      do i=2,imm
-      b(i,j) = fy(i,j)*(t(i,j,k,n,taum)-t(i,j-1,k,n,taum))* &
-               tmask(i,j,k)*tmask(i,j-1,k)
-      enddo
-      enddo
-!
-      do j=2,jmm
-      do i=2,imm
-      wka(i,j,k) = wka(i,j,k) + ah(i,j,k)*(sdxt(j)*(a(i+1,j)-a(i,j))+  &
-                                r1a(j)*b(i,j+1)-r1b(j)*b(i,j))
-      enddo
-      enddo
-      
-      if (energydiag.eq.1) then
-      do j=2,jmm
-      do i=2,imm
-      wka_temp(i,j,k) = ah(i,j,k)*(sdxt(j)*(a(i+1,j)-a(i,j))+  &
-                                r1a(j)*b(i,j+1)-r1b(j)*b(i,j))
-      enddo
-      enddo
-      end if
-      
-200   continue
-
-      end if
-
-      if (energydiag.eq.1) then
-      do j=2,jmm
-         do i=2,imm
-            do k=1,itn(i,j)
-               ts_hdif(i,j,k,n)=ts_ini(i,j,k,n)+wka_temp(i,j,k)/pbar(i,j)*dtts2
-            end do
-         end do
-      end do
-      end if
-!
 !-----------------------------------------------------------------------
 !     vertical diffusion
 !-----------------------------------------------------------------------
@@ -431,7 +303,6 @@
        enddo
       endif
 !
-      if (gm90==1) then
       do j=2,jmm
       do i=2,imm
       if(k.eq.itn(i,j))then
@@ -445,48 +316,14 @@
       enddo
       enddo
       
-      else
-      
-      do j=2,jmm
-      do i=2,imm
-      if(k.eq.itn(i,j))then
-        flxb(i,j) = c0
-      else if(k.lt.itn(i,j))then
-        flxb(i,j) = (t(i,j,k,n,taum)-t(i,j,k+1,n,taum))* &
-                    gravr*kappa_h(i,j,k)*rdzw(k)
-      else
-        flxb(i,j) = c0
-      endif
-      enddo
-      enddo
-      end if
-!
       do j=2,jmm
       do i=2,imm
       wka(i,j,k) = wka(i,j,k) + rdz(k)*(flxa(i,j)-flxb(i,j))*aidif
       enddo
       enddo
       
-      if (energydiag.eq.1) then
-      do j=2,jmm
-      do i=2,imm
-      wka_temp(i,j,k) = rdz(k)*(flxa(i,j)-flxb(i,j))*aidif
-      enddo
-      enddo
-      end if
-      
 300   continue
 
-      if (energydiag.eq.1) then
-      do j=2,jmm
-         do i=2,imm
-            do k=1,itn(i,j)
-               ts_vdif(i,j,k,n)=ts_ini(i,j,k,n)+wka_temp(i,j,k)/pbar(i,j)*dtts2
-            end do
-         end do
-      end do
-      end if
-!
 !-----------------------------------------------------------------------
 !     + surface forcing
 !-----------------------------------------------------------------------
@@ -537,14 +374,6 @@
 !
       endif
       
-      if (energydiag.eq.1) then
-      do j=2,jmm
-         do i=2,imm
-            ts_bc(i,j,n)=ts_ini(i,j,1,n)+stf(i,j)*rdz(1)*aidif/pbar(i,j)*tmask(i,j,1)*dtts2
-         end do
-      end do
-      end if
-
 !-----------------------------------------------------------------------
 !     compute T&S at tau+1 time level. Doesn't include implicit diffusion
 !-----------------------------------------------------------------------
@@ -563,48 +392,13 @@
 !-----------------------------------------------------------------------
 !
 
-      if (energydiag.eq.1) then
-      do j=2,jmm
-      do i=2,imm
-      do k=1,itn(i,j)
-      wka_temp(i,j,k) = wka(i,j,k)
-      end do
-      end do
-      end do
-      end if
-
-      if ((gm90==1).and.(implicitvmix==1)) then
+      if implicitvmix==1) then
       call invtri(wka,stf,wkb,aidif,dtts2,pbar,gravr,itn,tmask,rdz,rdzw,   &
                    imt,jmt,km,imm,jmm)
       end if
-      if ((gm90==0).and.(implicitvmix==1)) then
-      call invtri(wka,stf,kappa_h,aidif,dtts2,pbar,gravr,itn,tmask,rdz,rdzw,   &
-                   imt,jmt,km,imm,jmm)
-      end if
-      
-      if (energydiag.eq.1) then
-      do j=2,jmm
-         do i=2,imm
-            do k=1,itn(i,j)
-               ts_imp(i,j,k,n)=ts_ini(i,j,k,n)+wka(i,j,k)-wka_temp(i,j,k)
-            end do
-         end do
-      end do
-      end if
-!
 !-----------------------------------------------------------------------
 !     set T > -1.5 temporarily since no seaice model
 !-----------------------------------------------------------------------
-      if (energydiag.eq.1) then
-      do j=2,jmm
-      do i=2,imm
-      do k=1,itn(i,j)
-      wka_temp(i,j,k) = wka(i,j,k)
-      end do
-      end do
-      end do
-      end if
-
       if(n.eq.1)then
       do k=1,km
       do j=2,jmm
@@ -614,16 +408,6 @@
       enddo
       enddo
       endif
-!
-      if (energydiag.eq.1) then
-      do j=2,jmm
-         do i=2,imm
-            do k=1,itn(i,j)
-               ts_ice(i,j,k,n)=ts_ini(i,j,k,n)+wka(i,j,k)-wka_temp(i,j,k)
-            end do
-         end do
-      end do
-      end if
 !
 !-----------------------------------------------------------------------
 !     T&S=wka  & Filter & periodic b.c
@@ -649,67 +433,5 @@
       
 !      call swap_array_real5d(t,imt,jmt,km,nt,2,west,east,north,south)
 !
-      if (energydiag.eq.1) then
-         do j=2,jmm
-            do i=2,imm
-               do k=1,itn(i,j)
-                  t0=ts_ini(i,j,k,1)
-                  s0=ts_ini(i,j,k,2)
-                  p0=p(i,j,k)
-                  ini_temp=gsw_internal_energy(s0,t0,p0)
-                  
-                  t0=t(i,j,k,1,tau)
-                  s0=t(i,j,k,2,tau)
-                  total_in(i,j,k)=gsw_internal_energy(s0,t0,p0)
-                  
-                  t0=ts_adv(i,j,k,1)
-                  s0=ts_adv(i,j,k,2)
-                  rho_temp=unrdens(t0,s0,p0)
-                  dz_temp=dz(k)*pbar(i,j)*rho_temp/grav-gr_h(i,j,k)
-                  dpo_adv(i,j,k)=dz_temp*mass_up(i,j,k)*grav
-                  din_adv(i,j,k)=gsw_internal_energy(s0,t0,p0)-ini_temp
-                  
-                  t0=ts_hdif(i,j,k,1)
-                  s0=ts_hdif(i,j,k,2)
-                  rho_temp=unrdens(t0,s0,p0)
-                  dz_temp=dz(k)*pbar(i,j)*rho_temp/grav-gr_h(i,j,k)
-                  dpo_hdif(i,j,k)=dz_temp*mass_up(i,j,k)*grav
-                  din_hdif(i,j,k)=gsw_internal_energy(s0,t0,p0)-ini_temp
-                  
-                  t0=ts_vdif(i,j,k,1)
-                  s0=ts_vdif(i,j,k,2)
-                  rho_temp=unrdens(t0,s0,p0)
-                  dz_temp=dz(k)*pbar(i,j)*rho_temp/grav-gr_h(i,j,k)
-                  dpo_vdif(i,j,k)=dz_temp*mass_up(i,j,k)*grav
-                  din_vdif(i,j,k)=gsw_internal_energy(s0,t0,p0)-ini_temp
-                  
-                  t0=ts_imp(i,j,k,1)
-                  s0=ts_imp(i,j,k,2)
-                  rho_temp=unrdens(t0,s0,p0)
-                  dz_temp=dz(k)*pbar(i,j)*rho_temp/grav-gr_h(i,j,k)
-                  dpo_imp(i,j,k)=dz_temp*mass_up(i,j,k)*grav
-                  din_imp(i,j,k)=gsw_internal_energy(s0,t0,p0)-ini_temp
-                  
-                  t0=ts_ice(i,j,k,1)
-                  s0=ts_ice(i,j,k,2)
-                  rho_temp=unrdens(t0,s0,p0)
-                  dz_temp=dz(k)*pbar(i,j)*rho_temp/grav-gr_h(i,j,k)
-                  dpo_ice(i,j,k)=dz_temp*mass_up(i,j,k)*grav
-                  din_ice(i,j,k)=gsw_internal_energy(s0,t0,p0)-ini_temp
-                  
-                  if (k==1) then
-                  t0=ts_bc(i,j,1)
-                  s0=ts_bc(i,j,2)
-                  rho_temp=unrdens(t0,s0,p0)
-                  dz_temp=dz(k)*pbar(i,j)*rho_temp/grav-gr_h(i,j,k)
-                  dpo_bc(i,j)=p5*dz_temp*gr_mass(i,j,k)*grav
-                  din_bc(i,j)=gsw_internal_energy(s0,t0,p0)-ini_temp
-                  end if
-               end do
-            end do
-         end do
-         
-      end if
-
       return
       end subroutine tracer_st

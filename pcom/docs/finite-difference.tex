@@ -1,0 +1,151 @@
+
+\section{The Finite-Difference Scheme}
+
+\begin{figure}[h!]
+  \includegraphics[width=1.1\textwidth]{grid.eps} %
+  \caption{\small PCOM horizontal stagger B-grid and vertical layer} \label{fig:grid}
+\end{figure}
+
+The grid system is a rectangular Arakawa staggered B-grid \citep{Bryan1969}
+containing T cells and U cells (Fig.\ref{fig:grid}). 
+The T cell is arranged at the integer
+grid which defines the location of tracer quantities, and the U cell
+is arranged at the half-integer grid which defines the location of
+the zonal and meridional velocity components. 
+
+In the vertical direction, there are also two types of grid. One is the grid
+lies on the middle of the layers, the other is on the boundary of each layers.
+The location of the vertical
+velocity component $\dot{\sigma}$ is defined on the surface of T
+cell (i.e., at the level $\sigma_{k-1/2}$), and the geopotential
+$\phi$ is defined at the center of T cell (i.e., at the level $\sigma_{k}$).
+
+In horizontal, we define T grid as integer grid, and in vertical, the middle of
+layers as integer grid. We use $i,j,k$ to identify integer grid, use $ih, jh,
+kh$ to identify the corresponding half-integer grid.
+
+For example, we can classify the variables by grids:
+
+\bd
+
+\ii{ijk-grid} - $T$ (potential temperature), $S$ (salinity), 
+$p$ (pressure), $w$ (vertical velocity), $\rho$ (water density), $\phi$
+(geopotential height).
+\ii{ihjhk-grid} - $U$ (zonal velocity), $V$ (meridional velocity).
+\ii{ijkh-grid} - $p$ (pressure), $w$ (vertical velocity).
+\ii{ij-grid} -  (sea surface height). 
+\ii{ih-grid} -  \em{lat}
+\ii{i-grid} -  \em{latt}
+
+\ed
+
+The finite-difference schemes are based on \citet{Zeng1987}.
+Here we introduce the following notation for average and difference
+at the half-integer grids and integer grids
+\bese
+\begin{align}
+  \ol{F}{i+1/2} &= \f{F_{i+1} + F_i}{2},\\
+      \ol{F}{i} &= \f{F_{i+1/2} + F_{i-1/2}}{2},\\
+  \ul{F}{i+1/2} &= F_{i+1} - F_i,\\
+      \ul{F}{i} &= F_{i+1/2} - F_{i-1/2},
+\end{align}
+\ense
+And define
+\bese
+\begin{align}
+  \ol{F}{k+1/2} &= \text{vertically interpolate integer level to half-integer},\\
+      \ol{F}{k} &= \text{vertically interpolate half-integer level to integer},\\
+  \ul{F}{k+1/2} &= F_{k+1} - F_k,\\
+      \ul{F}{k} &= F_{k+1/2} - F_{k-1/2}
+\end{align}
+\ense
+
+Thus, the surface pressure tendency equation, by integrating (\ref{eq:19}) in vertical
+direction, may be written as (see appendix \ref{der:pre-tend} for derivation)
+\begin{equation}\label{eq:33}
+  \grpp{\pppt}_{i,j} = -\racosfjdl \uol{PU_B}{j}{i}  -\racosfjdf \uol{PV_B\cosf}{i}{j}
+  -\rho_{0}gF_{E-P},
+\end{equation}
+where $P=\sqrt{\ol{\pbt}{i,j}}$, \index{$P$} $U_{B}=\int_{0}^{1}Ud\sigma$, 
+and $V_{B}=\int_{0}^{1}Vd\sigma$.
+This scheme guarantees total mass conservation if
+\begin{equation}
+\underset{i}{\sum}\underset{j}{\sum}F_{E-P}a^{2}\cos\gf_{j}\gD\gl\gD\gf=0
+\end{equation}
+ i.e., no net global or domain averaged freshwater flux cross the
+air-sea interface.
+
+Similarly, the diagnostic vertical velocity can also be obtained by integrating
+(\ref{eq:19}) from surface to the $k$ layer of $\gs$, that is
+\begin{equation}
+[\pbt\dgs]_{i,j,k} = -\left[\rz g\fep + \gsk\pppt +
+\racosfj \sumkzk \grp{ \uol{PU}{j}{i} + \uol{PV\cosf}{i}{j}}\gD\gsk\right]
+\end{equation}
+
+The momentum equations may be expressed by
+\bese \label{eq:34}
+\begin{align} 
+  \ratihjhk{\pUpt} &= \grpp{ -\mm(U) + f^{*}V -\f{P}{\acosfjhdl}\grp{ 
+\uol{\phi}{j}{i} + \avgij{\ga}\uol{P}{j}{i} } + P\mdu },\label{eq:39}\\
+\ratihjhk{\pVpt} &= \grpp{ -\mm(V) - f^{*}U -\f{P}{\adf} \grp{ \uol{\phi}{i}{j} +
+\avgij{\ga}\uol{P}{i}{j} }+ P\mdv },\\
+\end{align}
+\ense
+in which $\alpha=\rho^{-1},\,\,  u=U/P,\,\, v=V/P$.  Note in PCOM $U,\, V$ are
+the prognostic variables but the real velocity $u$ and $v$ are the diagnostic
+variables.
+The finite-difference scheme of the advection operator is 
+ ( see \ref{app:1} for derivation )
+ \beeq \label{eq:40}
+\mm(\mu) = \f{1}{2\acosfjhdl} \left[ 2\ul{\ol{u}{i}\ol{\mu}{i}}{i} -
+\mu\uol{u}{i}{i}\right] + \f{1}{2\acosfjhdf} \left[
+  2\ul{\ol{\mu}{j}\ol{v\cosf}{j}}{j} - \mu\uol{v\cosf}{j}{j}\right] 
+  + \rdsk\grp{\ul{\ol{\dgs}{i,j}\ol{\mu}{k}}{k} - \f{\mu}{2}\uol{\dgs}{i,j}{k}}
+\eneq
+where 
+\bese
+\begin{align}
+  \gD\gsk &=\gs_{k+1/2} - \gs_{k-1/2},\\
+  \gD\gskh &=\gs_{k+1} - \gs_{k}.
+\end{align}
+\ense
+
+The viscous terms are
+\bese \label{eq:42}
+\begin{align}
+  P\mdu &= \mathaa\mathab \notag\\
+        &+\mathak\mathal - \matham\mathan\notag\\
+        &+ \f{1}{P}\fdppk{\fdrsgsp \gkm\fdpups} 
+        + A_m \grp{ \mathae U - \mathaf\mathag } \\
+  P\mdv &= \mathaa\mathah \notag\\
+        &+\mathak\mathao - \matham\mathap\notag\\
+        &+\f{1}{P}\fdppk{\fdrsgsp \gkm\fdpvps}
+        + A_m \grp{ \mathae V + \mathaf\mathaj }
+\end{align}
+\ense
+The tracers equations are
+\bese
+\begin{align}
+  \ratijk{\fp{(\pbt T)}{t}} &=-ADV(T)+DIF(T)\\
+  \ratijk{\fp{(\pbt S)}{t}} &=-ADV(S)+DIF(S)
+\end{align}
+\ense
+where
+\begin{align} \label{eq:41}
+  ADV(T) &= \racosfj \grp{ \fdppi{\avgj{PU}\avgi{T}} +
+  \fdppj{\avgi{PV\cosfjh}\avgj{T}} } + \fdppk{\pbt \dgs\avgk{T}}\\
+  DIF(T) &= \mathaq\mathar + \mathas\mathat - \mathau\mathav \notag\\
+         &+\fdppk{\f{{\avgk{\rho}}^2 g^2}{\pbt}\gkv\fdppk{T}}
+\end{align}
+ It can be proven that the total salt is conserved if the natural
+boundary conditions is applied. On the other hand, the total potential
+temperature may be conserved if both the heat flux and fresh water
+flux at sea surface are equal to zero, or, for the more general case
+is, if
+\begin{equation}
+\underset{i}{\sum}\underset{j}{\sum}(F_h-C_p\rz \fep T_1)a^2\cosfj\gD\gl\gD\gf=0
+\end{equation}
+ Furthermore, it can prove that if all the variables are defined at
+identical time levels and the frictional terms are neglected, the
+above-given finite-difference equations can guarantee an accurate
+conversion between the mechanical energy and internal energy.

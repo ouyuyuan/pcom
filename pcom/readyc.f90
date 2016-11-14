@@ -1,10 +1,18 @@
 !
 !     =================
+!BOP
+!
+! !MODULE: readyc.f90
+! !DESCRIPTION: \input{sections/code-readyc}
+!
+! !INTERFACE:
+!
       subroutine readyc(umask,tmask,ivn,pmum,pmup,pbt,spbt,du,dv,dub,dvb,up,vp,cosu,  &
                         rdxt,rdxu,rdyu,rdyt,sdxu,r1c,r1d,cv1,cv2,dz,rdz,rdzw,rzu,pn,  &
                         w,pax,pay,diffu,diffv,am,kappa_m,gravr,cdbot,leapfrog_c,bcu,  &
-                        bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,south,snbc,emp,  &
-                        energydiag)
+                        bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,south,snbc,emp)
+!EOP
+!-------------------------------------------------------------------------------
                         
 !     =================
 !     momentum advections, viscosities & atmpospheric pressure terms
@@ -13,7 +21,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,kmp1,i,j,k,snbc,energydiag
+      integer imt,jmt,km,imm,jmm,kmp1,i,j,k,snbc
       logical leapfrog_c
       real am(imt,jmt,km),kappa_m(imt,jmt,km),cdbot,gravr
       real ubar,vbar,abc,uvmag,t1,t2,t3

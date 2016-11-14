@@ -1,4 +1,3 @@
-! 2006-1-10 #ifdef gm90
 !     =================
       subroutine invtri (wk,topbc,dcb,aidif,dtts2,pbar,gravr,itn,tmask,rdz,rdzw,   &
                          imt,jmt,km,imm,jmm)

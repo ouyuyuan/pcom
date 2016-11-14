@@ -1,4 +1,11 @@
 !     =================
+!BOP
+!
+! !MODULE: inirun.f90
+! !DESCRIPTION: \input{sections/code-inirun}
+!
+! !INTERFACE:
+!
       subroutine inirun(afb1,afc1,aft1,afb2,afc2,aft2,dtts,dtuv,dtsf,nss,ncc,nbb,  &
                   onbb,oncc,onbc,c2dtsf,c2dtuv,c2dtts,epea,epeb,epla,eplb,   &
                   ebea,ebeb,ebla,eblb,bcf,pt,ps,t,pbt,pbt_st,up,vp,upb,vpb,  &
@@ -7,8 +14,10 @@
                   pcye,pdye,pbyw,pcyw,pdyw,rhodp,phibx,phiby,phib,rdxt,rdy,   &
                   ff,month,restrt,rho,fixp,itn,imt,jmt,km,nt,imm,jmm,kmp1, &
                   dz,decibar,myid,ncpux,ncpuy,west,east,north,south,mat_myid, &
-                  simt,sjmt,unesco,boussinesq,monloop,yearloop,t_stepu,stager_t,  &
+                  simt,sjmt,monloop,yearloop,t_stepu,stager_t,  &
                   adv_u,adv_v,am)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !     initialization
 !
@@ -16,7 +25,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !      
-      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,n,i2,j2,unesco,boussinesq
+      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,n,i2,j2
       integer stager_t,t_stepu
       real missvalue
       real a(imt,jmt),b(imt,jmt),c(imt,jmt),d(imt,jmt,km),t0
@@ -291,7 +300,7 @@
 !-----------------------------------------------------------------------
 !     initialize pbt & rho & fixp (for BCOM)
 !-----------------------------------------------------------------------
-      call setpbt(rho,pbt,itn,pt,ps,dz,decibar,imt,jmt,km,kmp1,nt,unesco,boussinesq,fixp)
+      call setpbt(rho,pbt,itn,pt,ps,dz,decibar,imt,jmt,km,kmp1,nt,fixp)
 !
       do j=1,jmt
       do i=1,imt

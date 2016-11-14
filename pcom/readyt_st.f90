@@ -1,10 +1,19 @@
 !
 !     =================
+!BOP
+!
+! !MODULE: readyt_st.f90
+! !DESCRIPTION: \input{sections/code-readyt_st}
+!
+! !INTERFACE:
+!
       subroutine readyt_st(tmask,z,dz,rzu,t,pbt_st,bcp,rho,rhodp,   &
                     up,vp,cosu,rdxt,rdy,pax,pay,itn,ivn,pbxn,pbxs,pbye,  &
                     pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,km,nt,  &
-                    imm,jmm,kmp1,decibar,west,east,north,south,unesco,boussinesq, &
-                    fixp,energydiag)
+                    imm,jmm,kmp1,decibar,west,east,north,south, &
+                    fixp)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !     calculate the variables depended on stratification
 !
@@ -12,7 +21,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,k2,n,unesco,boussinesq,energydiag
+      integer imt,jmt,km,nt,imm,jmm,kmp1,i,j,k,k2,n
       integer itn(imt,jmt),ivn(imt,jmt)
       real a,t1,t2,t3,rdens,decibar
       real tmask(imt,jmt,km)
@@ -56,14 +65,14 @@
       end do
       
       call density(tmask,z,t,pbt,bcp,rho,decibar,imt,jmt,km,nt,imm,jmm,fixp,  &
-                   west,east,north,south,unesco,boussinesq)
+                   west,east,north,south)
 !
 !-----------------------------------------------------------------------
 !     calculate pressure gradients related to stratification
 !-----------------------------------------------------------------------
       call prsgrd(bcp,rdxt,rdy,pax,pay,itn,ivn,rho,rhodp,z,dz,rzu,pbxn,pbxs, &
                   pbye,pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,  &
-                  km,imm,jmm,kmp1,west,east,north,south,boussinesq)
+                  km,imm,jmm,kmp1,west,east,north,south)
 !     
       return
       end subroutine readyt_st

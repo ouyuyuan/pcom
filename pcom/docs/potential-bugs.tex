@@ -1,0 +1,19 @@
+\section{Potential Bugs}
+\been
+\item In setcon.f90, Line 65-66, it cut vmix.nc value to fit |kh_max|, but didn't 
+cut vmix to fit |kh_min|, i.e., |kh_c|
+
+Also, the code want to set missing value to 0.1, but it seems it doesn't work.
+The missing value are still unchanged. See the test on 101, case
+|pcom_1.0\exp02_check|
+
+\item In the old code of Huang and Jin, $A_m$ and $A_h$ is different by 10 times, but
+now they are the same. see Line 208,209 of |setcon.f90|. Can change them back
+in the namelist of |am_c| and |ah_c|, to see the effects.
+
+\item In main.f90, it defined allocatable arrays before MPI initialization, may
+  be MPI init. should put in the very first?
+
+\item Set |pbt_st| to 1 where it is zero at the beginning of |ready_st.f90|
+\enen
+

@@ -1,7 +1,17 @@
 !
 !     ==================
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+!BOP
+!
+! !MODULE: convect.f90
+! !DESCRIPTION: \input{sections/code-convect}
+!
+! !INTERFACE:
+!
       subroutine convect(t,pt,ps,itn,dz,imt,jmt,km,nt,imm,jmm,myid,west,east,north,south,  &
-                   energydiag,dpo_con,din_con,p,pbar,mass_up,bottom_h,total_in,total_po)
+                   dpo_con,din_con,p,pbar,mass_up,bottom_h,total_in,total_po)
+!EOP
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 !     ==================
 !
 !     a full convective adjustment scheme, based on GFDL's version
@@ -33,7 +43,6 @@
       
       integer myid,west,east,north,south
       
-      integer energydiag
       real dpo_con(imt,jmt,km),din_con(imt,jmt,km)
       real p(imt,jmt,km),pbar(imt,jmt),gr_h(imt,jmt,km),gr_h2(imt,jmt,km),mass_up(imt,jmt,km)
       real total_in(imt,jmt,km),total_po(imt,jmt,km),bottom_h(imt,jmt)
@@ -42,21 +51,6 @@
       real din_test0,din_test1,din_test2,din_test3,din_test4
 !
 !
-      if (energydiag==1) then
-         do j=2,jmm
-            do i=2,imm
-               do k=1,itn(i,j)
-                  t0=t(i,j,k,1,tau)
-                  s0=t(i,j,k,2,tau)
-                  p0=p(i,j,k)
-                  rho_temp=unrdens(t0,s0,p0)
-                  gr_h(i,j,k) = dz(k)*pbar(i,j)*rho_temp/grav
-                  din_con(i,j,k)=total_in(i,j,k)
-               end do
-            end do
-         end do
-      end if
-
       do j=2,jmm
       do i=2,imm
 !
@@ -183,36 +177,5 @@
 !
       call swap_array_real5d(t,imt,jmt,km,nt,2,west,east,north,south)
 !
-      if (energydiag==1) then
-         do j=2,jmm
-            do i=2,imm
-               do k=1,itn(i,j)
-                  t0=t(i,j,k,1,tau)
-                  s0=t(i,j,k,2,tau)
-                  p0=p(i,j,k)
-                  rho_temp=unrdens(t0,s0,p0)
-                  gr_h2(i,j,k)=dz(k)*pbar(i,j)*rho_temp/grav
-                  dz_temp=gr_h2(i,j,k)-gr_h(i,j,k)
-                  dpo_con(i,j,k)=dz_temp*mass_up(i,j,k)*grav
-                  total_in(i,j,k)=gsw_internal_energy(s0,t0,p0)
-                  din_con(i,j,k)=total_in(i,j,k)-din_con(i,j,k)
-               end do
-            end do
-         end do
-         do j=2,jmm
-            do i=2,imm
-               do k=1,itn(i,j)
-                  dz_temp=p5*gr_h2(i,j,k)
-                  do kk=k+1,itn(i,j)
-                     dz_temp=dz_temp+gr_h2(i,j,kk)
-                  end do
-                  dz_temp=dz_temp+bottom_h(i,j)
-                  total_po(i,j,k)=dz_temp*grav
-               end do
-            end do
-         end do
-      end if
-      
-
       return
       end

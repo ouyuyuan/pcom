@@ -1,0 +1,34 @@
+\subsection{Tracer Equations}
+\label{der:tracer-sig}
+
+We take potential temperature $T$ as an example.
+
+By rule of difference
+\beeq \label{eq:15}
+\dptdt = \pbt\fd{T}{t} + T\fd{\pbt}{t}
+\eneq
+From the tracer equation in $z$-coordinate of (\ref{eq:12}) the the relation ship
+of substantial time difference operator in $z$ and $\sigma$ coordinate of
+(\ref{eq:3}), we have
+\beeq \label{eq:14}
+\dtdts = \mqt
+\eneq
+And from the mass conservation equation (\ref{eq:8}) we have
+\beeq
+\fp{\pbt}{t} + \vv\cdot\gn\pbt + \pbt\divv = 0
+\eneq
+\beeq \label{eq:13}
+\fd{\pbt}{t} = - \pbt\divv
+\eneq
+Substitute (\ref{eq:13}) and (\ref{eq:14}) into (\ref{eq:15}), we have
+\beeq
+\dptdt = \pbt\mqt - T\pbt\divv
+\eneq
+And substantial change equal local change plus advective term
+\beeq
+\dptdt = \pptpt + \vv\cdot\gn(\pbt T)
+\eneq
+Combine the above two equations, we get
+\beeq
+\pptpt+\divptv = \pbt\mqt
+\eneq

@@ -1,7 +1,16 @@
 !
 !     ===========================
+!BOP
+!
+! !MODULE: upwelling.f90
+! !DESCRIPTION: \input{sections/code-upwelling}
+!
+! !INTERFACE:
+!
       subroutine upwelling(u,v,w,rdxt,rdyt,tmask,dz,pn,imt,jmt,km,imm,jmm,kmp1,  &
                            west,east,north,south,snbc,emp)
+!EOP
+!-------------------------------------------------------------------------------
 !     ===========================
 !
 !     calculate vertical mass advection: pbt*dz/dt

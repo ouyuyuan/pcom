@@ -3,7 +3,17 @@
 !    +             PCOM and BCOM in eta-coordinates                  +
 !    +===============================================================+
 !    +                                                               +
+!BOP
+!
+! !MODULE: main.f90
+!
+! !DESCRIPTION: \input{sections/code-main}
+!
+! !INTERFACE:
+!
 program main
+!EOP
+!-------------------------------------------------------------------------------
       implicit none
       include 'param.h'
       include 'pconst.h'
@@ -216,14 +226,14 @@ program main
 !-----------------------------------------------------------------------------
       if (myid == 0) then
       namelist /contrl/ imt,jmt,km,nt,runlen_mon,runlen_day,runlen_sec,restrt,  &
-                        snbc,tnbc,gm90,implicitvmix,asselin_b,asselin_c,asselin_t,  &
-                        smtha,smthb,smthc,smth_start_nlat,smth_start_slat,fcof,unesco, &
-                        boussinesq,monloop,yearloop,monlong,daylong,hourlong
+                        snbc,tnbc,implicitvmix,asselin_b,asselin_c,asselin_t,  &
+                        smtha,smthb,smthc,smth_start_nlat,smth_start_slat,fcof, &
+                        monloop,yearloop,monlong,daylong,hourlong
       namelist /mpicontrl/ ncpux,ncpuy
       namelist /tsteps/ stager_t,dtts,dtuv,dtsf
       namelist /mixing/ fam,fah,fkm,fkh,kh_max,am_c,sma_c,ah_c,km_c,kh_c,athkdf_c,cdbot
       namelist /filter/ afb1,afc1,aft1
-      namelist /io/     uvtshdiag,energydiag,io_month,io_time,restr_mon,restr_time,infotime
+      namelist /io/     uvtshdiag,io_month,io_time,restr_mon,restr_time,infotime
 !
 !     read in model's control parameters
       open(15,file='namelist')
@@ -286,13 +296,13 @@ program main
       call dis_var_int(restr_mon,mat_myid,ncpux,ncpuy,myid)
       call dis_var_real(restr_time,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(uvtshdiag,mat_myid,ncpux,ncpuy,myid)
-      call dis_var_int(energydiag,mat_myid,ncpux,ncpuy,myid)
+      call dis_var_int(mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(io_month,mat_myid,ncpux,ncpuy,myid)
       call dis_var_real(io_time,mat_myid,ncpux,ncpuy,myid)
       call dis_var_real(infotime,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(snbc,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(tnbc,mat_myid,ncpux,ncpuy,myid)
-      call dis_var_int(gm90,mat_myid,ncpux,ncpuy,myid)
+      call dis_var_int(mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(implicitvmix,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(asselin_b,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(asselin_c,mat_myid,ncpux,ncpuy,myid)
@@ -300,8 +310,7 @@ program main
       call dis_var_int(smtha,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(smthb,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(smthc,mat_myid,ncpux,ncpuy,myid)
-      call dis_var_int(unesco,mat_myid,ncpux,ncpuy,myid)
-      call dis_var_int(boussinesq,mat_myid,ncpux,ncpuy,myid)
+      call dis_var_int(mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(monloop,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(yearloop,mat_myid,ncpux,ncpuy,myid)
       call dis_var_int(monlong,mat_myid,ncpux,ncpuy,myid)
@@ -636,7 +645,7 @@ program main
 !     set scalar quantities
       call setcon(fam,fah,fkm,fkh,kh_max,am_c,ah_c,km_c,kh_c,am,ah,kappa_m,kappa_h,   &
                   athkdf_c,athkdf,gravr,decibar,deltap,deltat,deltas,rdeltap,  &
-                  rdeltat,rdeltas,gamma_t,gamma_s,imt,jmt,km,boussinesq,myid,  &
+                  rdeltat,rdeltas,gamma_t,gamma_s,imt,jmt,km,myid,  &
                   ncpux,ncpuy,simt,sjmt,mat_myid)
 !
 !
@@ -644,9 +653,9 @@ program main
       call grdvar(z,z0,dz0,pn,itn,ivn,tmask,umask,phib,dz,rdz,rdzw,zu,rzu,   &
                   jstn,jedn,jeds,jsts,lat,lon,cost,cosu,ff,rdxt,rdxu,rdyt,rdyu,  &
                   sdxt,sdxu,r1a,r1b,r1c,r1d,cv1,cv2,dxdyt,dxdyu,area,rdy,    &
-                  decibar,imt,jmt,km,dlam,dphi,imm,jmm,kmp1,kmm1,unesco, &
+                  decibar,imt,jmt,km,dlam,dphi,imm,jmm,kmp1,kmm1, &
                   myid,ncpux,ncpuy,west,east,north,south,mat_myid,simt,sjmt, &
-                  smth_start_nlat,smth_start_slat,boussinesq,bottom_h,acfl,dtts)
+                  smth_start_nlat,smth_start_slat,bottom_h,acfl,dtts)
 !
 !     initialization
       call inirun(afb1,afc1,aft1,afb2,afc2,aft2,dtts,dtuv,dtsf,nss,ncc,nbb,  &
@@ -657,13 +666,11 @@ program main
                   pcye,pdye,pbyw,pcyw,pdyw,rhodp,phibx,phiby,phib,rdxt,rdy,   &
                   ff,month,restrt,rho,fixp,itn,imt,jmt,km,nt,imm,jmm,kmp1, &
                   dz,decibar,myid,ncpux,ncpuy,west,east,north,south,mat_myid, &
-                  simt,sjmt,unesco,boussinesq,monloop,yearloop,t_stepu,stager_t,  &
+                  simt,sjmt,monloop,yearloop,t_stepu,stager_t,  &
                   adv_u,adv_v,am)
 !
-      if (gm90==1) then
-        call isopyi(imt,jmt,km,kmp1,slmxr,ahisop,ah,fzisop,kref,rdz0,   &
-                    dz0,z0,K1,K2,K3,adv_vetiso,adv_vntiso,rhoi,e,adv_vbtiso)
-      end if
+      call isopyi(imt,jmt,km,kmp1,slmxr,ahisop,ah,fzisop,kref,rdz0,   &
+                  dz0,z0,K1,K2,K3,adv_vetiso,adv_vntiso,rhoi,e,adv_vbtiso)
 !----------------------------------------------------------------------
 !     if run time less than 1 month or 1 day, then reset integral cycle
 !-----------------------------------------------------------------------
@@ -711,10 +718,10 @@ program main
 !     compute coefficients for calculation of potential density anomaly
 !      if (stager_t.eq.1) then
 !      call rho_ref_st(tmask,t,z,pbt_st,pt,ps,deltat,deltas,rdeltat,rdeltas,decibar,fixp,  &
-!                   imt,jmt,km,nt,imm,jmm,west,east,north,south,unesco,boussinesq)
+!                   imt,jmt,km,nt,imm,jmm,west,east,north,south)
 !      else
       call rho_ref(tmask,t,z,pbt,pt,ps,deltat,deltas,rdeltat,rdeltas,decibar,fixp,  &
-                   imt,jmt,km,nt,imm,jmm,west,east,north,south,unesco,boussinesq)
+                   imt,jmt,km,nt,imm,jmm,west,east,north,south)
 !      end if
 !
 !     interpolate the observed monthly mean data
@@ -732,14 +739,14 @@ program main
       call readyt_st(tmask,z,dz,rzu,t,pbt_st,bcp,rho,rhodp,   &
                     up,vp,cosu,rdxt,rdy,pax,pay,itn,ivn,pbxn,pbxs,pbye,  &
                     pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,km,nt,  &
-                    imm,jmm,kmp1,decibar,west,east,north,south,unesco,boussinesq, &
-                    fixp,energydiag)
+                    imm,jmm,kmp1,decibar,west,east,north,south, &
+                    fixp)
       else
       call readyt(tmask,z,dz,rzu,t,pbt,spbt,pmtm,pmtp,bcp,rho,rhodp,umm,vmm,   &
                   ump,vmp,up,vp,cosu,rdxt,rdy,pax,pay,itn,ivn,pbxn,pbxs,pbye,  &
                   pbyw,pcxn,pcxs,pcye,pcyw,pdxn,pdxs,pdye,pdyw,imt,jmt,km,nt,  &
-                  imm,jmm,kmp1,decibar,west,east,north,south,unesco,boussinesq, &
-                  fixp,energydiag)
+                  imm,jmm,kmp1,decibar,west,east,north,south, &
+                  fixp)
       end if
 !
 !-----------------------------------------------------------------------
@@ -752,13 +759,13 @@ program main
                     dvb,up,vp,cosu,rdxt,rdxu,rdyu,rdyt,sdxu,r1c,r1d,cv1,cv2,dz,  &
                     rdz,rdzw,rzu,pn,w,pax,pay,diffu,diffv,am,kappa_m,gravr,cdbot,  &
                     bcu,bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,  &
-                    south,snbc,emp,t_stepu,energydiag,dke_bcf,dke_fri)
+                    south,snbc,emp,t_stepu,dke_bcf,dke_fri)
       else
       call readyc(umask,tmask,ivn,pmum,pmup,pbt,spbt,du,dv,dub,dvb,up,vp,cosu,  &
                   rdxt,rdxu,rdyu,rdyt,sdxu,r1c,r1d,cv1,cv2,dz,rdz,rdzw,rzu,pn,  &
                   w,pax,pay,diffu,diffv,am,kappa_m,gravr,cdbot,leapfrog_c,bcu,  &
                   bcv,imt,jmt,km,imm,jmm,kmp1,west,east,north,south,snbc,emp, &
-                  energydiag)
+                  )
       end if
 !
       if (stager_t.eq.1) then
@@ -767,16 +774,16 @@ program main
                     eblb,ebea,ebeb,pn,zu,cosu,rdxt,rdyt, &
                     dtsf,nbb,imt,jmt,km,imm,jmm,    &
                     myid,west,east,north,south,snbc,emp,jstn,jedn,jsts,   &
-                    jeds,smtha,fcof,umask,boussinesq,phib,pdxn,pdxs,pdye,pdyw,  &
-                    lat,lon,energydiag)
+                    jeds,smtha,fcof,umask,phib,pdxn,pdxs,pdye,pdyw,  &
+                    lat,lon)
       else
       call barotr(ivn,itn,upb,vpb,r1c,r1d,sdxu,am,dub,dvb,spbt,pbt,phibx,    &
                   phiby,pbxn,pbxs,pbye,pbyw,pcxn,pcxs,pcye,pcyw,ff,ebla,     &
                   eblb,ebea,ebeb,pn,zu,cosu,rdxt,rdyt,leapfrog_b,euler_back, &
                   dtsf,c2dtsf,afb1,afb2,pmup,pmtp,nbb,imt,jmt,km,imm,jmm,    &
                   myid,west,east,north,south,asselin_b,snbc,emp,jstn,jedn,jsts,   &
-                  jeds,smtha,fcof,umask,boussinesq,phib,pdxn,pdxs,pdye,pdyw,  &
-                  lat,lon,energydiag)
+                  jeds,smtha,fcof,umask,phib,pdxn,pdxs,pdye,pdyw,  &
+                  lat,lon)
       end if
 !
 !     prediction of baroclinic mode
@@ -784,13 +791,13 @@ program main
       call bclinc_st(phib,spbt,pbt,pbt_st,rhodp,rho,rdxt,rdy,ump,vmp,upb,  &
                      vpb,up,vp,du,dv,adv_u,adv_v,diffu,diffv,epla,eplb,epea,epeb,  &
                      pax,pay,ff,umask,ivn,itn,z,dz,rzu,onbb,dtuv,  &
-                     cosu,imt,jmt,km,imm,jmm,west,east,north,south,boussinesq,energydiag,  &
+                     cosu,imt,jmt,km,imm,jmm,west,east,north,south,  &
                      dke_pre,dke_adv,dke_ape,dke_bar,dke_bcf,dke_fri,dke_cor,myid)
       else
       call bclinc(pmup,pmum,phib,spbt,pbt,rhodp,rho,rdxt,rdy,ump,vmp,upb,    &
                   vpb,up,vp,du,dv,epla,eplb,epea,epeb,ff,umask,ivn,z,dz,rzu, &
                   onbb,leapfrog_c,dtuv,c2dtuv,afc1,afc2,cosu,imt,jmt,km,imm, &
-                  jmm,west,east,north,south,asselin_c,boussinesq,itn,energydiag)
+                  jmm,west,east,north,south,asselin_c,itn)
       end if
 !
       if (smthb==1) then
@@ -811,10 +818,10 @@ program main
       call tracer_st(imt,jmt,km,nt,imm,jmm,kmp1,dtts,t,w,ump,vmp,sdxt,rdxt,  &
                     rdxu,rdyt,rdy,rdz,rdzw,r1a,r1b,lat,cosu,tmask,itn,dz,dz0,z0,z,  &
                     pn,bct,bcs,ddd,emp,bcp,gamma_t,gamma_s,du,dv,ah,am,sma_c,acfl,kappa_h,  &
-                    kappa_m,gravr,west,east,north,south,myid,gm90,implicitvmix,snbc,  &
+                    kappa_m,gravr,west,east,north,south,myid,implicitvmix,snbc,  &
                     tnbc,K1,K2,K3,adv_vetiso,adv_vntiso,adv_vbtiso,rhoi,e,slmxr,ahisop,  &
-                    athkdf,fzisop,kref,rdz0,unesco,umn,vmn,wmn,pmn,pbt_st,rho,phib, &
-                    gr_mass,energydiag,dpo_adv,dpo_hdif,dpo_vdif,dpo_bc,dpo_imp,dpo_ice,  &
+                    athkdf,fzisop,kref,rdz0,umn,vmn,wmn,pmn,pbt_st,rho,phib, &
+                    gr_mass,dpo_adv,dpo_hdif,dpo_vdif,dpo_bc,dpo_imp,dpo_ice,  &
                     dpo_bar,dpo_bcp,din_adv,din_hdif,din_vdif,din_bc,din_imp,din_ice,  &
                     din_bar,p,pbar,mass_up,total_in,gr_mass2)
       else
@@ -822,11 +829,11 @@ program main
                   rdz,rdzw,r1a,r1b,tmask,itn,dz,pn,bct,bcs,ddd,gamma_t,gamma_s,  &
                   du,dv,ah,am,sma_c,acfl,kappa_h,gravr,leapfrog_t,c2dtts,dtts,  &
                   imt,jmt,km,nt,imm,jmm,kmp1,west,east,north,south,myid,asselin_t,  &
-                  gm90,implicitvmix,snbc,tnbc,aft1,aft2,emp,dz0,z0,rdy,cosu,K1,   &
+                  implicitvmix,snbc,tnbc,aft1,aft2,emp,dz0,z0,rdy,cosu,K1,   &
                   K2,K3,adv_vetiso,adv_vntiso,adv_vbtiso,rhoi,e,slmxr,ahisop,    &
-                  athkdf,fzisop,kref,rdz0,unesco,umn,vmn,wmn,pmn,rho,phib,gr_mass, &
+                  athkdf,fzisop,kref,rdz0,umn,vmn,wmn,pmn,rho,phib,gr_mass, &
                   bottom_h,ncpux,ncpuy,mat_myid,z,nss,rdxu,lat,bcp,  &
-                  energydiag,dpo_adv,dpo_hdif,dpo_vdif,dpo_bc,din_adv,din_hdif,  &
+                  dpo_adv,dpo_hdif,dpo_vdif,dpo_bc,din_adv,din_hdif,  &
                   din_vdif,din_bc,dpo_imp,din_imp,dpo_ice,din_ice,dpo_ast,din_ast, &
                   dsa_ast,p,pbar,mass_up)
       end if
@@ -836,7 +843,7 @@ program main
 !
 !     convective adjustment if unstable stratification ocurs
       call convect(t,pt,ps,itn,dz,imt,jmt,km,nt,imm,jmm,myid,west,east,north,south,  &
-                   energydiag,dpo_con,din_con,p,pbar,mass_up,bottom_h,total_in,total_po)
+                   dpo_con,din_con,p,pbar,mass_up,bottom_h,total_in,total_po)
 !
 !
       call diag(imt,jmt,simt,sjmt,km,nt,imm,jmm,kmp1,nss,dtts,mode_t,year,month,  &
@@ -844,7 +851,7 @@ program main
                 restr_time,restr_mon,infotime,myid,ncpux,ncpuy,west,east,north,south,  &
                 mat_myid,stager_t,t_stepu,pbt,pbt_st,up,vp,upb,vpb,pmtp,ump,vmp,adv_u,  &
                 adv_v,uvtshdiag,pmn,umn,vmn,wmn,t,tmn_mo,smn_mo,pmn_mo,umn_mo,vmn_mo,  &
-                wmn_mo,am,energydiag,bcu,bcv,sa_ini,ma_ini,ke_ini,in_ini,po_ini,gr_mass, &
+                wmn_mo,am,bcu,bcv,sa_ini,ma_ini,ke_ini,in_ini,po_ini,gr_mass, &
                 dpo_adv   ,dpo_hdif   ,dpo_vdif   ,dpo_imp   ,dpo_con   ,dpo_bc    ,  &
                 dpo_adv_mo,dpo_hdif_mo,dpo_vdif_mo,dpo_imp_mo,dpo_con_mo,dpo_bc_mo ,  &
                 din_adv   ,din_hdif   ,din_vdif   ,din_imp   ,din_con   ,din_bc    ,  &

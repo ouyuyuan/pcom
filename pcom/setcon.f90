@@ -1,8 +1,17 @@
 !     =================
+!BOP
+!
+! !MODULE: setcon.f90
+! !DESCRIPTION: \input{sections/code-setcon}
+!
+! !INTERFACE:
+!
       subroutine setcon(fam,fah,fkm,fkh,kh_max,am_c,ah_c,km_c,kh_c,am,ah,kappa_m,kappa_h,   &
                         athkdf_c,athkdf,gravr,decibar,deltap,deltat,deltas,rdeltap,  &
-                        rdeltat,rdeltas,gamma_t,gamma_s,imt,jmt,km,boussinesq,myid,  &
+                        rdeltat,rdeltas,gamma_t,gamma_s,imt,jmt,km,myid,  &
                         ncpux,ncpuy,simt,sjmt,mat_myid)
+!EOP
+!-------------------------------------------------------------------------------
                         
 !     =================
 !     set scalar quantities
@@ -15,7 +24,7 @@
 !     calendar
 !---------------------------------------------------------------------
 
-      integer imt,jmt,km,i,j,k,boussinesq
+      integer imt,jmt,km,i,j,k
       integer fam,fah,fkm,fkh
       real am_c,ah_c,km_c,kh_c,athkdf_c
       real gravr,decibar,deltap,rdeltap,deltat,deltas
@@ -205,11 +214,7 @@
 !      enddo
 !      cdbot   = 2.6e-3
 !
-      if (boussinesq==1) then
-      gravr = grav
-      else
       gravr = grav*rho_0
-      end if
 !
 !     change the unit of pressure from dynes/cm**2 to decibars
 !     1 dynes/cm**2 = 0.1 N/m**2 = 1.0e-3 mbar = 1.0e-5 decibars

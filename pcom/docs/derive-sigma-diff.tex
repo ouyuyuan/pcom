@@ -1,0 +1,40 @@
+\subsection{Substantial Difference Operator} \label{der:ddt-sig}
+
+Assume a scalar filed $F(\gl,\gf,z,t)$, according to equation
+\ref{eq:sub-diff2}, we have
+\beeq \label{eq:7}
+\dfdtz = \pfptz + \f{u}{a\cosf}\pfplz + \f{v}{a}\pfpfz + w\pfpz.
+\eneq
+So we need to know the expressions of the following terms in Pressure-$\gs$
+coordinate
+\beeq
+  \pfptz, \pfplz, \pfpfz
+\eneq
+
+Since
+\beeq
+F(\gl,\gf,z,t) = F(\gl,\gf,\gs,t)
+\eneq
+According to the chain rule of composite functions, difference the above
+equation, we get
+\bese
+\begin{align} \label{eq:6}
+\pfptz &= \pfpts + \pfps\psptz\\
+\pfplz &= \pfpls + \pfps\psplz\\
+\pfpfz &= \pfpfs + \pfps\pspfz\\
+ \pfpz &= \pfps \pspz
+\end{align}
+\ense
+Substitute equations \ref{eq:6} into equation \ref{eq:7}, after some term-arrangement, we get
+\begin{align}
+  \dfdtz &= \pfpts + \f{u}{a\cosf}\pfpls + \f{v}{a}\pfpfs \nonumber\\
+         & + \pfps \grpp{ \psptz + \f{u}{a\cosf}\psplz + \f{v}{a}\pspfz + w\pspz
+}\nonumber\\
+         &= \pfpts + \f{u}{a\cosf}\pfpls + \f{v}{a}\pfpfs + \pfps \dsdtz
+\nonumber \\
+         &= \pfpts + \f{u}{a\cosf}\pfpls + \f{v}{a}\pfpfs + \dot{\gs}\pfps
+\nonumber \\
+         &= \dfdts,
+\end{align}
+where $\dot{\gs}$ is defined as the vertical velocity in $(\gl,\gf,\gs,t)$
+coordinate.

@@ -3,7 +3,7 @@
       subroutine bclinc_st(phib,spbt,pbt,pbt_st,rhodp,rho,rdxt,rdy,ump,vmp,upb,  &
                      vpb,up,vp,du,dv,adv_u,adv_v,diffu,diffv,epla,eplb,epea,epeb,  &
                      pax,pay,ff,umask,ivn,itn,z,dz,rzu,onbb,dtuv,  &
-                     cosu,imt,jmt,km,imm,jmm,west,east,north,south,boussinesq,energydiag,  &
+                     cosu,imt,jmt,km,imm,jmm,west,east,north,south,  &
                      dke_pre,dke_adv,dke_ape,dke_bar,dke_bcf,dke_fri,dke_cor,myid)
 !     =================
 !
@@ -13,7 +13,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,imm,jmm,i,j,k,boussinesq,energydiag
+      integer imt,jmt,km,imm,jmm,i,j,k
       integer ivn(imt,jmt),itn(imt,jmt)
       real t1,t2
       real dtuv,onbb,z(km),dz(km),rzu(imt,jmt),cosu(jmt)
@@ -71,32 +71,6 @@
 !     calculate pressure gradients  * spbt
 !-----------------------------------------------------------------------
 !
-      if (boussinesq==1) then
-!
-!     a  = geopotential
-!     b  = pressure
-!     px = (rho)xbar*(a)x + (b)x
-!     py = (rho)ybar*(a)y + (b)y
-!
-      do k=1,km
-      do j=1,jmt
-      do i=1,imt
-      a(i,j) = phib(i,j)-pbar(i,j)*(z(k)+phib(i,j))
-      b(i,j) = pbar(i,j)*rhodp(i,j,k)
-      enddo
-      enddo
-      do j=2,jmm
-      do i=2,imm
-      px(i,j,k) = ( (rho(i,j,k)+rho(i+1,j,k))*p5*(a(i+1,j)-a(i,j)) + &
-                  (b(i+1,j)-b(i,j)) )*rdxt(j)
-      py(i,j,k) = ( (rho(i,j,k)+rho(i,j+1,k))*p5*(a(i,j+1)-a(i,j)) + &
-                  (b(i,j+1)-b(i,j)) )*rdy
-      enddo
-      enddo
-      end do
-      
-      else
-      
 !     a  = geopotential
 !     b  = pressure
 !     px = (a)x + (rho)xbar*(b)x
@@ -119,7 +93,6 @@
       enddo
       enddo
       end do
-      end if
       
       call swap_ns_real3d(px,imt,jmt,km,north,south)
       call swap_ew_real3d(py,imt,jmt,km,west,east)
@@ -162,30 +135,6 @@
          end do
       end do
       
-      if (energydiag==1) then
-         do j=2,jmm
-            do i=2,imm
-               uv_ini(i,j,k,1)=up(i,j,k,taum)
-               uv_ini(i,j,k,2)=vp(i,j,k,taum)
-               dke_pre(i,j,k,1)= - etax(i,j)*dtuv
-               dke_pre(i,j,k,2)= - etay(i,j)*dtuv
-               dke_adv(i,j,k,1)=advu(i,j,k)*dtuv
-               dke_adv(i,j,k,2)=advv(i,j,k)*dtuv
-               dke_fri(i,j,k,1)=dke_fri(i,j,k,1)*dtuv
-               dke_fri(i,j,k,2)=dke_fri(i,j,k,2)*dtuv
-               dke_ape(i,j,k,1)= - pax(i,j)*spbt(i,j)*dtuv
-               dke_ape(i,j,k,2)= - pay(i,j)*spbt(i,j)*dtuv
-               dke_cor(i,j,k,1)=(du(i,j,k)-(advu(i,j,k) + diffu(i,j,k) - etax(i,j) - pax(i,j)*spbt(i,j)))*dtuv
-               dke_cor(i,j,k,2)=(dv(i,j,k)-(advv(i,j,k) + diffv(i,j,k) - etay(i,j) - pay(i,j)*spbt(i,j)))*dtuv
-               if (k==1) then
-                  dke_bcf(i,j,1)=dke_bcf(i,j,1)*dtuv
-                  dke_bcf(i,j,2)=dke_bcf(i,j,2)*dtuv
-               end if
-            end do
-         end do
-      end if
-      
-!
 100   continue 
 !
 !-----------------------------------------------------------------------
@@ -221,90 +170,6 @@
       enddo
       enddo
       
-      if (energydiag==1) then
-         do j=2,jmm
-            do i=2,imm
-               do k=1,ivn(i,j)
-                  dke_bar(i,j,k,1)= - a(i,j) + upb(i,j,tau)
-                  dke_bar(i,j,k,2)= - b(i,j) + vpb(i,j,tau)
-               end do
-            end do
-         end do
-         
-         do j=2,jmm
-            do i=2,imm
-               do k=1,ivn(i,j)
-                  if (k==1) then
-                  ka=uv_ini (i,j,k,1)
-                  kb=dke_adv(i,j,k,1)
-                  kc=dke_fri(i,j,k,1)
-                  kd=dke_pre(i,j,k,1)
-                  ke=dke_bar(i,j,k,1)
-                  kf=dke_bcf(i,j,1)
-                  kg=dke_ape(i,j,k,1)
-                  kh=dke_cor(i,j,k,1)
-                  temp=(c2*ka+kb+kc+kd+ke+kf+kg+kh)/(spbt(i,j)**2)
-                  dke_adv(i,j,k,1)=kb*temp
-                  dke_fri(i,j,k,1)=kc*temp
-                  dke_pre(i,j,k,1)=kd*temp
-                  dke_bar(i,j,k,1)=ke*temp
-                  dke_bcf(i,j,1)  =kf*temp
-                  dke_ape(i,j,k,1)=kg*temp
-                  dke_cor(i,j,k,1)=kh*temp
-                  
-                  ka=uv_ini (i,j,k,2)
-                  kb=dke_adv(i,j,k,2)
-                  kc=dke_fri(i,j,k,2)
-                  kd=dke_pre(i,j,k,2)
-                  ke=dke_bar(i,j,k,2)
-                  kf=dke_bcf(i,j,2)
-                  kg=dke_ape(i,j,k,2)
-                  kh=dke_cor(i,j,k,2)
-                  temp=(c2*ka+kb+kc+kd+ke+kf+kg+kh)/(spbt(i,j)**2)
-                  dke_adv(i,j,k,2)=kb*temp
-                  dke_fri(i,j,k,2)=kc*temp
-                  dke_pre(i,j,k,2)=kd*temp
-                  dke_bar(i,j,k,2)=ke*temp
-                  dke_bcf(i,j,2)  =kf*temp
-                  dke_ape(i,j,k,2)=kg*temp
-                  dke_cor(i,j,k,2)=kh*temp
-                  else
-                  ka=uv_ini (i,j,k,1)
-                  kb=dke_adv(i,j,k,1)
-                  kc=dke_fri(i,j,k,1)
-                  kd=dke_pre(i,j,k,1)
-                  ke=dke_bar(i,j,k,1)
-                  kg=dke_ape(i,j,k,1)
-                  kh=dke_cor(i,j,k,1)
-                  temp=(c2*ka+kb+kc+kd+ke+kg+kh)/(spbt(i,j)**2)
-                  dke_adv(i,j,k,1)=kb*temp
-                  dke_fri(i,j,k,1)=kc*temp
-                  dke_pre(i,j,k,1)=kd*temp
-                  dke_bar(i,j,k,1)=ke*temp
-                  dke_ape(i,j,k,1)=kg*temp
-                  dke_cor(i,j,k,1)=kh*temp
-                  
-                  ka=uv_ini (i,j,k,2)
-                  kb=dke_adv(i,j,k,2)
-                  kc=dke_fri(i,j,k,2)
-                  kd=dke_pre(i,j,k,2)
-                  ke=dke_bar(i,j,k,2)
-                  kg=dke_ape(i,j,k,2)
-                  kh=dke_cor(i,j,k,2)
-                  temp=(c2*ka+kb+kc+kd+ke+kg+kh)/(spbt(i,j)**2)
-                  dke_adv(i,j,k,2)=kb*temp
-                  dke_fri(i,j,k,2)=kc*temp
-                  dke_pre(i,j,k,2)=kd*temp
-                  dke_bar(i,j,k,2)=ke*temp
-                  dke_ape(i,j,k,2)=kg*temp
-                  dke_cor(i,j,k,2)=kh*temp
-                  end if
-               end do
-            end do
-         end do
-      end if
-!
-!
       call swap_array_real4d(up,imt,jmt,km,2,west,east,north,south)
       call swap_array_real4d(vp,imt,jmt,km,2,west,east,north,south)
 !

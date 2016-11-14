@@ -1,7 +1,16 @@
 !
 !     ================
-      subroutine setpn(dz0,z0,dz,z,pn,imt,jmt,km,kmp1,itn,decibar,unesco,boussinesq,   &
+!BOP
+!
+! !MODULE: setpn.f90
+! !DESCRIPTION: \input{sections/code-setpn}
+!
+! !INTERFACE:
+!
+      subroutine setpn(dz0,z0,dz,z,pn,imt,jmt,km,kmp1,itn,decibar,   &
                        phib,myid,ncpux,ncpuy,mat_myid,west,east,north,south)
+!EOP
+!-------------------------------------------------------------------------------
 !     ================
 !     calculate pn, z & dz
 !
@@ -13,7 +22,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer imt,jmt,km,kmp1,i,j,k,itn(imt,jmt),unesco,boussinesq
+      integer imt,jmt,km,kmp1,i,j,k,itn(imt,jmt)
       real p0,dens,undens,pres,decibar,missvalue
       real pre(kmp1),denz(km)
       real t30(km),s30(km)
@@ -56,17 +65,10 @@
       pre(k+1) = pre(k) + denz(k)*grav*dz0(k)
       enddo
 !
-      if (unesco==1) then
       do k=1,km
       p0      = (pre(k)+pre(k+1))*p5*decibar
       denz(k) = undens(t30(k),s30(k),p0)
       enddo
-      else
-      do k=1,km
-      p0      = (pre(k)+pre(k+1))*p5*decibar
-      denz(k) = dens(t30(k),s30(k),p0)
-      enddo
-      end if
 !
       if(abs(pre(kmp1)-pres).gt.c1em4)then
        pres = pre(kmp1)
@@ -76,34 +78,14 @@
 !---------------------------------------------------------------------
 !     calculate z & dz
 !---------------------------------------------------------------------
-      if (boussinesq==1) then
-      do k=1,km
-        z(k) = z0(k) * grav
-       dz(k) = dz0(k) * grav
-      enddo
-      else
       do k=1,km
         z(k) = (pre(k+1)+pre(k))*p5
        dz(k) =  pre(k+1)-pre(k)
       enddo
-      end if
 !
 !---------------------------------------------------------------------
 !     calculate pn
 !---------------------------------------------------------------------
-      if (boussinesq==1) then
-      do j=1,jmt
-      do i=1,imt
-      if(itn(i,j).eq.0) then
-       pn(i,j) = c1
-      else
-       pn(i,j) = abs(phib(i,j))
-      endif
-      enddo
-      enddo
-      
-      else
-      
       do j=1,jmt
       do i=1,imt
       if(itn(i,j).eq.0) then
@@ -113,7 +95,6 @@
       endif
       enddo
       enddo
-      end if
       
       call swap_array_real2d(pn,imt,jmt,west,east,north,south)
 

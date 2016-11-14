@@ -1,0 +1,30 @@
+\subsection{Vertical Velocity Equation}
+\label{der:sig-w}
+
+Integrate the mass conservation equation (\ref{eq:8}) from the surface to an
+arbitary vertical depth
+\beeq
+\intzs \grpp{ \pppt+\racosf\ppupl+\racosf\ppvcpf+\ppsps }d\gs=0
+\eneq
+\beeq 
+\pppt \gs + \racosf \intzs \grpp{ \ppupl + \ppvcpf }d\gs + 
+\pbt \dgs - (\pbt\dgs)_{\gs=0} = 0
+\eneq
+So
+\beeq \label{eq:35}
+\pbt\dgs = (\pbt\dgs)_{\gs=0} - \gs\pppt - \racosf\intzs\grpp{ \ppupl + \ppvcpf }d\gs
+\eneq
+
+From (\ref{eq:28}), we get
+\beeq \label{eq:36}
+\pppt = -\rz g \fep - \racosf \grpp{ \fp{(P U_b)}{\gl} + \fp{(P V_b\cosf)}{\gf}
+}.
+\eneq
+Substitute (\ref{eq:36}) into (\ref{eq:35}), we have
+\begin{align}
+  \pbt\dgs &= -\rz g \fep + \gs\rz g\fep + \racosf\intzs d\gs
+  \grpp{ \fp{(\spbt U_b)}{\gl} + \fp{(\spbt V_b\cosf)}{\gf} } \notag\\
+  &-\racosf\intzs \grpp{ \fp{(\spbt U)}{\gl} + \fp{(\spbt V\cosf)}{\gf} }\notag\\
+  &=\racosf\intzs\grppp{ \fp{[\spbt (U_b-U)]}{\gl} + \fp{[\spbt
+  (V_b-V)\cosf]}{\gf} } -(1-\gs)\rz g\fep
+\end{align}

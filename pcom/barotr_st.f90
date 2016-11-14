@@ -5,8 +5,8 @@
                     eblb,ebea,ebeb,pn,zu,cosu,rdxt,rdyt, &
                     dtsf,nbb,imt,jmt,km,imm,jmm,    &
                     myid,west,east,north,south,snbc,emp,jstn,jedn,jsts,   &
-                    jeds,smtha,fcof,umask,boussinesq,phib,pdxn,pdxs,pdye,pdyw,  &
-                    lat,lon,energydiag)
+                    jeds,smtha,fcof,umask,phib,pdxn,pdxs,pdye,pdyw,  &
+                    lat,lon)
 !     =================
 !     compute pbt, upb & vpb at "tau+1" time level
 !
@@ -14,7 +14,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer mode_b,nbb,snbc,boussinesq,nannum,energydiag
+      integer mode_b,nbb,snbc,nannum
       integer imt,jmt,km,imm,jmm,i,j,k,k2,n
       integer jstn,jedn,jsts,jeds,smtha
       integer ivn(imt,jmt),itn(imt,jmt)
@@ -176,42 +176,6 @@
 !-----------------------------------------------------------------------
 !
 !
-      if (boussinesq==1) then
-      do j=1,jmt
-      do i=1,imt
-      a(i,j) = phib(i,j)*(c1-pbt(i,j,tau))
-      enddo
-      enddo
-      end if
-      
-      if (boussinesq==1) then
-      do j=2,jmm
-      do i=2,imm
-      if(ivn(i,j).gt.0)then
-!
-      etax(i,j) = spbt(i,j)*p5*(  &
-              (a(i+1,j  )-a(i,j  ))*pdxn(i,j) &
-            +(a(i+1,j+1)-a(i,j+1))*pdxs(i,j+1) + &
-             (pbt(i+1,j  ,tau)-pbt(i,j  ,tau))*pbxn(i,j)   &
-            +(pbt(i+1,j+1,tau)-pbt(i,j+1,tau))*pbxs(i,j+1) +  &
-             (pbt(i+1,j  ,tau)+pbt(i,j  ,tau))*pcxn(i,j)    &
-            +(pbt(i+1,j+1,tau)+pbt(i,j+1,tau))*pcxs(i,j+1) )
-!
-!
-      etay(i,j) = spbt(i,j)*p5*(   &
-              (a(i  ,j+1)-a(i  ,j))*pdye(i,j)   &
-            +(a(i+1,j+1)-a(i+1,j))*pdyw(i+1,j) +  &
-             (pbt(i  ,j+1,tau)-pbt(i,  j,tau))*pbye(i  ,j)  &
-            +(pbt(i+1,j+1,tau)-pbt(i+1,j,tau))*pbyw(i+1,j) +  &
-             (pbt(i  ,j+1,tau)+pbt(i,  j,tau))*pcye(i  ,j)  &
-            +(pbt(i+1,j+1,tau)+pbt(i+1,j,tau))*pcyw(i+1,j) )  
-!
-      endif
-      enddo
-      enddo
-      
-      else
-      
       do j=2,jmm
       do i=2,imm
       if(ivn(i,j).gt.0)then
@@ -234,7 +198,6 @@
       endif
       enddo
       enddo
-      end if
 !
 !-----------------------------------------------------------------------
 !     advection + viscosiy + pressure gradient + coriolis

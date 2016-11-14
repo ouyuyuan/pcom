@@ -1,12 +1,23 @@
 !
+!     ===============
+!
+!BOP
+!
+! !MODULE: barotr.f90
+! !DESCRIPTION: \input{sections/code-barotr}
+!
+! !INTERFACE:
+!
 !     =================
       subroutine barotr(ivn,itn,upb,vpb,r1c,r1d,sdxu,am,dub,dvb,spbt,pbt,phibx,    &
                         phiby,pbxn,pbxs,pbye,pbyw,pcxn,pcxs,pcye,pcyw,ff,ebla,     &
                         eblb,ebea,ebeb,pn,zu,cosu,rdxt,rdyt,leapfrog_b,euler_back, &
                         dtsf,c2dtsf,afb1,afb2,pmup,pmtp,nbb,imt,jmt,km,imm,jmm,    &
                         myid,west,east,north,south,asselin_b,snbc,emp,jstn,jedn,jsts,   &
-                        jeds,smtha,fcof,umask,boussinesq,phib,pdxn,pdxs,pdye,pdyw,  &
-                        lat,lon,energydiag)
+                        jeds,smtha,fcof,umask,phib,pdxn,pdxs,pdye,pdyw,  &
+                        lat,lon)
+!EOP
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 !     =================
 !     compute pbt, upb & vpb at "tau+1" time level
 !
@@ -14,7 +25,7 @@
       include 'pconst.h'
       include 'mpif.h'
 !
-      integer mode_b,nbb,asselin_b,snbc,boussinesq,nannum,energydiag
+      integer mode_b,nbb,asselin_b,snbc,nannum
       integer imt,jmt,km,imm,jmm,i,j,k
       integer jstn,jedn,jsts,jeds,smtha
       logical euler_back,leapfrog_b
@@ -119,42 +130,6 @@
 !-----------------------------------------------------------------------
 !
 !
-      if (boussinesq==1) then
-      do j=1,jmt
-      do i=1,imt
-      a(i,j) = phib(i,j)*(c1-pbt(i,j,tau))
-      enddo
-      enddo
-      end if
-      
-      if (boussinesq==1) then
-      do j=2,jmm
-      do i=2,imm
-      if(ivn(i,j).gt.0)then
-!
-      etax(i,j) = spbt(i,j)*p5*(  &
-              (a(i+1,j  )-a(i,j  ))*pdxn(i,j) &
-            +(a(i+1,j+1)-a(i,j+1))*pdxs(i,j+1) + &
-             (pbt(i+1,j  ,tau)-pbt(i,j  ,tau))*pbxn(i,j)   &
-            +(pbt(i+1,j+1,tau)-pbt(i,j+1,tau))*pbxs(i,j+1) +  &
-             (pbt(i+1,j  ,tau)+pbt(i,j  ,tau))*pcxn(i,j)    &
-            +(pbt(i+1,j+1,tau)+pbt(i,j+1,tau))*pcxs(i,j+1) )
-!
-!
-      etay(i,j) = spbt(i,j)*p5*(   &
-              (a(i  ,j+1)-a(i  ,j))*pdye(i,j)   &
-            +(a(i+1,j+1)-a(i+1,j))*pdyw(i+1,j) +  &
-             (pbt(i  ,j+1,tau)-pbt(i,  j,tau))*pbye(i  ,j)  &
-            +(pbt(i+1,j+1,tau)-pbt(i+1,j,tau))*pbyw(i+1,j) +  &
-             (pbt(i  ,j+1,tau)+pbt(i,  j,tau))*pcye(i  ,j)  &
-            +(pbt(i+1,j+1,tau)+pbt(i+1,j,tau))*pcyw(i+1,j) )  
-!
-      endif
-      enddo
-      enddo
-      
-      else
-      
       do j=2,jmm
       do i=2,imm
       if(ivn(i,j).gt.0)then
@@ -177,7 +152,6 @@
       endif
       enddo
       enddo
-      end if
 !
 !-----------------------------------------------------------------------
 !     advection + viscosiy + pressure gradient + coriolis
@@ -242,7 +216,7 @@
       endif
       enddo
       enddo
-      else
+      else !(snbc=0)
       do j=2,jmm
       do i=2,imm
       if(itn(i,j).gt.0)then
@@ -347,6 +321,6 @@
 !
 !
 1000  continue
-!
+
       return
       end

@@ -1,0 +1,17 @@
+\subsection{Geopotential Height}
+\label{der:phi-sig}
+
+From the hydrostatic relation
+\beeq
+\fp{z}{\gs}=\fp{z}{p}\fp{p}{\gs}=-\f{\pbt}{\rho g}
+\eneq
+
+In vertical direction, $\fp{z}{\gs}=\fd{z}{\gs}$, ($z$ not related to
+$\gl,\gf,t$ in a fixed time in vertical direction), so
+\begin{align}
+dz &= -\f{\pbt}{\rho g}d\gs \\
+\intso dz &= -\f{1}{g}\intso\f{\pbt}{\rho}d\gs \\
+z_b - z &= -\f{1}{g}\intso\f{\pbt}{\rho}d\gs \\
+gz &= g z_b +\intso\f{\pbt}{\rho}d\gs \\
+\phi &= g z_b +\intso\f{\pbt}{\rho}d\gs
+\end{align}

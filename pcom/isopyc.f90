@@ -1,6 +1,15 @@
 !     =================
+!BOP
+!
+! !MODULE: isopyc
+! !DESCRIPTION: initilization of isopycnal mixing (GM90)
+!
+! !INTERFACE:
+!
       subroutine isopyi(imt,jmt,km,kmp1,slmxr,ahisop,ah,fzisop,kref,rdz0,   &
                         dz0,z0,K1,K2,K3,adv_vetiso,adv_vntiso,rhoi,e,adv_vbtiso)
+!EOP
+!-------------------------------------------------------------------------------
 !     =================
 !
 !=======================================================================
@@ -233,10 +242,20 @@
       end
 !
 !     =================
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+!BOP
+!
+! !IROUTINE: isopyc
+! !DESCRIPTION: \input{sections/code-isopyc}
+!
+! !INTERFACE:
+!
       subroutine isopyc(imt,jmt,km,kmp1,imm,jmm,nt,itn,tmask,kref,fzisop,rdz0,dz0,z0,  &
                         rdxt,rdyt,rdy,rdzw,dz,pn,cosu,t,slmxr,athkdf,K1,K2,K3,  &
                         adv_vetiso,adv_vntiso,adv_vbtiso,rhoi,e,fx,fy,west,east,north, &
-                        south,unesco)
+                        south)
+!EOP
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 !     =================
 !
 !=======================================================================
@@ -286,7 +305,7 @@
       integer xup,xmd,xlo
       parameter(xup=1,xmd=2,xlo=3)
       
-      integer i,j,k,imt,jmt,km,kmp1,imm,jmm,nt,unesco
+      integer i,j,k,imt,jmt,km,kmp1,imm,jmm,nt
       real    t0,s0,dens,undens
       integer mm1,mm2
       
@@ -315,7 +334,6 @@
 !
 !xjin calculate densities using unesco(1981) state equation
 !
-      if (unesco==1) then
       do k=1,km
       do j=1,jmt
       do i=1,imt
@@ -331,24 +349,6 @@
       enddo
       enddo
       enddo
-      else
-      do k=1,km
-      do j=1,jmt
-      do i=1,imt
-      if(tmask(i,j,k).gt.c0)then
-      mm1             = max(k-1,1)
-      mm2             = min(k+1,km)
-      t0              = t(i,j,k,1,tau)
-      s0              = t(i,j,k,2,tau)
-      rhoi(i,k,j,xup) = dens(t0,s0,kref(mm1))
-      rhoi(i,k,j,xmd) = dens(t0,s0,kref(k  ))
-      rhoi(i,k,j,xlo) = dens(t0,s0,kref(mm2))
-      endif
-      enddo
-      enddo
-      enddo
-      end if
-!
 !
 !      do j=1,jmt
 !        call setbcx (rhoi(1,1,j,xup), imt, km)
@@ -392,8 +392,18 @@
 !
 !
 !     ===============
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+!BOP
+!
+! !IROUTINE: K1_3
+! !DESCRIPTION: \input{sections/code-K1_3}
+!
+! !INTERFACE:
+!
       subroutine k1_3(imt,jmt,imm,jmm,km,kmp1,slmxr,itn,e,rhoi,rdz0,dz0,tmask,   &
                       rdxt,rdy,rdzw,fzisop,K1,west,east,north,south)
+!EOP
+!ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 !     ===============
 !
 !=======================================================================
@@ -568,8 +578,16 @@
 !
 !
 !     ===============
+!BOP
+!
+! !IROUTINE: K2_3
+! !DESCRIPTION: \input{sections/code-K2_3}
+!
+! !INTERFACE:
+!
       subroutine k2_3(imt,jmt,imm,jmm,km,kmp1,slmxr,itn,e,rhoi,rdz0,dz0,tmask,   &
                       rdxt,rdy,rdzw,fzisop,K2,west,east,north,south)
+!EOP
 !     ===============
 !     
 !=======================================================================
@@ -739,8 +757,16 @@
       end
 !
 !     =================
+!BOP
+!
+! !IROUTINE: K3_123
+! !DESCRIPTION: \input{sections/code-K3_123}
+!
+! !INTERFACE:
+!
       subroutine k3_123(imt,jmt,imm,jmm,km,kmp1,slmxr,e,rhoi,rdz0,dz0,tmask,   &
                         rdxt,rdy,rdzw,fzisop,K3)
+!EOP
 !     =================
 !
 !=======================================================================
@@ -873,9 +899,17 @@
       end
 !
 !     =================
+!BOP
+!
+! !IROUTINE: isoadv
+! !DESCRIPTION: \input{sections/code-isoadv}
+!
+! !INTERFACE:
+!
       subroutine isoadv(imt,jmt,imm,jmm,km,athkdf,itn,rdxt,rdyt,dz,pn,fx,fy,rdz0,  &
                         cosu,tmask,adv_vetiso,adv_vntiso,adv_vbtiso,K1,K2,west,    &
                         east,north,south)
+!EOP
 !     =================
 !
 !=======================================================================
@@ -1078,9 +1112,17 @@
 !
 !
 !     =============================
+!BOP
+!
+! !IROUTINE: isoflux
+! !DESCRIPTION: \input{sections/code-isoflux}
+!
+! !INTERFACE:
+!
       subroutine isoflux(tf,mtrace,imt,jmt,imm,jmm,nt,km,kmp1,itn,gravr,rdz0,dz0,rdz,  &
                          rdzw,rdxt,rdyt,rdy,cosu,tmask,t,ahisop,K1,K2,K3,adv_vetiso, &
                          adv_vntiso,adv_vbtiso,fx,fy)
+!EOP
 !     =============================
 !     isopycnal diffusive tracer fluxes are computed.
 !

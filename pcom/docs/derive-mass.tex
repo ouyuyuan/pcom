@@ -1,0 +1,33 @@
+\subsection{Mass Conservation Equation} \label{der:mass}
+
+The vector form of mass conservation equation is (see
+\citet{Yang1982_book}{P.92 5.52})
+\beeq \label{eq:mass-vec}
+\underbrace{ \fd{\rho}{t} }_\text{substantial change} + 
+\overbrace{ \rho \gn \cdot \vv }^\text{source \& sink} = 0.
+\eneq
+
+Let $\vv = u\vel + v\vef + w\ver$, 
+the divergence operator on spherical coordinate is 
+(see \citet{Xie2012_book}{P.122 3.4}, 
+map $q_1\ra \gl$, $q_2\ra \gf$, and $q_3\ra r$)
+\beeq
+\gn \cdot \vv = \f{1}{H_\gl H_\gf H_r} 
+\grpp{ \fp{}{\gl}(H_\gf H_r u) + \fp{}{\gf}(H_\gl H_r v) + \fp{}{r}(H_\gl H_\gf w) }
+\eneq
+
+Combine the above equation with equations \ref{eq:20}, we get
+\begin{align}
+  \gn \cdot \vv &= \f{1}{r^2\cosf} 
+\grpp{ \fp{}{\gl}(ru) + \fp{}{\gf}(rv\cosf) + \fp{}{r}(r^2 w\cosf) }\\
+&= \f{1}{r\cosf} \grpp{ \fp{u}{\gl} + \fp{(v\cosf)}{\gf} } + 
+\fp{w}{r} + \f{2 w}{r}
+\end{align}
+
+Let $r=a+z$, and adopt thin-layer approximation, on the surface of earth, we have
+\beeq
+\divv = \f{1}{a\cosf} \grpp{ \fp{u}{\gl} + \fp{(v\cosf)}{\gf} } + \fp{w}{z},
+\eneq
+
+Combine the above equation with equation \ref{eq:mass-vec}, we get the mass
+conservation equation \ref{eq:mass} in the spherical coordinate.
