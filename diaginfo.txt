@@ -1,0 +1,5 @@
+glo_ni =  360 with  8 processors in the x-direction, and ni approximate  45 for the sub-domain.
+glo_nj =  162 with  4 processors in the y-direction, and nj approximate  41 for the sub-domain.
+nk =   60
+ 
+created output file output/results.nc                                                               
