@@ -1,0 +1,9 @@
+source  /disk1/soft/intel/Compiler/11.1/073/bin/intel64/ifortvars_intel64.sh
+source  /disk1/soft/intel/Compiler/11.1/073/bin/intel64/iccvars_intel64.sh
+source  /disk1/soft/intel/Compiler/11.1/073/bin/intel64/idbvars.sh 
+
+source  /disk1/soft/intel/impi/4.0.1.007/bin64/mpivars.sh
+export I_MPI_PIN=off
+
+export NETCDF=/disk5/home/lyh/local/netcdf-4.1.3-ifc
+export LD_LIBRARY_PATH="$NETCDF/lib:$LD_LIBRARY_PATH"

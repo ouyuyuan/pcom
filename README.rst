@@ -1,7 +1,7 @@
 
-This version is modify from pcom1.0, 
-in order to test the code stability by comparing with
-pcom_en (git tag v1.1). 
+
+Version 1.2, modify from v1.1 to run the model like GFDL
+style using mkmf and compile templates
 
 Ou 
 2016
