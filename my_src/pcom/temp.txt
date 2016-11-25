@@ -1,0 +1,55 @@
+[1mmain.f90	 Line [0m[1m[32m320: [0m[0m  type (type_mat) :: [1m[31mp[0m[0m
+[1mmain.f90	 Line [0m[1m[32m329: [0m[0m    [1m[31mp[0m[0m%x(1) = loni
+[1mmain.f90	 Line [0m[1m[32m330: [0m[0m    [1m[31mp[0m[0m%x(2) = latj
+[1mmain.f90	 Line [0m[1m[32m331: [0m[0m    hpos(i,j,1)%x(1) = [1m[31mp[0m[0m%x(1) * torad
+[1mmain.f90	 Line [0m[1m[32m332: [0m[0m    hpos(i,j,1)%x(2) = [1m[31mp[0m[0m%x(2) * torad
+[1mmain.f90	 Line [0m[1m[32m339: [0m[0m    [1m[31mp[0m[0m%x(1) = loni
+[1mmain.f90	 Line [0m[1m[32m340: [0m[0m    [1m[31mp[0m[0m%x(2) = latj
+[1mmain.f90	 Line [0m[1m[32m341: [0m[0m    hpos(i,j,2)%x(1) = [1m[31mp[0m[0m%x(1) * torad
+[1mmain.f90	 Line [0m[1m[32m342: [0m[0m    hpos(i,j,2)%x(2) = [1m[31mp[0m[0m%x(2) * torad
+[1mmain.f90	 Line [0m[1m[32m347: [0m[0m    [1m[31mp[0m[0m%x(1) = loni
+[1mmain.f90	 Line [0m[1m[32m348: [0m[0m    [1m[31mp[0m[0m%x(2) = latj
+[1mmain.f90	 Line [0m[1m[32m349: [0m[0m    hpos(i,j,3)%x(1) = [1m[31mp[0m[0m%x(1) * torad
+[1mmain.f90	 Line [0m[1m[32m350: [0m[0m    hpos(i,j,3)%x(2) = [1m[31mp[0m[0m%x(2) * torad
+[1mmain.f90	 Line [0m[1m[32m354: [0m[0m    [1m[31mp[0m[0m%x(1) = loni
+[1mmain.f90	 Line [0m[1m[32m355: [0m[0m    [1m[31mp[0m[0m%x(2) = latj
+[1mmain.f90	 Line [0m[1m[32m356: [0m[0m    hpos(i,j,4)%x(1) = [1m[31mp[0m[0m%x(1) * torad
+[1mmain.f90	 Line [0m[1m[32m357: [0m[0m    hpos(i,j,4)%x(2) = [1m[31mp[0m[0m%x(2) * torad
+[1mmain.f90	 Line [0m[1m[32m517: [0m[0m  ! [1m[31mp[0m[0m
+[1mmain.f90	 Line [0m[1m[32m518: [0m[0m  gi1%[1m[31mp[0m[0m(1) = 0.0
+[1mmain.f90	 Line [0m[1m[32m519: [0m[0m  gi1%[1m[31mp[0m[0m(2:nkp) = pmn(:)
+[1mmain.f90	 Line [0m[1m[32m521: [0m[0m  gi2%[1m[31mp[0m[0m(1) = pmn(1)*0.5
+[1mmain.f90	 Line [0m[1m[32m523: [0m[0m    gi2%[1m[31mp[0m[0m(k) = ( pmn(k) + pmn(k-1) )*0.5
+[1mmain.f90	 Line [0m[1m[32m539: [0m[0m    gi1%dpr(k) = gi2%p(k) - gi2%[1m[31mp[0m[0m(k-1)
+[1mmain.f90	 Line [0m[1m[32m608: [0m[0m      g12%ph(i,j) = gi1%[1m[31mp[0m[0m(k+1)
+[1mmain.f90	 Line [0m[1m[32m616: [0m[0m      g32%ph(i,j) = gi1%[1m[31mp[0m[0m(k+1)
+[1mmod_arrays.f90	 Line [0m[1m[32m46: [0m[0m    prho, & ! (p rho)/([1m[31mp[0m[0m t/s), partial derivative of density
+[1mmod_arrays.f90	 Line [0m[1m[32m81: [0m[0m    adp, & ! m^3/kg * Pa, indefinite integration of alpha from [1m[31mp[0m[0m to ph
+[1mmod_arrays.f90	 Line [0m[1m[32m159: [0m[0m  allocate(gi1%[1m[31mp[0m[0m(nkp),  stat=is); call chk(is)
+[1mmod_arrays.f90	 Line [0m[1m[32m163: [0m[0m  gi1%z  = 0.0; gi1%[1m[31mp[0m[0m  = 0.0
+[1mmod_arrays.f90	 Line [0m[1m[32m167: [0m[0m  allocate(gi2%[1m[31mp[0m[0m(nk),  stat=is); call chk(is)
+[1mmod_arrays.f90	 Line [0m[1m[32m171: [0m[0m  gi2%z  = 0.0; gi2%[1m[31mp[0m[0m  = 0.0
+[1mmod_den.f90	 Line [0m[1m[32m54: [0m[0m                 ch(i,j) * git%[1m[31mp[0m[0m(k) + bnd%pa%v(i,j) )
+[1mmod_den.f90	 Line [0m[1m[32m69: [0m[0m  ! [1m[31mp[0m[0m = pressure, Pa
+[1mmod_den.f90	 Line [0m[1m[32m89: [0m[0m  real (kind=wp) :: [1m[31mp[0m[0m, p2, & 
+[1mmod_den.f90	 Line [0m[1m[32m95: [0m[0m  [1m[31mp[0m[0m = p0 * 1e-5 + 1.013
+[1mmod_den.f90	 Line [0m[1m[32m96: [0m[0m!  [1m[31mp[0m[0m = p0 * 1e-5
+[1mmod_den.f90	 Line [0m[1m[32m98: [0m[0m  p2  = p*[1m[31mp[0m[0m
+[1mmod_den.f90	 Line [0m[1m[32m116: [0m[0m     + ( 3.186519    + 2.212276e-2*t - 2.984642e-4*t2 + 1.956415e-6*t3 ) * [1m[31mp[0m[0m &
+[1mmod_den.f90	 Line [0m[1m[32m117: [0m[0m     + ( 6.704388e-3 - 1.847318e-4*t + 2.059331e-7*t2 ) * s * [1m[31mp[0m[0m &
+[1mmod_den.f90	 Line [0m[1m[32m118: [0m[0m     +   1.480266e-4*s32*[1m[31mp[0m[0m  &
+[1mmod_den.f90	 Line [0m[1m[32m122: [0m[0m  den_rho = r / ( 1.0 - [1m[31mp[0m[0m / k )
+[1mmod_den.f90	 Line [0m[1m[32m135: [0m[0m  real (kind=wp) :: t, s, [1m[31mp[0m[0m, rhoa, rhob
+[1mmod_den.f90	 Line [0m[1m[32m144: [0m[0m    p = ch%tc(i,j) * gi2%[1m[31mp[0m[0m(k)
+[1mmod_den.f90	 Line [0m[1m[32m146: [0m[0m    rhoa = den_rho( t + deltat, s, [1m[31mp[0m[0m )
+[1mmod_den.f90	 Line [0m[1m[32m147: [0m[0m    rhob = den_rho( t - deltat, s, [1m[31mp[0m[0m )
+[1mmod_den.f90	 Line [0m[1m[32m150: [0m[0m    rhoa = den_rho( t, s + deltas, [1m[31mp[0m[0m )
+[1mmod_den.f90	 Line [0m[1m[32m151: [0m[0m    rhob = den_rho( t, s - deltas, [1m[31mp[0m[0m )
+[1mmod_int.f90	 Line [0m[1m[32m73: [0m[0m  ! indefinite integration from [1m[31mp[0m[0m to sea bottom
+[1mmod_int.f90	 Line [0m[1m[32m75: [0m[0m  p3d = spread(spread(alpha%g%vg%[1m[31mp[0m[0m,1,nj),1,ni)
+[1mmod_int.f90	 Line [0m[1m[32m159: [0m[0m    pupb, & ! m/s^2, tendency of upb, (p upb)/([1m[31mp[0m[0m t)
+[1mmod_int.f90	 Line [0m[1m[32m312: [0m[0m    wk = ch%bc * git%[1m[31mp[0m[0m(k)
+[1mmod_op.f90	 Line [0m[1m[32m113: [0m[0m  ! ans = 1/sch*div(ch*gra(v)) + cv1*vp + cv2*sch*(p vc/ [1m[31mp[0m[0m x1) + vert.
+[1mmod_op.f90	 Line [0m[1m[32m146: [0m[0m  ! cv2*sch*(p vc/ [1m[31mp[0m[0m x1)
+[1mmod_op.f90	 Line [0m[1m[32m349: [0m[0m  nda = size(vga%[1m[31mp[0m[0m)
+[1mmod_type.f90	 Line [0m[1m[32m62: [0m[0m    real (kind=wp), allocatable :: [1m[31mp[0m[0m(:)

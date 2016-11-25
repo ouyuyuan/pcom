@@ -3,25 +3,23 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2016-04-05 19:42:16 BJT
+! Last Change: 2016-05-12 20:17:00 BJT
 
 module mod_param
 
   use mpi
   use mod_kind, only: sglp, wp
-  use mod_pro, only: pro_print
-  use mod_type, only: type_time, type_mat
 
   implicit none
   public
 
   ! exported variables !{{{1
 
-  ! mpi group, the whole world
+  ! mpi envioronment
   type :: type_my
-    integer :: id ! communicator/group/rank of the group
+    integer :: id ! rank of the group
     integer :: i, j ! coordinate in the topology of processors
-    integer :: ni, nj ! number of grid points in 3d directions
+    integer :: ni, nj ! number of grid points in east-west/north-south directions
     integer :: s, n, w, e ! south/north/west/east/upper/lower neighbor ids
     integer :: gn, gs, gw, ge ! indices in the global array
   end type type_my
@@ -56,7 +54,7 @@ module mod_param
   !   2. file namelist
   type :: type_nm
     sequence
-    ! number of Processors in 3d directions
+    ! number of Processors in horizontal directions
     integer :: py, px
 
     ! Begin/End Date for integration, in the form of yyyy-mm-dd hh:mm:ss
@@ -87,15 +85,6 @@ module mod_param
   integer :: glo_ni, glo_nj, ni, nj, nk, &
     nim, njm, nkp ! minus/plus 1, frequently used, for simplity
 
-  ! integration time control !{{{1
-  type :: type_tctr
-    type (type_time) :: pt, ct ! previous/current baroclinic step
-    real (kind=wp)   :: t1, t2 ! mpi time barrier
-    integer*8        :: nt     ! total baroclinic time steps
-    integer*8        :: i      ! current baroclinic time steps
-  end type
-  type (type_tctr) :: tctr
-
   ! other
   integer, parameter :: tc = 1 ! current time value
   integer, parameter :: tp = 2 ! previous time value
@@ -120,8 +109,9 @@ subroutine print_my (one) !{{{1
   
 end subroutine print_my
 
-subroutine param_set_nm () !{{{1
+subroutine param_set_nm ( nm ) !{{{1
   ! set the parameters in the namelist structure
+  type (type_nm) :: nm
 
   integer, parameter :: fid_nam = 20
 
@@ -172,11 +162,13 @@ subroutine param_set_nm () !{{{1
 
 end subroutine param_set_nm
 
-subroutine param_set_my ()  !{{{1
+subroutine param_set_my ( my )  !{{{1
   ! set mpi groups
+  type (type_my) :: my
+
   integer :: i
 
-  call set_ids ()
+  call set_ids( ids )
 
   ! set my
   my%id = myid
@@ -259,7 +251,7 @@ subroutine get_neighbor (one, ids)  !{{{1
 
 end subroutine get_neighbor
 
-subroutine set_ids () !{{{1
+subroutine set_ids ( ids ) !{{{1
   ! if nm%px = 4, nm%py = 2, then ids is:
   !   (NOTE that east-west direction is wrap up, 
   !     and the map is 'a reverse matrix')
@@ -269,6 +261,8 @@ subroutine set_ids () !{{{1
   !    2 6
   !    3 7
   !
+  integer, allocatable, dimension(:,:) :: ids
+
   integer, allocatable, dimension(:) :: ia
   integer :: i
 

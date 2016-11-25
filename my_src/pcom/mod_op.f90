@@ -3,36 +3,31 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-11 15:23:38 BJT
-! Last Change: 2016-04-05 14:51:29 BJT
+! Last Change: 2016-05-12 20:07:57 BJT
 
 module mod_op
 
   ! imported variables !{{{1
   use mod_arrays, only: &
-    g1, g2, g3, g4, hg1, hg2, hg3, hg4, &
-    vg1, vg2, &
-    gt, gu, hgt, hgu, vgt, vgw, &
-    bnd, am, km, kh, up, wm, pbt, &
-    cv1, cv2, &
-    arrays_init, arrays_cp_shape, arrays_free, &
-    glo_lon, glo_lat, z
+    g32, gi1, gi2, &
+    gt, gu, gtj, guj, git, giw, &
+    am, km, kh, up, wm, ch, &
+    cv1, cv2
 
   use mod_con, only: &
     a, g, rho0, cdbot, ah_c
 
   use mod_kind, only: wp
 
-  use mod_mympi, only: mympi_swpbnd, mympi_quick_output
+  use mod_mympi, only: mympi_swpbnd
 
   use mod_param, only: &
-    glo_nj, ni, nj, nk, nkp, &
-    tc, tp, tctr, &
-    nim, njm, myid, mid
+    ni, nj, nk, nkp, &
+    tc, tp, nim, njm
 
   use mod_type, only: type_mat, &
-    type_stg, type_vstg, type_stg3d, &
+    tctr, type_gi, type_gj, type_gij, &
     type_gvar_m3d, type_gvar_m2d, type_gvar_r2d, type_gvar_r3d
-
   implicit none
   private
 
@@ -107,12 +102,12 @@ module mod_op
   end interface
 contains !{{{1
 
-subroutine fri_r3d (ans, spbt, v, vp, vc, tau) !{{{1
+subroutine fri_r3d (ans, sch, v, vp, vc, tau) !{{{1
   ! horizontal frictional force
   ! ans is on the same grid as vp
-  ! ans = 1/spbt*div(pbt*gra(v)) + cv1*vp + cv2*spbt*(p vc/ p x1) + vert.
+  ! ans = 1/sch*div(ch*gra(v)) + cv1*vp + cv2*sch*(p vc/ p x1) + vert.
   real (kind=wp), dimension(:,:,:) :: ans
-  real (kind=wp), dimension(:,:), intent(in) :: spbt
+  real (kind=wp), dimension(:,:), intent(in) :: sch
   real (kind=wp), dimension(:,:,:), intent(in) :: &
     v, & ! unweighted velocity 
     vp, & ! pressure weighted velocity
@@ -121,48 +116,48 @@ subroutine fri_r3d (ans, spbt, v, vp, vc, tau) !{{{1
 
   type (type_mat), dimension(ni,nj,nk) :: wkmat
   real (kind=wp), dimension(ni,nj,nkp) :: wkp
-  real (kind=wp), dimension(ni,nj,nk) :: wka, wkb, spbt3d, pbt3da, pbt3db
+  real (kind=wp), dimension(ni,nj,nk) :: wka, wkb, sch3d, ch3da, ch3db
   real (kind=wp), dimension(ni,nj) :: wkr2d
   real (kind=wp) :: mag
   integer :: is, i, j, k
 
-  spbt3d = spread(spbt, 3, nk)
+  sch3d = spread(sch, 3, nk)
 
   ! horizontal viscosity
 
-  ! div(pbt*gra(v))
-  call op_gra( wkmat, v, hgu, hgu%ew, hgu%ns )
-  call op_ter( wkr2d, pbt%tc, pbt%hg, hgu%ew )
-  pbt3da = spread( wkr2d, 3, nk )
-  call op_ter( wkr2d, pbt%tc, pbt%hg, hgu%ns )
-  pbt3db = spread( wkr2d, 3, nk )
-  call div_r3d( wka, pbt3da*wkmat%x(1), pbt3db*wkmat%x(2), &
-                hgu%ew, hgu%ns, hgu )
-  ans = am%v/spbt3d * wka
+  ! div(ch*gra(v))
+  call op_gra( wkmat, v, guj, guj%ew, guj%ns )
+  call op_ter( wkr2d, ch%tc, ch%hg, guj%ew )
+  ch3da = spread( wkr2d, 3, nk )
+  call op_ter( wkr2d, ch%tc, ch%hg, guj%ns )
+  ch3db = spread( wkr2d, 3, nk )
+  call div_r3d( wka, ch3da*wkmat%x(1), ch3db*wkmat%x(2), &
+                guj%ew, guj%ns, guj )
+  ans = am%v/sch3d * wka
 
   ! cv1*vp
   ans = ans + am%v*spread(cv1,3,nk)*vp
 
-  ! cv2*spbt*(p vc/ p x1)
+  ! cv2*sch*(p vc/ p x1)
   ! oddly center difference of vc
-  call px_r3d_center( wka, vc, hgu )
-  ans = ans + am%v*spread(cv2,3,nk)*spbt3d*wka
+  call px_r3d_center( wka, vc, guj )
+  ans = ans + am%v*spread(cv2,3,nk)*sch3d*wka
 
   ! vertical viscosity
 
   ! oddly vertical difference respect to thickness (not pressure)
   call pz_r3d( wkp, vp, gu%msk )
-  wkp = g*rho0*km%v * wkp / (spread(spbt,3,nk))**2
+  wkp = g*rho0*km%v * wkp / (spread(sch,3,nk))**2
 
   ! surface boundary condition
-  wkp(:,:,1) = g*tau(:,:) / spbt(:,:)
+  wkp(:,:,1) = g*tau(:,:) / sch(:,:)
 
   do j = 1, nj
   do i = 1, ni
     k = gu%lev(i,j)
     if ( k > 0 ) then ! bottom drag
       mag = sqrt( v(i,j,k)**2 + vc(i,j,k)**2 )
-      wkp(i,j,k+1) = v(i,j,k)*g*cdbot*mag/spbt(i,j)
+      wkp(i,j,k+1) = v(i,j,k)*g*cdbot*mag/sch(i,j)
     end if
   end do
   end do
@@ -173,52 +168,52 @@ subroutine fri_r3d (ans, spbt, v, vp, vc, tau) !{{{1
 
 end subroutine fri_r3d
 
-subroutine op_fri(ans, spbt, up, tau) !{{{1
+subroutine op_fri(ans, sch, up, tau) !{{{1
   ! horizontal frictional force
   ! output is on the same grid as up
   type (type_mat), dimension(:,:,:) :: ans
-  real (kind=wp), dimension(:,:), intent(in) :: spbt
+  real (kind=wp), dimension(:,:), intent(in) :: sch
   type (type_gvar_m3d), intent(in) :: up
   type (type_gvar_m2d), intent(in) :: tau
 
-  real (kind=wp), dimension(ni,nj,nk) :: u, v, spbt3d
+  real (kind=wp), dimension(ni,nj,nk) :: u, v, sch3d
 
-  spbt3d = spread( spbt, 3, nk )
-  u = up%x(1)%v / spbt3d
-  v = up%x(2)%v / spbt3d
+  sch3d = spread( sch, 3, nk )
+  u = up%x(1)%v / sch3d
+  v = up%x(2)%v / sch3d
 
-  call fri_r3d( ans%x(1), spbt, u, up%x(1)%v, -v, tau%x(1)%v )
-  call fri_r3d( ans%x(2), spbt, v, up%x(2)%v,  u, tau%x(2)%v )
+  call fri_r3d( ans%x(1), sch, u, up%x(1)%v, -v, tau%x(1)%v )
+  call fri_r3d( ans%x(2), sch, v, up%x(2)%v,  u, tau%x(2)%v )
 
 end subroutine op_fri
 
-subroutine op_dif (ans, pbt, var) !{{{1
+subroutine op_dif (ans, ch, var) !{{{1
   ! diffusion of tracers
   ! ans is on the same grid as var
-  ! ans = div(pbt*gra(var)) + vert.
+  ! ans = div(ch*gra(var)) + vert.
   real (kind=wp), dimension(:,:,:) :: ans
-  real (kind=wp), dimension(:,:), intent(in) :: pbt
+  real (kind=wp), dimension(:,:), intent(in) :: ch
   real (kind=wp), dimension(:,:,:), intent(in) :: var ! tracer
 
   type (type_mat), dimension(ni,nj,nk) :: wkm
   real (kind=wp), dimension(ni,nj,nkp) :: wkp
-  real (kind=wp), dimension(ni,nj,nk) :: wk, pbt3da, pbt3db
+  real (kind=wp), dimension(ni,nj,nk) :: wk, ch3da, ch3db
   real (kind=wp), dimension(ni,nj) :: wkr2d
   integer :: is, k
 
   ! horizontal diffusion
 
-  ! div(pbt*gra(var))
-  call p1_r3d_b( wkm%x(1), var, hgt, hgt%ew, gt%msk )
-  wkm%x(1) = wkm%x(1) / ( a * spread(hgt%ew%rh1, 3, nk) )
-  call p2_r3d_b( wkm%x(2), var, hgt, hgt%ns, gt%msk )
+  ! div(ch*gra(var))
+  call p1_r3d_b( wkm%x(1), var, gtj, gtj%ew, gt%msk )
+  wkm%x(1) = wkm%x(1) / ( a * spread(gtj%ew%rh, 3, nk) )
+  call p2_r3d_b( wkm%x(2), var, gtj, gtj%ns, gt%msk )
   wkm%x(2) = wkm%x(2) / a
-  call op_ter( wkr2d, pbt, hgt, hgt%ew )
-  pbt3da = spread( wkr2d, 3, nk )
-  call op_ter( wkr2d, pbt, hgt, hgt%ns )
-  pbt3db = spread( wkr2d, 3, nk )
-  call div_r3d( wk, pbt3da*wkm%x(1), pbt3db*wkm%x(2), &
-                hgt%ew, hgt%ns, hgt )
+  call op_ter( wkr2d, ch, gtj, gtj%ew )
+  ch3da = spread( wkr2d, 3, nk )
+  call op_ter( wkr2d, ch, gtj, gtj%ns )
+  ch3db = spread( wkr2d, 3, nk )
+  call div_r3d( wk, ch3da*wkm%x(1), ch3db*wkm%x(2), &
+                gtj%ew, gtj%ns, gtj )
   ans = ah_c * wk
 
   ! vertical diffusion
@@ -231,43 +226,43 @@ subroutine op_dif (ans, pbt, var) !{{{1
   ans = ans + wk
 end subroutine op_dif
 
-subroutine op_adv (ans, var, spbt) !{{{1
+subroutine op_adv (ans, var, sch) !{{{1
   ! calc. advection of horizontal pressure weighted velocity var
   ! op_adv(var) = div(var*v) - 0.5*var*div(v), 
   !   v = (u, w) are unweighted 3d velocity
   real (kind=wp), dimension(:,:,:) :: ans
   real (kind=wp), dimension(:,:,:), intent(in) :: var
-  real (kind=wp), dimension(:,:), intent(in) :: spbt
+  real (kind=wp), dimension(:,:), intent(in) :: sch
 
   type (type_mat), dimension(ni,nj,nk) :: wkm
-  real (kind=wp),  dimension(ni,nj,nk) :: wka, wkb, cos3d, spbt3d, u, v
+  real (kind=wp),  dimension(ni,nj,nk) :: wka, wkb, cos3d, sch3d, u, v
   real (kind=wp),  dimension(ni,nj,nkp):: wkap, wkbp, w
 
   ! unaveraged velocity, interpolate to proper grid
-  spbt3d = spread( spbt, 3, nk )
-  wka = up(tc)%x(1)%v / spbt3d
-  call ter_r3d( u, wka, hgu, hgu%ew )
+  sch3d = spread( sch, 3, nk )
+  wka = up(tc)%x(1)%v / sch3d
+  call ter_r3d( u, wka, guj, guj%ew )
 
-  cos3d = spread(hgu%rh1,3,nk)
-  wka = up(tc)%x(2)%v / spbt3d
-  call ter_r3d( v, wka*cos3d, hgu, hgu%ns )
+  cos3d = spread(guj%rh,3,nk)
+  wka = up(tc)%x(2)%v / sch3d
+  call ter_r3d( v, wka*cos3d, guj, guj%ns )
 
-  wkap = wm%v / spread(pbt%tc,3,nkp)
-  call ter_r3d( w, wkap, hgt, hgu )
+  wkap = wm%v / spread(ch%tc,3,nkp)
+  call ter_r3d( w, wkap, gtj, guj )
 
   ! var*u
-  call ter_r3d( wka, var, hgu, hgu%ew )
-  call ter_r3d( wkb, var, hgu, hgu%ns )
+  call ter_r3d( wka, var, guj, guj%ew )
+  call ter_r3d( wkb, var, guj, guj%ns )
   wkm%x(1) = wka * u
   wkm%x(2) = wkb * v
 
   ! horizontal: div(var*u)
-  call p1_r3d( wka, wkm%x(1), hgu%ew, hgu )
-  call p2_r3d( wkb, wkm%x(2), hgu%ns, hgu )
+  call p1_r3d( wka, wkm%x(1), guj%ew, guj )
+  call p2_r3d( wkb, wkm%x(2), guj%ns, guj )
   ans = (wka + wkb) / (a*cos3d)
 
   ! var*w
-  call vter_r3d( wkap, var, vgt, vgw )
+  call vter_r3d( wkap, var, git, giw )
   wkap = wkap*w
   ! set to zero if any of the upper and lower layer of U-grid is land
   wkbp(:,:,1)   = 0
@@ -279,8 +274,8 @@ subroutine op_adv (ans, var, spbt) !{{{1
   ans = ans + wka
 
   ! div(v)
-  call p1_r3d( wkm%x(1), u, hgu%ew, hgu )
-  call p2_r3d( wkm%x(2), v, hgu%ns, hgu )
+  call p1_r3d( wkm%x(1), u, guj%ew, guj )
+  call p2_r3d( wkm%x(2), v, guj%ns, guj )
   call p3_r3d( wka, w )
   ans = ans - 0.5*var*( (wkm%x(1)+wkm%x(2))/(a*cos3d) + wka )
 
@@ -298,38 +293,38 @@ subroutine op_adv_ts (ans, var, wm) !{{{1
   type (type_mat), dimension(ni,nj,nk) :: wkm, um
   real (kind=wp),  dimension(ni,nj,nkp):: wkp
   real (kind=wp),  dimension(ni,nj,nk) :: wka, wkb, cos3d
-  real (kind=wp),  dimension(ni,nj) :: spbt
+  real (kind=wp),  dimension(ni,nj) :: sch
   integer :: k
 
-  call op_ter( spbt, pbt%tc, pbt%hg, hgu, 1.0 )
-  spbt = sqrt(spbt)
+  call op_ter( sch, ch%tc, ch%hg, guj, 1.0 )
+  sch = sqrt(sch)
 
   do k = 1, nk
-    um(:,:,k)%x(1) = up(tc)%x(1)%v(:,:,k) * spbt
-    um(:,:,k)%x(2) = up(tc)%x(2)%v(:,:,k) * spbt * hgu%rh1
+    um(:,:,k)%x(1) = up(tc)%x(1)%v(:,:,k) * sch
+    um(:,:,k)%x(2) = up(tc)%x(2)%v(:,:,k) * sch * guj%rh
   end do
 
   ! horizontal advection
-  call p1_r3d( wkm%x(1), var, hgt, hgt%ew )
-  call p2_r3d( wkm%x(2), var, hgt, hgt%ns )
+  call p1_r3d( wkm%x(1), var, gtj, gtj%ew )
+  call p2_r3d( wkm%x(2), var, gtj, gtj%ns )
 
-  cos3d = spread(hgt%rh1,3,nk)
+  cos3d = spread(gtj%rh,3,nk)
 
-  call ter_r3d( wka, um%x(1), hgu, hgt%ew )
-  call ter_r3d( wkb, wka * wkm%x(1), hgt%ew, hgt )
+  call ter_r3d( wka, um%x(1), guj, gtj%ew )
+  call ter_r3d( wkb, wka * wkm%x(1), gtj%ew, gtj )
   ! not interpolate the cosine factor
   ans = wkb / (a*cos3d)
 
-  call ter_r3d( wka, um%x(2), hgu, hgt%ns )
-  call ter_r3d( wkb, wka * wkm%x(2), hgt%ns, hgt )
+  call ter_r3d( wka, um%x(2), guj, gtj%ns )
+  call ter_r3d( wkb, wka * wkm%x(2), gtj%ns, gtj )
   ! not interpolate the cosine factor
   ans = ans + wkb / (a*cos3d)
 
   ! vertical advection
   call dx3_r3d_b( wkp, var )
-  call vter_r3d( wka, wm * wkp, vgw, vgt ) 
+  call vter_r3d( wka, wm * wkp, giw, git ) 
   ! not interpolate the layer 'thickness'
-  wka = wka / spread(spread(vgt%dp,1,nj), 1, ni)
+  wka = wka / spread(spread(git%dpr,1,nj), 1, ni)
   ans = ans + wka
 
 end subroutine op_adv_ts
@@ -338,7 +333,7 @@ subroutine vter_r3d(ans, var, vga, vgb, dft) !{{{1
   ! interpolate vertically from grid vga to grid vgb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_vstg), target :: vga, vgb
+  type (type_gj), target :: vga, vgb
   real (kind=wp), optional :: dft
 
   integer :: nda
@@ -346,7 +341,7 @@ subroutine vter_r3d(ans, var, vga, vgb, dft) !{{{1
   if ( vga%n == vgb%n ) &
     stop 'no need to interpolate in ans of mod_op'
 
-  nda = size(vga%p)
+  nda = size(vga%pr)
 
   if ( size(var,3) /= nda ) &
     stop 'var and vga unmatch in ans of mod_op'
@@ -357,10 +352,10 @@ subroutine vter_r3d(ans, var, vga, vgb, dft) !{{{1
     ans = 0.0
   end if
 
-  ! vg2 to vg1
+  ! gi2 to gi1
   if ( vga%n == 2 ) then
     ans(:,:,2:nk) = ( var(:,:,1:nk-1) + var(:,:,2:nk) ) * 0.5
-  ! from vg1 to vg2
+  ! from gi1 to gi2
   else
     ans(:,:,1:nk) = ( var(:,:,1:nk) + var(:,:,2:nkp) ) * 0.5
   end if
@@ -372,7 +367,7 @@ subroutine ter_r3d(ans, var, hga, hgb, dft) !{{{1
   ! interpolate from grid hga to grid hgb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
   real (kind=wp), optional :: dft
 
   if ( present(dft) ) then
@@ -406,7 +401,7 @@ subroutine ter_r2d(ans, var, hga, hgb, dft) !{{{1
   ! interpolate from grid hga to grid hgb
   real (kind=wp), dimension(ni,nj) :: ans
   real (kind=wp), intent(in) :: var(:,:)
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
   real (kind=wp), optional :: dft
 
   if ( present(dft) ) then
@@ -450,7 +445,7 @@ subroutine ter_i3d(ans, var, hga, hgb, dft) !{{{1
   ! interpolate from grid hga to grid hgb
   integer :: ans(:,:,:)
   integer, intent(in) :: var(:,:,:)
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
   integer, optional :: dft
 
   if ( hga%n == hgb%n ) stop 'no need to interpolate in ans of mod_op'
@@ -484,7 +479,7 @@ subroutine ter_i2d (ans, var, hga, hgb, dft) !{{{1
   ! interpolate from grid hga to grid hgb
   integer, dimension(ni,nj) :: ans
   integer, intent(in) :: var(:,:)
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
   integer, optional :: dft
 
   if ( hga%n == hgb%n ) stop 'no need to interpolate in ans of mod_op'
@@ -514,7 +509,7 @@ subroutine ter_i2d (ans, var, hga, hgb, dft) !{{{1
 end subroutine ter_i2d
 
 subroutine op_ter_t2u( va, vb ) !{{{1
-  ! interpolate from grid 1 to grid 3
+  ! interpolate from grid 12 to grid 32
   real (kind=wp), intent(in) :: va(:,:)
   real (kind=wp):: vb(:,:)
 
@@ -522,7 +517,7 @@ subroutine op_ter_t2u( va, vb ) !{{{1
 
   do i = 1, nim
   do j = 1, njm
-    if ( g3%lev(i,j) > 0 ) vb(i,j) = &
+    if ( gu%lev(i,j) > 0 ) vb(i,j) = &
       ( va(i,j)   + va(i,j+1) + &
         va(i+1,j) + va(i+1,j+1) ) * 0.25
   end do
@@ -534,10 +529,10 @@ end subroutine op_ter_t2u
 
 subroutine dx1_r3d ( ans, var, ga, gb )  !{{{1
   ! var(x+dx) - var(x)
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
   real (kind=wp), allocatable, dimension(:,:,:) :: temp
 
   integer :: d3, is
@@ -565,10 +560,10 @@ end subroutine dx1_r3d
 
 subroutine dx2_r3d( ans, var, ga, gb )  !{{{1
   ! var(y+dy) - var(y)
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
   real (kind=wp), allocatable, dimension(:,:,:) :: temp
 
   integer :: d3, is
@@ -594,10 +589,10 @@ end subroutine dx2_r3d
 
 subroutine p1_r3d ( ans, var, ga, gb )  !{{{1
   ! (partial var) / (partial x1), not include metric effects
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
   real (kind=wp), allocatable, dimension(:,:,:) :: temp
 
   integer :: d3, is
@@ -627,10 +622,10 @@ end subroutine p1_r3d
 
 subroutine px_r3d ( ans, var, hga, hgb )  !{{{1
   ! physical derivative, (partial var) / (partial x)
-  ! var on grid hga, result on grid pb
+  ! var on grid hga, result on grid gb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
 
   integer :: d3, k, ia, ib
 
@@ -642,7 +637,7 @@ subroutine px_r3d ( ans, var, hga, hgb )  !{{{1
       ia = 1 + hga%i
       ib = nim + hga%i
       ans(ia:ib,:,k) = (var(2:ni,:,k) - var(1:nim,:,k)) / &
-                       (a * hgb%rh1(ia:ib,:) * hgb%dx(ia:ib,:)%x(1))
+                       (a * hgb%rh(ia:ib,:) * hgb%dx(ia:ib,:)%x(1))
     end do
   else
     stop "grid unmatched in px_r3d of mod_op"
@@ -654,23 +649,23 @@ end subroutine px_r3d
 
 subroutine px_r3d_center ( ans, var, hg )  !{{{1
   ! physical derivative, (partial var) / (partial x)
-  ! var on grid hgu, result also on grid hgu
+  ! var on grid guj, result also on grid guj
   ! center difference scheme
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg), target :: hg
+  type (type_gi), target :: hg
 
   real (kind=wp) :: dx
   integer :: d3, k, i, j
 
   d3 = size(var, 3)
 
-  if ( associated(hgu, hg) ) then
+  if ( associated(guj, hg) ) then
     ans = 0.0
     do k = 1, d3
     do j = 1, nj
     do i = 2, ni - 1
-      dx = a * hg%ew%rh1(i,j) * &
+      dx = a * hg%ew%rh(i,j) * &
         ( hg%ew%dx(i,j)%x(1) + hg%ew%dx(i+1,j)%x(1) )
       ans(i,j,k) = ( var(i+1,j,k) - var(i-1,j,k) ) / dx
     end do
@@ -686,12 +681,12 @@ end subroutine px_r3d_center
 
 subroutine p1_r3d_b ( ans, var, ga, gb, mask )  !{{{1
   ! (partial var) / (partial x1), not include metric effects
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   ! set to zero if any of the two points is missing
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), dimension(:,:,:), intent(in) :: var
   integer, dimension(:,:,:), intent(in) :: mask
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
   real (kind=wp), allocatable, dimension(:,:,:) :: temp
 
   integer :: d3, is
@@ -722,10 +717,10 @@ end subroutine p1_r3d_b
 
 subroutine p1_r2d ( ans, var, ga, gb )  !{{{1
   ! (partial var) / (partial x1), not include metric effects
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   real (kind=wp), dimension(ni,nj) :: ans
   real (kind=wp), intent(in) :: var(:,:)
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
 
   real (kind=wp), dimension(ni,nj) :: temp
 
@@ -747,10 +742,10 @@ end subroutine p1_r2d
 
 subroutine p2_r3d( ans, var, ga, gb )  !{{{1
   ! (partial var) / (partial x2), not include metric effects
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), dimension(:,:,:), intent(in) :: var
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
   real (kind=wp), allocatable, dimension(:,:,:) :: temp
 
   integer :: d3, is
@@ -779,12 +774,12 @@ end subroutine p2_r3d
 
 subroutine p2_r3d_b( ans, var, ga, gb, mask )  !{{{1
   ! (partial var) / (partial x2), not include metric effects
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   ! set to zero if any of the tow points is missing
   real (kind=wp) :: ans(:,:,:)
   real (kind=wp), dimension(:,:,:), intent(in) :: var
   integer, dimension(:,:,:), intent(in) :: mask
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
   real (kind=wp), allocatable, dimension(:,:,:) :: temp
 
   integer :: d3, is
@@ -814,10 +809,10 @@ end subroutine p2_r3d_b
 
 subroutine p2_r2d ( ans, var, ga, gb )  !{{{1
   ! (partial var) / (partial x2), not include metric effects
-  ! var on grid ga, result on grid pb
+  ! var on grid ga, result on grid gb
   real (kind=wp), dimension(ni,nj) :: ans
   real (kind=wp), intent(in) :: var(:,:)
-  type (type_stg), target :: ga, gb
+  type (type_gi), target :: ga, gb
 
   real (kind=wp), dimension(ni,nj) :: temp
 
@@ -841,7 +836,7 @@ end subroutine p2_r2d
 subroutine p3_r3d ( ans, var )  !{{{1
   ! default (partial var) / (partial x3)
   ! upward is positive
-  ! vertically, var on vg1, result on vg2
+  ! vertically, var on gi1, result on gi2
   real (kind=wp), dimension(ni,nj,nk) :: ans
   real (kind=wp), dimension(ni,nj,nkp) :: var
 
@@ -852,9 +847,9 @@ subroutine p3_r3d ( ans, var )  !{{{1
   if (d3 == nkp) then
     ans = 0.0
     ans(:,:,1:nk) = var(:,:,1:nk) - var(:,:,2:nkp)
-    ans = ans / spread(spread(vg2%dp,1,nj), 1, ni)
+    ans = ans / spread(spread(gi2%dpr,1,nj), 1, ni)
   else
-    stop 'var should vertically on vg1 in p3_r3d in mod_op'
+    stop 'var should vertically on gi1 in p3_r3d in mod_op'
   end if
 
   ! no need to swap boundary horizontally
@@ -863,7 +858,7 @@ end subroutine p3_r3d
 subroutine p3_r3d_b ( ans, var )  !{{{1
   ! default (partial var) / (partial x3)
   ! upward is positive
-  ! vertically, var on vg2, result on vg1
+  ! vertically, var on gi2, result on gi1
   real (kind=wp), dimension(ni,nj,nkp) :: ans
   real (kind=wp), dimension(ni,nj,nk) :: var
 
@@ -874,9 +869,9 @@ subroutine p3_r3d_b ( ans, var )  !{{{1
   if (d3 == nk) then
     ans = 0.0
     ans(:,:,2:nk) = var(:,:,1:nk-1) - var(:,:,2:nk)
-    ans = ans / spread(spread(vg1%dp,1,nj), 1, ni)
+    ans = ans / spread(spread(gi1%dpr,1,nj), 1, ni)
   else
-    stop 'var should vertically on vg2 in p3_r3d_b in mod_op'
+    stop 'var should vertically on gi2 in p3_r3d_b in mod_op'
   end if
 
   ! no need to swap boundary horizontally
@@ -885,24 +880,24 @@ end subroutine p3_r3d_b
 subroutine p3_r3d_ter( ans, var, hga, hgb )  !{{{1
   ! (partial var) / (partial x3)
   ! upward is positive
-  ! var horizontally on hga, vertically on vg1
-  ! result horizontally in hgb, vertically on vg2
+  ! var horizontally on hga, vertically on gi1
+  ! result horizontally in hgb, vertically on gi2
   real (kind=wp), dimension(ni,nj,nk) :: ans
   real (kind=wp), dimension(ni,nj,nkp) :: var
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
 
   real (kind=wp), dimension(ni,nj,nkp) :: temp
   integer :: d3
 
   d3 = size(var, 3)
   if (d3 /= nkp) &
-    stop 'var should vertically on vg1 in ans in mod_op'
+    stop 'var should vertically on gi1 in ans in mod_op'
 
   call ter_r3d( temp, var, hga, hgb )
 
   ans = 0.0
   ans(:,:,1:nk) = temp(:,:,1:nk) - temp(:,:,2:nkp)
-  ans = ans / spread(spread(vg2%dp,1,nj), 1, ni)
+  ans = ans / spread(spread(gi2%dpr,1,nj), 1, ni)
 
   ! no need to swap boundary horizontally
 end subroutine p3_r3d_ter
@@ -910,7 +905,7 @@ end subroutine p3_r3d_ter
 subroutine pz_r3d ( ans, var, msk )  !{{{1
   ! (partial var) / (partial z), with respect to height, not pressure
   ! upward is positive
-  ! vertically, var on vg2, result on vg1
+  ! vertically, var on gi2, result on gi1
   ! set to zero if any of the upper and lower layer of grid mask is land
   real (kind=wp), dimension(ni,nj,nkp) :: ans
   real (kind=wp), dimension(ni,nj,nk), intent(in) :: var
@@ -926,12 +921,12 @@ subroutine pz_r3d ( ans, var, msk )  !{{{1
     do j = 1, nj
     do i = 1, ni
       ans(i,j,k) = ( var(i,j,k-1) - var(i,j,k) ) * &
-        msk(i,j,k-1)*msk(i,j,k) / vgw%dz(k)
+        msk(i,j,k-1)*msk(i,j,k) / giw%dz(k)
     end do
     end do
     end do
   else
-    stop 'var should vertically on vg2 in pz_r3d in mod_op'
+    stop 'var should vertically on gi2 in pz_r3d in mod_op'
   end if
 
   ! no need to swap boundary horizontally
@@ -940,10 +935,10 @@ end subroutine pz_r3d
 subroutine dx3_r3d ( ans, var )  !{{{1
   ! default (partial var) / (partial x3)
   ! upward is positive
-  ! vertically, var on vg1, result on vg2
+  ! vertically, var on gi1, result on gi2
   real (kind=wp), dimension(ni,nj,nk) :: ans
   real (kind=wp), dimension(ni,nj,nkp) :: var
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
 
   integer :: d3
 
@@ -953,7 +948,7 @@ subroutine dx3_r3d ( ans, var )  !{{{1
     ans = 0.0
     ans(:,:,1:nk) = var(:,:,1:nk) - var(:,:,2:nkp)
   else
-    stop 'var should vertically on vg1 in dx3_r3d in mod_op'
+    stop 'var should vertically on gi1 in dx3_r3d in mod_op'
   end if
 
   ! no need to swap boundary horizontally
@@ -962,10 +957,10 @@ end subroutine dx3_r3d
 subroutine dx3_r3d_b ( ans, var )  !{{{1
   ! default (partial var) / (partial x3)
   ! upward is positive
-  ! vertically, var on vg2, result on vg1
+  ! vertically, var on gi2, result on gi1
   real (kind=wp), dimension(ni,nj,nkp) :: ans
   real (kind=wp), dimension(ni,nj,nk) :: var
-  type (type_stg), target :: hga, hgb
+  type (type_gi), target :: hga, hgb
 
   integer :: d3
 
@@ -975,7 +970,7 @@ subroutine dx3_r3d_b ( ans, var )  !{{{1
     ans = 0.0
     ans(:,:,2:nk) = var(:,:,1:nk-1) - var(:,:,2:nk)
   else
-    stop 'var should vertically on vg2 in dx3_r3d_b in mod_op'
+    stop 'var should vertically on gi2 in dx3_r3d_b in mod_op'
   end if
 
   ! no need to swap boundary horizontally
@@ -986,16 +981,16 @@ subroutine div_r3d (ans, va, vb, ga, gb, gc) !{{{1
   ! (va, vb) on grid (ga, gb), result on grid gc
   real (kind=wp), dimension(ni,nj,nk) :: ans
   real (kind=wp), dimension(ni,nj,nk), intent(in) :: va, vb
-  type (type_stg), intent(in) :: ga, gb, gc
+  type (type_gi), intent(in) :: ga, gb, gc
 
   real (kind=wp), dimension(ni,nj,nk) :: wka, wkb, wk
 
-  wk = spread(gb%rh1,3,nk)
+  wk = spread(gb%rh,3,nk)
   call p1_r3d( wka, va, ga, gc )
   call p2_r3d( wkb, vb*wk, gb, gc)
   ans = wka + wkb
 
-  wk = spread(gc%rh1,3,nk)
+  wk = spread(gc%rh,3,nk)
   ans = ans / (a * wk)
 
 end subroutine div_r3d
@@ -1005,16 +1000,16 @@ subroutine div_r2d (ans, va, vb, ga, gb, gc) !{{{1
   ! (va, vb) on grid (ga, gb), result on grid gc
   real (kind=wp), dimension(ni,nj) :: ans
   real (kind=wp), dimension(ni,nj), intent(in) :: va, vb
-  type (type_stg), intent(in) :: ga, gb, gc
+  type (type_gi), intent(in) :: ga, gb, gc
 
   real (kind=wp), dimension(ni,nj) :: wk
 
   call p1_r2d( wk, va, ga, gc )
   ans = wk
-  call p2_r2d( wk, vb*gb%rh1, gb, gc )
+  call p2_r2d( wk, vb*gb%rh, gb, gc )
   ans = ans + wk
 
-  ans = ans / (a * gc%rh1)
+  ans = ans / (a * gc%rh)
 
 end subroutine div_r2d
 
@@ -1023,10 +1018,10 @@ subroutine gra_r2d (ans, var, hga, hgb, hgc) !{{{1
   ! var on grid hga, output on (hgb, hgc)
   type (type_mat) :: ans(ni,nj)
   real (kind=wp),  dimension(ni,nj), intent(in) :: var
-  type (type_stg), target :: hga, hgb, hgc
+  type (type_gi), target :: hga, hgb, hgc
 
   call p1_r2d( ans%x(1), var, hga, hgb )
-  ans%x(1) = ans%x(1) / ( a * hgb%rh1 )
+  ans%x(1) = ans%x(1) / ( a * hgb%rh )
   call p2_r2d( ans%x(2), var, hga, hgc )
   ans%x(2) = ans%x(2) / a
 
@@ -1037,12 +1032,12 @@ subroutine gra_r2d_b (ans, var, hga, hgb, hgc) !{{{1
   ! var on grid hga, output on (hgb, hgc)
   type (type_gvar_m2d) :: ans
   real (kind=wp),  dimension(ni,nj), intent(in) :: var
-  type (type_stg), target :: hga, hgb, hgc
+  type (type_gi), target :: hga, hgb, hgc
 
   ans%x(1)%hg => hgb; ans%x(2)%hg => hgc
 
   call p1_r2d( ans%x(1)%v, var, hga, hgb )
-  ans%x(1)%v = ans%x(1)%v / ( a * hgb%rh1 )
+  ans%x(1)%v = ans%x(1)%v / ( a * hgb%rh )
   call p2_r2d( ans%x(2)%v, var, hga, hgc )
   ans%x(2)%v = ans%x(2)%v / a
 
@@ -1053,12 +1048,12 @@ subroutine gra_r3d (ans, var, ga, gb, gc) !{{{1
   ! var on grid ga, output on (gb, gc)
   type (type_mat) :: ans(:,:,:)
   real (kind=wp),  dimension(:,:,:), intent(in) :: var
-  type (type_stg) :: ga, gb, gc
+  type (type_gi) :: ga, gb, gc
 
   integer :: k, d3, is
 
   call p1_r3d( ans%x(1), var, ga, gb)
-  ans%x(1) = ans%x(1) / ( a * spread(gb%rh1,3,d3) )
+  ans%x(1) = ans%x(1) / ( a * spread(gb%rh,3,d3) )
   call p2_r3d( ans%x(2), var, ga, gc)
   ans%x(2) = ans%x(2) / a
 
@@ -1071,7 +1066,7 @@ subroutine gra_gr2d (ans, var) !{{{1
 
   ans%x(1)%hg => var%hg%ew
   call p1_r2d( ans%x(1)%v, var%v, var%hg, ans%x(1)%hg )
-  ans%x(1)%v = ans%x(1)%v / ( a * ans%x(1)%hg%rh1 )
+  ans%x(1)%v = ans%x(1)%v / ( a * ans%x(1)%hg%rh )
 
   ans%x(2)%hg => var%hg%ns
   call p2_r2d( ans%x(2)%v, var%v, var%hg, ans%x(2)%hg )
@@ -1090,7 +1085,7 @@ subroutine gra_gr3d (ans, var) !{{{1
 
   ans%x(1)%g => var%g%ew
   call p1_r3d( ans%x(1)%v, var%v, var%g%hg, ans%x(1)%g%hg )
-  ans%x(1)%v = ans%x(1)%v / ( a * spread(ans%x(1)%g%hg%rh1, 3, d3) )
+  ans%x(1)%v = ans%x(1)%v / ( a * spread(ans%x(1)%g%hg%rh, 3, d3) )
 
   ans%x(2)%g => var%g%ns
   call p2_r3d( ans%x(2)%v, var%v, var%g%hg, ans%x(2)%g%hg )
@@ -1102,21 +1097,21 @@ subroutine lap_r2d (ans, var, ga, gb) !{{{1
   ! var on grid ga, output on grid gb
   real (kind=wp), dimension(ni,nj) :: ans
   real (kind=wp), dimension(:,:), intent(in) :: var
-  type (type_stg), intent(in) :: ga, gb
+  type (type_gi), intent(in) :: ga, gb
 
   real (kind=wp), dimension(ni,nj) :: wka, wkb
   
   call p1_r2d( wka, var, ga, gb%ew )
-  wka = wka / gb%ew%rh1 
+  wka = wka / gb%ew%rh 
   call p1_r2d( wkb, wka, gb%ew, gb )
   ans = wkb
 
   call p2_r2d( wka, var, ga, gb%ns )
-  wka = wka * gb%ns%rh1
+  wka = wka * gb%ns%rh
   call p2_r2d( wkb, wka, gb%ns, gb )
   ans = ans + wkb
 
-  ans = ans / ( a*a*gb%rh1 )
+  ans = ans / ( a*a*gb%rh )
 
 end subroutine lap_r2d
 
@@ -1137,12 +1132,12 @@ subroutine int_tobot (ans, var, grd)!{{{1
   ! assuming var is on the center of the layer
   real (kind=wp), dimension(ni,nj,nk) :: ans
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg3d), intent(in) :: grd
+  type (type_gij), intent(in) :: grd
 
   real (kind=wp), dimension(ni,nj,nk) :: temp
   integer :: k
 
-  temp = var * spread(spread(grd%vg%dp(1:nk),1,nj), 1, ni) * grd%msk
+  temp = var * spread(spread(grd%vg%dpr(1:nk),1,nj), 1, ni) * grd%msk
 
   do k = 1, nk-1
     ans(:,:,k) = temp(:,:,k)*0.5 + sum(temp(:,:,k+1:nk), 3)
@@ -1153,18 +1148,18 @@ end subroutine int_tobot
 
 subroutine op_vint_ns (var, ren, res)!{{{1
   ! vertical integration from sea surface to sea bottom
-  ! var is horizontally on grid 2, vertically on vg2
-  ! result on grid 3 (north and south)
+  ! var is horizontally on g2j, vertically on gi2
+  ! result on g3j (north and south)
   real (kind=wp), intent(in) :: var(:,:,:)
   real (kind=wp), dimension(:,:) :: ren, res
 
-  real (kind=wp), dimension(ni,nj,nk) :: dp3d
+  real (kind=wp), dimension(ni,nj,nk) :: dpr3d
 
-  dp3d = spread( spread(g3%vg%dp,1,nj), 1, ni )
-  ! divide by an integration facter pb
-  ren = sum(var*dp3d*g3%msk, 3) / g3%pb
-  ! shift mask and pb one grid northwards
-  res = sum(var*dp3d*cshift(g3%msk,-1,2), 3) / cshift(g3%pb,-1,2)
+  dpr3d = spread( spread(gi2%dpr,1,nj), 1, ni )
+  ! divide by an integration facter prh
+  ren = sum(var*dpr3d*g32%msk, 3) / g32%prh
+  ! shift mask and prh one grid northwards
+  res = sum(var*dpr3d*cshift(g32%msk,-1,2), 3) / cshift(g32%prh,-1,2)
 
   call mympi_swpbnd (ren, res) 
 
@@ -1172,18 +1167,18 @@ end subroutine op_vint_ns
 
 subroutine op_vint_ew (var, ree, rew)!{{{1
   ! vertical integration from sea surface to sea bottom
-  ! var is horizontally on grid 4, vertically on vg2
-  ! result on grid 3 (east and west)
+  ! var is horizontally on g4j, vertically on gi2
+  ! result on g3j (east and west)
   real (kind=wp), intent(in) :: var(:,:,:)
   real (kind=wp), dimension(:,:) :: ree, rew
 
-  real (kind=wp), dimension(ni,nj,nk) :: dp3d
+  real (kind=wp), dimension(ni,nj,nk) :: dpr3d
 
-  dp3d = spread( spread(g3%vg%dp,1,nj), 1, ni )
-  ! divide by an integration facter pb
-  ree = sum(var*dp3d*g3%msk, 3) / g3%pb
-  ! shift mask and pb one grid northwards
-  rew = sum(var*dp3d*cshift(g3%msk,-1,1), 3) / cshift(g3%pb,-1,1)
+  dpr3d = spread( spread(g32%vg%dpr,1,nj), 1, ni )
+  ! divide by an integration facter prh
+  ree = sum(var*dpr3d*g32%msk, 3) / g32%prh
+  ! shift mask and prh one grid northwards
+  rew = sum(var*dpr3d*cshift(g32%msk,-1,1), 3) / cshift(g32%prh,-1,1)
 
   call mympi_swpbnd (ree, rew) 
 
@@ -1191,15 +1186,15 @@ end subroutine op_vint_ew
 
 subroutine vint_r3d (ans, var, grd)!{{{1
   ! vertical integration from sea surface to sea bottom
-  ! result divided by a factor of pb
+  ! result divided by a factor of prh
   real (kind=wp), dimension(ni,nj) :: ans
   real (kind=wp), intent(in) :: var(:,:,:)
-  type (type_stg3d) :: grd
+  type (type_gij) :: grd
 
-  real (kind=wp), dimension(ni,nj,nk) :: dp3d
+  real (kind=wp), dimension(ni,nj,nk) :: dpr3d
 
-  dp3d = spread( spread(grd%vg%dp(1:nk),1,nj), 1, ni )
-  ans = sum(var * dp3d * grd%msk, 3) / grd%pb
+  dpr3d = spread( spread(grd%vg%dpr(1:nk),1,nj), 1, ni )
+  ans = sum(var * dpr3d * grd%msk, 3) / grd%prh
 
 end subroutine vint_r3d
 

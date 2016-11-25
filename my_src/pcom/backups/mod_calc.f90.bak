@@ -1,0 +1,116 @@
+
+! Description: calculation procedures
+!
+!      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
+!     Created: 2015-10-11 15:23:38 BJT
+! Last Change: 2015-10-11 19:27:56 BJT
+
+module mod_calc
+
+  ! imported variables !{{{1
+  use mod_kind, only: wp
+
+  use mod_param, only: &
+    glo_ny, nx, ny, nz, mydom
+
+  use mod_mympi, only: &
+    mympi_swpbnd
+
+  use mod_arrays, only: grdt
+
+  implicit none
+  private
+
+  public  &
+    calc_divh, &
+    ih2w, &
+    jh2w, &
+    u2t
+
+contains !{{{1
+
+function u2t (var) !{{{1
+  ! interpolate from U-grid to T-grid
+  real (kind=wp), intent(in) :: var(:,:)
+  real (kind=wp), dimension(ny,nx) :: u2t
+
+  u2t = ih2w ( jh2w ( var ) )
+
+  return
+end function u2t
+
+function calc_div (vx, vy) !{{{1
+  ! horizontal divergence operator for 2d vector field vx and vy
+  ! vx, vy are on U-grid, while the return value will on T-grid
+  real (kind=wp), dimension(ny,nx), intent(in) :: vx, vy
+  real (kind=wp), dimension(ny,nx) :: calc_div
+
+  real (kind=wp), dimension(ny,nx) :: a, b
+  integer :: i, j
+
+  calc_div(:,:) = 0.0
+  a(:,:) = jh2w (vx)
+  b(:,:) = ih2w (vy)
+
+  forall ( j=2:ny-1, i=2:nx-1 ) & 
+      calc_div(j,i) = ( a(j,i) - a(j,i-1) ) / grdt % dx(j,i) + &
+                      ( b(j,i) - b(j+1,i) ) / grdt % dy(j,i)
+
+  ! north and south is not wrap up
+  if ( mydom % gs == glo_ny ) calc_div(ny-1,:) = calc_div(ny-2,:)
+
+  call mympi_swpbnd ( calc_div(:,:) )
+
+  return
+end function calc_div
+
+function ih2w (var) !{{{1
+  ! interpolate var from half grid to whole grid in the i-direction
+  real (kind=wp), dimension(ny,nx), intent(in) :: var
+  real (kind=wp), dimension(ny,nx) :: ih2w
+
+  integer :: i, j
+
+  ih2w = var
+  forall ( j=2:ny-1, i=2:nx-1 ) &
+      ih2w(j,i) = 0.5*( var(j,i-1) + var(j,i) )
+  call mympi_swpbnd (ih2w)
+
+  return
+end function ih2w
+
+function jh2w (var) !{{{1
+  ! interpolate var from half grid to whole grid in the i-direction
+  real (kind=wp), dimension(ny,nx), intent(in) :: var
+  real (kind=wp), dimension(ny,nx) :: jh2w
+
+  integer :: i, j
+
+  jh2w = var
+  ! note i increase southwards
+  forall ( j=2:ny-1, i=2:nx-1 ) &
+      jh2w(j,i) = 0.5*( var(j+1,i) + var(j,i) )
+
+  ! north south is not wrap up
+  if ( mydom % gs == glo_ny ) jh2w(ny-1,:) = var(ny-1,:)
+
+  call mympi_swpbnd (jh2w)
+
+  return
+end function jh2w
+
+subroutine chk( ista ) !{{{1
+  ! check state of allocate array 
+
+  integer, intent(in) ::  ista
+
+  if ( ista /= 0 ) then
+    write(*,*) 'Allocate array failed. Stop'
+    stop 2
+  end if
+end subroutine chk
+
+end module mod_calc!{{{1
+!-------------------------------------------------------{{{1
+! vim:fdm=marker:fdl=0:
+! vim:foldtext=getline(v\:foldstart).'...'.(v\:foldend-v\:foldstart):

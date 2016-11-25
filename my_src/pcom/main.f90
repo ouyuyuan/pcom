@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2016-04-06 16:11:39 BJT
+! Last Change: 2016-05-14 09:23:06 BJT
 
 program main
 
@@ -12,36 +12,33 @@ program main
   use mod_arrays, only: &
     adv, arrays_init, &
     cv1, cv2, &
-    hg1, hg2, hg3, hg4, hgt, hgu, &
-    sg1, sg2, sg3, sg4, &
-    vg1, vg2, vgt, vgw, g1, g3, gt, gu, &
+    g1j, g2j, g3j, g4j, gtj, guj, &
+    gi1, gi2, git, giw, g12, g32, gt, gu, &
     acts, acuv, acw, acssh, am, arrays_allocate, &
     bnd, bphi, bgraphi, &
-    dub, &
-    frc, fcor, fri, &
-    glo_lat, glo_lon, graphib, grapa, &
+    badv, &
+    frc, cor, fri, &
+    glo_lat, glo_lon, graphih, grapa, &
     hpos, &
     km, kh, &
     lon, lat, &
-    rrho, rrhodp, &
-    pbt, prho, &
+    alpha, adp, &
+    ch, prho, &
     ts, &
     up, upb, &
-    z, &
-    arrays_cp_shape, arrays_free
+    wm, &
+    z
     
   use mod_con, only: &
-    rho0, g, am_c, km_c, gamma_b, a, torad, &
-    omega
+    rho0, g, km_c, a, torad, omega
 
-  use mod_den, only: den_rrho, den_rho, den_prho
+  use mod_den, only: den_alpha, den_rho, den_prho
 
   use mod_int, only: int_trop, int_bnd, &
     int_pgra, int_readyc, int_clin, int_ts, int_ssh
 
-  use mod_io, only: io_create, io_create_grdvar, &
-    io_get_dim_len, io_write, &
-    io_quick_output, io_read
+  use mod_io, only: io_create, &
+    io_get_dim_len, io_write, io_read
 
   use mod_kind, only: wp
 
@@ -49,32 +46,27 @@ program main
 
   use mod_mympi, only: &
     mympi_div, mympi_divx, mympi_divy, &
-    mympi_output, mympi_swpbnd, &
-    mympi_merge, mympi_bcast, mympi_quick_output
+    mympi_output, mympi_swpbnd, mympi_bcast
 
-  use mod_op, only: &
-    op_lap, op_ter, op_gra
+  use mod_op, only: op_ter, op_gra
 
   use mod_param, only: &
     nm, my, missing_float, &
     glo_ni, glo_nj, &
     ni, nj, nk, nim, njm, nkp, &
-    myid, npro, mid, names, ids, &
-    param_set_my, tctr, &
+    myid, npro, mid, names, &
+    param_set_my, param_set_nm, &
     tc, tp
-
-  use mod_pro, only: pro_print
 
   use mod_type, only: &
     type_accu_gm3d, type_accu_gr3d, type_accu_gr2d, &
-    type_stg, type_vstg, type_stg3d, &
+    type_gi, type_gj, type_gij, &
     type_str2time, &
     type_str2sec, type_mat, &
-    type_memo_r, type_frc, &
+    type_frc, tctr, &
     type_gvar_m2d, type_gvar_m3d, &
     type_gvar_r2d, type_gvar_r3d, &
-    type_bintg3, &
-    type_print, &
+    type_bintgu, &
     operator (+), operator (<)
 
   ! local variables !{{{1
@@ -113,18 +105,18 @@ program main
   call calc_hpos (hpos)
 
   ! setting stagger grids
-  call set_hgrid (hg1, hg2, hg3, hg4, hgt, hgu) 
-  call set_vgrid (vg1, vg2, vgt, vgw)
-  call set_grid  (g1, g3, gt, gu)
+  call set_hgrid (g1j, g2j, g3j, g4j, gtj, guj) 
+  call set_vgrid (gi1, gi2, git, giw)
+  call set_grid  (g12, g32, gt, gu)
 
   ! calc. grid variables
   call calc_cf( cv1, cv2 )
 
   ! Coriolis force
-  fcor%v = 2.0*omega*sin(hpos(:,:,fcor%hg%n)%x(2))
+  cor%v = 2.0*omega*sin(hpos(:,:,cor%hg%n)%x(2))
 
   ! prepare initial state of the ocean
-  call inistat(ts, frc, graphib)
+  call inistat(ts, frc, graphih)
 
   ! create output file
   if ( myid == mid ) then
@@ -159,25 +151,25 @@ program main
     end if
 
     ! calc. the specific volume, reciprocal of density
-    call den_rrho (rrho%v, ts(tc), pbt%tc, gt%msk)
+    call den_alpha (alpha%v, ts(tc), ch%tc, gt%msk)
 
     ! calc. pressure gradient forces
-    call int_pgra (rrhodp, bphi, bgraphi)
+    call int_pgra (adp, bphi, bgraphi)
 
     ! prepare for baroclinic integration
-    call int_readyc (grapa, dub, adv, fri)
+    call int_readyc (grapa, badv, adv, fri, wm)
 
     ! integrate series time steps per baroclinic time step
-    call int_trop (pbt, dub)
+    call int_trop (ch, upb)
 
     ! prediction of baroclinic mode
-    call int_clin (up, acuv)
+    call int_clin (up, acuv, am%v)
 
     ! calc. sea surface height
-    call int_ssh (acssh, rrho%v)
+    call int_ssh (acssh, alpha%v)
 
     ! prediction of temperature and salinity
-    call int_ts (ts, acts, acw)
+    call int_ts (ts, acts, acw, wm)
 
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
@@ -199,8 +191,6 @@ contains  !{{{1
 
 subroutine init () !{{{1
   ! initialize model environment
-  use mod_param, only: param_set_nm
-
   integer :: is
 
   ! get namelist !{{{2
@@ -208,7 +198,7 @@ subroutine init () !{{{1
   ! although we can read in namelist in all processors, 
   ! but it seems the namelist file may be destroyed by 
   ! muliple-opening (happened once)
-  if ( myid == mid ) call param_set_nm ()
+  if ( myid == mid ) call param_set_nm (nm)
 
   call mympi_bcast (nm%px)
   call mympi_bcast (nm%py)
@@ -236,7 +226,7 @@ subroutine init () !{{{1
   call mympi_bcast(glo_ni)
   call mympi_bcast(nk)
 
-  call param_set_my ()
+  call param_set_my (my)
   call mpi_barrier (mpi_comm_world, err)
 
   ni = my%ni
@@ -374,10 +364,10 @@ subroutine calc_hpos (hpos) !{{{1
 
 end subroutine calc_hpos
 
-subroutine set_hgrid (hg1, hg2, hg3, hg4, hgt, hgu) !{{{1
+subroutine set_hgrid (g1j, g2j, g3j, g4j, gtj, guj) !{{{1
   ! setting horizontal stagger grid properties
-  type (type_stg), target :: hg1, hg2, hg3, hg4
-  type (type_stg), pointer :: hgt, hgu
+  type (type_gi), target :: g1j, g2j, g3j, g4j
+  type (type_gi), pointer :: gtj, guj
 
   real (kind=wp) :: dx1, dx2
   integer :: is, i, j
@@ -388,87 +378,87 @@ subroutine set_hgrid (hg1, hg2, hg3, hg4, hgt, hgu) !{{{1
     dx1 = hpos(i,j,2)%x(1) - hpos(i-1,j,2)%x(1)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
     dx2 = hpos(i,j,4)%x(2) - hpos(i,j-1,4)%x(2)
-    hg1%dx(i,j)%x(1) = dx1
-    hg1%dx(i,j)%x(2) = dx2
+    g1j%dx(i,j)%x(1) = dx1
+    g1j%dx(i,j)%x(2) = dx2
 
     dx1 = hpos(i+1,j,1)%x(1) - hpos(i,j,1)%x(1)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
     dx2 = hpos(i,j,3)%x(2) - hpos(i,j-1,3)%x(2)
-    hg2%dx(i,j)%x(1) = dx1
-    hg2%dx(i,j)%x(2) = dx2
+    g2j%dx(i,j)%x(1) = dx1
+    g2j%dx(i,j)%x(2) = dx2
 
     dx1 = hpos(i+1,j,4)%x(1) - hpos(i,j,4)%x(1)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
     dx2 = hpos(i,j+1,2)%x(2) - hpos(i,j,2)%x(2)
-    hg3%dx(i,j)%x(1) = dx1
-    hg3%dx(i,j)%x(2) = dx2
+    g3j%dx(i,j)%x(1) = dx1
+    g3j%dx(i,j)%x(2) = dx2
 
     dx1 = hpos(i,j,3)%x(1) - hpos(i-1,j,3)%x(1)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
     dx2 = hpos(i,j+1,1)%x(2) - hpos(i,j,1)%x(2)
-    hg4%dx(i,j)%x(1) = dx1
-    hg4%dx(i,j)%x(2) = dx2
+    g4j%dx(i,j)%x(1) = dx1
+    g4j%dx(i,j)%x(2) = dx2
   end do
   end do
-  call mympi_swpbnd (hg1%dx)
-  call mympi_swpbnd (hg2%dx)
-  call mympi_swpbnd (hg3%dx)
-  call mympi_swpbnd (hg4%dx)
+  call mympi_swpbnd (g1j%dx)
+  call mympi_swpbnd (g2j%dx)
+  call mympi_swpbnd (g3j%dx)
+  call mympi_swpbnd (g4j%dx)
 
   ! extropolate
 
   if (my%gs == 1) then
-    hg1%dx(:,1)%x(1) = 2*hg1%dx(:,2)%x(1) - hg1%dx(:,3)%x(1)
-    hg1%dx(:,1)%x(2) = 2*hg1%dx(:,2)%x(2) - hg1%dx(:,3)%x(2)
+    g1j%dx(:,1)%x(1) = 2*g1j%dx(:,2)%x(1) - g1j%dx(:,3)%x(1)
+    g1j%dx(:,1)%x(2) = 2*g1j%dx(:,2)%x(2) - g1j%dx(:,3)%x(2)
 
-    hg2%dx(:,1)%x(1) = 2*hg2%dx(:,2)%x(1) - hg2%dx(:,3)%x(1)
-    hg2%dx(:,1)%x(2) = 2*hg2%dx(:,2)%x(2) - hg2%dx(:,3)%x(2)
+    g2j%dx(:,1)%x(1) = 2*g2j%dx(:,2)%x(1) - g2j%dx(:,3)%x(1)
+    g2j%dx(:,1)%x(2) = 2*g2j%dx(:,2)%x(2) - g2j%dx(:,3)%x(2)
 
-    hg3%dx(:,1)%x(1) = 2*hg3%dx(:,2)%x(1) - hg3%dx(:,3)%x(1)
-    hg3%dx(:,1)%x(2) = 2*hg3%dx(:,2)%x(2) - hg3%dx(:,3)%x(2)
+    g3j%dx(:,1)%x(1) = 2*g3j%dx(:,2)%x(1) - g3j%dx(:,3)%x(1)
+    g3j%dx(:,1)%x(2) = 2*g3j%dx(:,2)%x(2) - g3j%dx(:,3)%x(2)
 
-    hg4%dx(:,1)%x(1) = 2*hg4%dx(:,2)%x(1) - hg4%dx(:,3)%x(1)
-    hg4%dx(:,1)%x(2) = 2*hg4%dx(:,2)%x(2) - hg4%dx(:,3)%x(2)
+    g4j%dx(:,1)%x(1) = 2*g4j%dx(:,2)%x(1) - g4j%dx(:,3)%x(1)
+    g4j%dx(:,1)%x(2) = 2*g4j%dx(:,2)%x(2) - g4j%dx(:,3)%x(2)
   end if
 
   if (my%gn == glo_nj) then
-    hg1%dx(:,nj)%x(1) = 2*hg1%dx(:,nj-1)%x(1) - hg1%dx(:,nj-2)%x(1)
-    hg1%dx(:,nj)%x(2) = 2*hg1%dx(:,nj-1)%x(2) - hg1%dx(:,nj-2)%x(2)
+    g1j%dx(:,nj)%x(1) = 2*g1j%dx(:,nj-1)%x(1) - g1j%dx(:,nj-2)%x(1)
+    g1j%dx(:,nj)%x(2) = 2*g1j%dx(:,nj-1)%x(2) - g1j%dx(:,nj-2)%x(2)
 
-    hg2%dx(:,nj)%x(1) = 2*hg2%dx(:,nj-1)%x(1) - hg2%dx(:,nj-2)%x(1)
-    hg2%dx(:,nj)%x(2) = 2*hg2%dx(:,nj-1)%x(2) - hg2%dx(:,nj-2)%x(2)
+    g2j%dx(:,nj)%x(1) = 2*g2j%dx(:,nj-1)%x(1) - g2j%dx(:,nj-2)%x(1)
+    g2j%dx(:,nj)%x(2) = 2*g2j%dx(:,nj-1)%x(2) - g2j%dx(:,nj-2)%x(2)
 
-    hg3%dx(:,nj)%x(1) = 2*hg3%dx(:,nj-1)%x(1) - hg3%dx(:,nj-2)%x(1)
-    hg3%dx(:,nj)%x(2) = 2*hg3%dx(:,nj-1)%x(2) - hg3%dx(:,nj-2)%x(2)
+    g3j%dx(:,nj)%x(1) = 2*g3j%dx(:,nj-1)%x(1) - g3j%dx(:,nj-2)%x(1)
+    g3j%dx(:,nj)%x(2) = 2*g3j%dx(:,nj-1)%x(2) - g3j%dx(:,nj-2)%x(2)
 
-    hg4%dx(:,nj)%x(1) = 2*hg4%dx(:,nj-1)%x(1) - hg4%dx(:,nj-2)%x(1)
-    hg4%dx(:,nj)%x(2) = 2*hg4%dx(:,nj-1)%x(2) - hg4%dx(:,nj-2)%x(2)
+    g4j%dx(:,nj)%x(1) = 2*g4j%dx(:,nj-1)%x(1) - g4j%dx(:,nj-2)%x(1)
+    g4j%dx(:,nj)%x(2) = 2*g4j%dx(:,nj-1)%x(2) - g4j%dx(:,nj-2)%x(2)
   end if
 
   ! Lame coefficients and triangle function
 
   do j = 1, nj
   do i = 1, ni
-    hg1%rh1(i,j) = cos( hpos(i,j,1)%x(2) )
-    hg2%rh1(i,j) = cos( hpos(i,j,2)%x(2) )
-    hg3%rh1(i,j) = cos( hpos(i,j,3)%x(2) )
-    hg4%rh1(i,j) = cos( hpos(i,j,4)%x(2) )
+    g1j%rh(i,j) = cos( hpos(i,j,1)%x(2) )
+    g2j%rh(i,j) = cos( hpos(i,j,2)%x(2) )
+    g3j%rh(i,j) = cos( hpos(i,j,3)%x(2) )
+    g4j%rh(i,j) = cos( hpos(i,j,4)%x(2) )
 
-    hg1%tn(i,j) = tan( hpos(i,j,1)%x(2) )
-    hg2%tn(i,j) = tan( hpos(i,j,2)%x(2) )
-    hg3%tn(i,j) = tan( hpos(i,j,3)%x(2) )
-    hg4%tn(i,j) = tan( hpos(i,j,4)%x(2) )
+    g1j%tn(i,j) = tan( hpos(i,j,1)%x(2) )
+    g2j%tn(i,j) = tan( hpos(i,j,2)%x(2) )
+    g3j%tn(i,j) = tan( hpos(i,j,3)%x(2) )
+    g4j%tn(i,j) = tan( hpos(i,j,4)%x(2) )
   end do
   end do
 
-  hgt => hg1
-  hgu => hg3
+  gtj => g1j
+  guj => g3j
 end subroutine set_hgrid
 
-subroutine set_vgrid (vg1, vg2, vgt, vgw) !{{{1
+subroutine set_vgrid (gi1, gi2, git, giw) !{{{1
   ! set vertical stagger grid properties
-  type (type_vstg), target :: vg1, vg2
-  type (type_vstg), pointer :: vgt, vgw
+  type (type_gj), target :: gi1, gi2
+  type (type_gj), pointer :: git, giw
 
   real (kind=wp), dimension(nk) :: dz, rmn, pmn, tmn, smn
   real (kind=wp) :: pmnbot
@@ -508,53 +498,53 @@ subroutine set_vgrid (vg1, vg2, vgt, vgw) !{{{1
 
   ! set vertical grid info. at the initial state !{{{2
   ! z
-  vg1%z(1) = 0.0 ! sea surface
+  gi1%z(1) = 0.0 ! sea surface
   do k = 2, nkp
-    vg1%z(k) = vg1%z(k-1) + dz(k-1)
+    gi1%z(k) = gi1%z(k-1) + dz(k-1)
   end do
 
-  vg2%z(:) = z(:)
+  gi2%z(:) = z(:)
 
-  ! p
-  vg1%p(1) = 0.0
-  vg1%p(2:nkp) = pmn(:)
+  ! pr
+  gi1%pr(1) = 0.0
+  gi1%pr(2:nkp) = pmn(:)
 
-  vg2%p(1) = pmn(1)*0.5
+  gi2%pr(1) = pmn(1)*0.5
   do k = 2, nk
-    vg2%p(k) = ( pmn(k) + pmn(k-1) )*0.5
+    gi2%pr(k) = ( pmn(k) + pmn(k-1) )*0.5
   end do
 
   ! dz
-  vg1%dz = 0.0
-  vg1%dz(1) = 0.5*dz(1)
+  gi1%dz = 0.0
+  gi1%dz(1) = 0.5*dz(1)
   do k = 2, nk
-    vg1%dz(k) = z(k) - z(k-1)
+    gi1%dz(k) = z(k) - z(k-1)
   end do
-  vg1%dz(nkp) = vg1%dz(nk)
+  gi1%dz(nkp) = gi1%dz(nk)
 
-  vg2%dz(:) = dz(:)
+  gi2%dz(:) = dz(:)
 
-  ! dp
-  vg1%dp(1) = 0.5*pmn(1)
+  ! dpr
+  gi1%dpr(1) = 0.5*pmn(1)
   do k = 2, nk
-    vg1%dp(k) = vg2%p(k) - vg2%p(k-1)
+    gi1%dpr(k) = gi2%pr(k) - gi2%pr(k-1)
   end do
-  vg1%dp(nkp) = vg1%dp(nk)
+  gi1%dpr(nkp) = gi1%dpr(nk)
 
-  vg2%dp(1) = pmn(1)
+  gi2%dpr(1) = pmn(1)
   do k = 2, nk
-    vg2%dp(k) = pmn(k) - pmn(k-1)
+    gi2%dpr(k) = pmn(k) - pmn(k-1)
   end do
 
-  vgw => vg1
-  vgt => vg2
+  giw => gi1
+  git => gi2
 
 end subroutine set_vgrid
 
-subroutine set_grid (g1, g3, gt, gu) !{{{1
+subroutine set_grid (g12, g32, gt, gu) !{{{1
   ! 3d model stagger grid
-  type (type_stg3d),target :: g1, g3
-  type (type_stg3d), pointer :: gt, gu
+  type (type_gij),target :: g12, g32
+  type (type_gij), pointer :: gt, gu
 
   integer, allocatable, dimension(:,:) :: glo_itn
   real (kind=wp), dimension(nk) :: phimn
@@ -565,70 +555,70 @@ subroutine set_grid (g1, g3, gt, gu) !{{{1
     glo_itn = 0
     call io_read (nm%fi, 'itn', glo_itn)
   end if
-  call mympi_div (glo_itn, g1%lev)
+  call mympi_div (glo_itn, g12%lev)
 
   ! set to land first
-  g1%msk(:,:,:) = 0 
-  g3%msk(:,:,:) = 0 
+  g12%msk(:,:,:) = 0 
+  g32%msk(:,:,:) = 0 
 
   do k = 1, nk
   do j = 2, njm
   do i = 2, nim
-    if ( g1%lev(i,j) >= k ) g1%msk(i,j,k) = 1
+    if ( g12%lev(i,j) >= k ) g12%msk(i,j,k) = 1
   end do
   end do
   end do
-  call mympi_swpbnd ( g1%msk )
+  call mympi_swpbnd ( g12%msk )
 
   ! a water U-grid should be surounded by T-grids
   do k = 1, nk
   do j = 1, njm
   do i = 1, nim
-    g3%msk(i,j,k) = g1%msk(i,j,k) * g1%msk(i+1,j,k)  &
-                  * g1%msk(i,j+1,k) * g1%msk(i+1,j+1,k)
+    g32%msk(i,j,k) = g12%msk(i,j,k) * g12%msk(i+1,j,k)  &
+                  * g12%msk(i,j+1,k) * g12%msk(i+1,j+1,k)
   end do
   end do
   end do
-  call mympi_swpbnd ( g3%msk )
+  call mympi_swpbnd ( g32%msk )
 
-  g3%lev(:,:) = sum(g3%msk(:,:,:), 3)
+  g32%lev(:,:) = sum(g32%msk(:,:,:), 3)
 
   ! sea bottom pressure, geoptential height
-  phimn(1) = - g * vg2%dz(1)
+  phimn(1) = - g * gi2%dz(1)
   do k = 2, nk
-    phimn(k) = phimn(k-1)  - g * vg2%dz(k)
+    phimn(k) = phimn(k-1)  - g * gi2%dz(k)
   end do
 
   do j = 1, nj
   do i = 1, ni
-    k = g1%lev(i, j)
+    k = g12%lev(i, j)
     if ( k == 0 ) then
-      g1%phib(i,j) = 0.0
+      g12%phih(i,j) = 0.0
     else
-      g1%phib(i,j) = phimn(k)
-      g1%pb(i,j) = vg1%p(k+1)
+      g12%phih(i,j) = phimn(k)
+      g12%prh(i,j) = gi1%pr(k+1)
     end if
 
-    k = g3%lev(i, j)
+    k = g32%lev(i, j)
     if ( k == 0 ) then
-      g3%phib(i,j) = 0.0
+      g32%phih(i,j) = 0.0
     else
-      g3%phib(i,j) = phimn(k)
-      g3%pb(i,j) = vg1%p(k+1)
+      g32%phih(i,j) = phimn(k)
+      g32%prh(i,j) = gi1%pr(k+1)
     end if
   end do
   end do
 
-  ! in case of 1/pb, set to 0.1Pa in land
-  where( g1%lev == 0 ) g1%pb = 0.1
-  where( g3%lev == 0 ) g3%pb = 0.1
+  ! in case of 1/prh, set to 0.1Pa in land
+  where( g12%lev == 0 ) g12%prh = 0.1
+  where( g32%lev == 0 ) g32%prh = 0.1
 
-  gt=>g1
-  gu=>g3
+  gt=>g12
+  gu=>g32
 end subroutine set_grid
 
 subroutine calc_cf (cv1, cv2) !{{{1
-  ! calc. coefficents of frictional force at hg3 grid
+  ! calc. coefficents of frictional force at g3j grid
   real (kind=wp), dimension(ni,nj) :: cv1, cv2
   real (kind=wp), dimension(ni,nj) :: temp
 
@@ -641,13 +631,14 @@ subroutine calc_cf (cv1, cv2) !{{{1
 
 end subroutine calc_cf
 
-subroutine inistat (ts, frc, graphib) !{{{1
+subroutine inistat (ts, frc, graphih) !{{{1
   ! prepare the initial state of the ocean
   type (type_gvar_m3d) :: ts(2)
   type (type_frc) :: frc
-  type (type_gvar_m2d) :: graphib, wk
+  type (type_gvar_m2d) :: graphih
 
-  type (type_stg), pointer :: hg1, hg2
+  type (type_mat), dimension(ni,nj) :: wk
+  type (type_gi), pointer :: g1j, g2j
   real (kind=wp), allocatable, dimension(:,:,:) :: glo_pt, glo_sa
   type (type_frc) :: glo_frc
   integer :: is, m, i, j, k
@@ -687,7 +678,7 @@ subroutine inistat (ts, frc, graphib) !{{{1
 
   ! forcing on land set to zero (no forcing)
   !!! potential bug, missing is not all at land of input file
-!  where (spread(g1%lev, 3, 12) == 0)
+!  where (spread(g12%lev, 3, 12) == 0)
   where (frc%tau%x(1)%v == missing_float)
     frc%tau%x(1)%v = 0.0 
     frc%tau%x(2)%v = 0.0 
@@ -703,12 +694,9 @@ subroutine inistat (ts, frc, graphib) !{{{1
   ts(tp) = ts(tc)
 
   !! why not average before differentiate?
-  call arrays_cp_shape( graphib, wk )
-  call op_gra( wk, g1%phib, g1%hg, g1%hg%ew, g1%hg%ns )
-  call op_ter( graphib%x(1)%v, wk%x(1)%v, wk%x(1)%hg, graphib%x(1)%hg )
-  call op_ter( graphib%x(2)%v, wk%x(2)%v, wk%x(2)%hg, graphib%x(2)%hg )
-
-  call arrays_free( wk )
+  call op_gra( wk, gt%phih, gtj, gtj%ew, gtj%ns )
+  call op_ter( graphih%x(1)%v, wk%x(1), gtj%ew, graphih%x(1)%hg )
+  call op_ter( graphih%x(2)%v, wk%x(2), gtj%ns, graphih%x(2)%hg )
 end subroutine inistat
 
 subroutine write_dim_info (fid) !{{{1
@@ -762,7 +750,7 @@ subroutine check_output (acts, acuv, acw, acssh) !{{{1
 
     ! calc. fluctuation of ssh, minus global mean
     call mympi_output (nm%fo, names%ssh, acssh, &
-      acssh%var%hg%rh1*gt%msk(:,:,1), gt%msk(:,:,1))
+      acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
 
   end if
 

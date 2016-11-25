@@ -3,43 +3,39 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2016-04-05 15:40:54 BJT
+! Last Change: 2016-05-12 19:43:33 BJT
 
 module mod_den
 
   use mod_arrays, only: &
-    glo_lon, glo_lat, z, &
-    vg2, vgt, &
-    g1, bnd, ts, pbt
+    gi2, git, &
+    bnd, ts, ch
 
   use mod_con, only: deltat, deltas
 
   use mod_kind, only: wp
 
-  use mod_mympi, only: mympi_quick_output
+  use mod_param, only: ni, nj, nk, tc
 
-  use mod_param, only: ni, nj, nk, myid, mid, &
-    tp, tc, tctr
-
-  use mod_type, only: type_mat, type_gvar_r3d, type_gvar_m3d
+  use mod_type, only: type_mat, type_gvar_m3d
 
   implicit none
   private
 
   public &
     den_rho, &
-    den_rrho, &
+    den_alpha, &
     den_prho
     
 contains !{{{1
 
-subroutine den_rrho (rrho, ts, pbt, mask)!{{{1
+subroutine den_alpha (alpha, ts, ch, mask)!{{{1
   ! dianose specific volume from (T, S) and 
-  !   normalized bottom pressure pbt
+  !   normalized bottom pressure ch
 
   type (type_gvar_m3d) :: ts
-  real (kind=wp), dimension(ni,nj,nk) :: rrho
-  real (kind=wp), dimension(ni,nj), intent(in) :: pbt
+  real (kind=wp), dimension(ni,nj,nk) :: alpha
+  real (kind=wp), dimension(ni,nj), intent(in) :: ch
   integer, dimension(ni,nj,nk), intent(in) :: mask
 
   integer :: i, j, k
@@ -48,15 +44,15 @@ subroutine den_rrho (rrho, ts, pbt, mask)!{{{1
   do j = 1, nj
   do i = 1, ni
     if ( mask(i,j,k) == 1 ) &
-      rrho(i,j,k) = 1.0 /   &
+      alpha(i,j,k) = 1.0 /   &
         den_rho( ts%x(1)%v(i,j,k), &
                  ts%x(2)%v(i,j,k), &
-                 pbt(i,j) * vgt%p(k) + bnd%pa%v(i,j) )
+                 ch(i,j) * git%pr(k) + bnd%pa%v(i,j) )
   end do
   end do
   end do
 
-end subroutine den_rrho
+end subroutine den_alpha
 
 pure function den_rho (t, s, p0) !{{{1
   ! Calculates the density of seawater using the
@@ -141,7 +137,7 @@ subroutine den_prho( prho ) !{{{1
   if ( ts(tc)%x(1)%g%msk(i,j,k) > 0 ) then
     t = ts(tc)%x(1)%v(i,j,k)
     s = ts(tc)%x(2)%v(i,j,k)
-    p = pbt%tc(i,j) * vg2%p(k)
+    p = ch%tc(i,j) * gi2%pr(k)
 
     rhoa = den_rho( t + deltat, s, p )
     rhob = den_rho( t - deltat, s, p )

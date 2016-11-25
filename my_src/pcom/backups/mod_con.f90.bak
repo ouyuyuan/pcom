@@ -1,0 +1,30 @@
+
+! Description: physical constants and tunable coefficients
+!
+!      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
+!     Created: 2015-10-03 07:33:17 BJT
+! Last Change: 2015-10-24 14:07:03 BJT
+
+module mod_con
+
+  use mod_kind, only: wp
+  implicit none
+  public
+
+  ! physical 
+  real (kind=wp), parameter :: &
+    rho0 = 1035, & ! kg/m^3, reference density, \citep[P.47]{Gill1982book}
+    g = 9.8,     & ! m/s^2, gravity accerleration 
+    a = 6371e3,  & ! m, mean radius of Earth \citep{Griffies2008}, \citep[P.597]{Gill1982book]
+    pi = 3.141592653589793, &
+    torad = pi / 180.0
+
+  ! tunable
+  real (kind=wp), parameter :: &
+    gamma_b = 0.2, & ! predict-corrector algorithm coef. in barotropic integration
+    am_c = 1.0e7     ! initial horizontal momentum viscosity, 
+
+end module mod_con!{{{1
+!-------------------------------------------------------{{{1
+! vim:fdm=marker:fdl=0:
+! vim:foldtext=getline(v\:foldstart).'...'.(v\:foldend-v\:foldstart):

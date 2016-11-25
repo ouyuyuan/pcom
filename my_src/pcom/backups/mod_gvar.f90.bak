@@ -1,0 +1,112 @@
+
+! Description: algebra rules of grid variables
+!
+!      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
+!     Created: 2015-12-24 08:08:32 BJT
+! Last Change: 2015-12-24 21:13:55 BJT
+
+module mod_gvar
+
+  ! imported variables !{{{1
+
+  use mod_type, only: &
+    type_mat, &
+    type_stg, &
+    type_vstg, &
+    type_stg3d, &
+    type_gvar_r2d, &
+    type_gvar_r3d, &
+    type_gvar_m2d, &
+    type_gvar_m3d
+
+  use mod_op, only: op_ter
+
+  implicit none
+  public
+
+  ! interfaces !{{{1
+  interface gvar_copy
+    module procedure cp_m3d_r3d
+  end interface
+
+  interface operator(*)
+    module procedure gr2d_mul_gm3d
+    module procedure gr2d_mul_gr3d
+  end interface
+
+contains !{{{1
+
+function gr2d_mul_gm3d (va, vb)!{{{1
+  ! result is m3d, grid on vb's grid
+  type (type_gvar_r2d), intent(in) :: va
+  type (type_gvar_m3d), intent(in) :: vb
+  type (type_gvar_m3d) :: gr2d_mul_gm3d
+
+  gr2d_mul_gm3d = vb
+
+  gr2d_mul_gm3d%v%x(1) = spread(va%v, 3, size(vb%v,3)) * vb%v%x(1)
+  gr2d_mul_gm3d%v%x(2) = spread(va%v, 3, size(vb%v,3)) * vb%v%x(2)
+
+end function gr2d_mul_gm3d
+
+function gr2d_mul_gr3d (va, vb)!{{{1
+  ! grid variable multiplication
+  ! result on the grid of vb
+  type (type_gvar_r2d), intent(in) :: va
+  type (type_gvar_r3d), intent(in) :: vb
+  type (type_gvar_r3d) :: gr2d_mul_gr3d
+
+  gr2d_mul_gr3d = vb
+  if (.not. associated(va%hg, vb%hg)) then 
+    gr2d_mul_gr3d%v = spread(op_ter(va%v,va%hg,vb%hg), &
+                             3, size(vb%v,3)) * vb%v
+  else
+    gr2d_mul_gr3d%v = spread(va%v, 3, size(vb%v,3)) * vb%v
+  end if
+
+end function gr2d_mul_gr3d
+
+subroutine cp_m3d_r3d (va, n, vb) !{{{1
+  ! initialize vb as va's n th element structure and 
+  !   copy the value of n th element of va's to vb
+  type (type_gvar_m3d), intent(in) :: va
+  integer, intent(in) :: n
+  type (type_gvar_r3d) :: vb
+
+  integer :: d(3), is
+
+  d = shape(va%v%x(n))
+  if (.not.allocated(vb%v)) &
+    allocate(vb%v(d(1),d(2),d(3)), stat=is); call chk(is)
+
+  if ( n == 1 ) then
+    vb%g  => va%ga
+    vb%hg => va%hga
+    vb%vg => va%vga
+  else if ( n == 2 ) then
+    vb%g  => va%gb
+    vb%hg => va%hgb
+    vb%vg => va%vgb
+  else
+    stop "wrong value of n in cp_m3d_r3d of mod_type"
+  end if
+
+  vb%v = va%v%x(n)
+
+end subroutine cp_m3d_r3d
+
+subroutine chk( ista ) !{{{1
+  ! check state of allocate array 
+
+  integer, intent(in) ::  ista
+
+  if ( ista /= 0 ) then
+    write(*,*) 'Allocate array failed. Stop'
+    stop 2
+  end if
+end subroutine chk
+
+end module mod_gvar!{{{1
+!-------------------------------------------------------{{{1
+! vim:fdm=marker:fdl=0:
+! vim:foldtext=getline(v\:foldstart).'...'.(v\:foldend-v\:foldstart):

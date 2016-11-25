@@ -3,22 +3,40 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2016-04-05 18:27:10 BJT
+! Last Change: 2016-05-13 09:45:01 BJT
 
 module mod_type
 
   use mod_kind, only: sglp, wp
-  use mod_pro, only: pro_days_month, pro_days_year
 
   implicit none
-  public
+  private
 
-  ! u, v are in half grid, T, S in whole grid
-
-  ! memo !{{{1
-  type :: type_memo_r
-    real (kind=wp) :: p, c ! previous/current values
-  end type type_memo_r
+  public &
+    type_mat, &
+    type_time, &
+    tctr, &
+    type_gi, &
+    type_gj, &
+    type_gij, &
+    type_gvar_r2d, &
+    type_gvar_r3d, &
+    type_gvar_m2d, &
+    type_gvar_m3d, &
+    type_frc, &
+    type_bnd, &
+    type_bintgu, &
+    type_ch, &
+    type_accu_gm3d, &
+    type_accu_gr3d, &
+    type_accu_gr2d, &
+    operator(+), &
+    operator(<), &
+    type_print, &
+    type_days_month, &
+    type_days_year, &
+    type_str2sec, &
+    type_str2time
 
   ! matrix structure !{{{1
   ! for horizontal (u,v) and tracer (theta,s)
@@ -28,65 +46,70 @@ module mod_type
 
   ! time structure !{{{1
   ! yyyy-mm-dd hh:mm:ss
-  type :: type_date
-    character (len=19) :: d
-  end type type_date
-
   type :: type_time
     integer :: y, m, d, h, mi, s
     integer :: mm ! maxima day of the current month
   end type type_time
 
-  ! stagger grid  !{{{1
-  type :: type_stg
+  ! integration time control !{{{1
+  type :: type_tctr
+    type (type_time) :: pt, ct ! time of previous/current baroclinic step
+    real (kind=wp)   :: t1, t2 ! mpi time barrier
+    integer*8        :: nt     ! total baroclinic time steps
+    integer*8        :: i      ! current baroclinic time steps
+  end type
+  type (type_tctr) :: tctr
+
+  ! horizontal stagger grid  !{{{1
+  type :: type_gi
     integer :: n ! grid number
     integer :: i, j ! x/y position of (i,j) grid
     ! rescaled Lame coefficients, h1 / a
     !   rh2 and h3 is 1 for current version of pcom
-    real (kind=wp), allocatable :: rh1(:,:)
+    real (kind=wp), allocatable :: rh(:,:)
     real (kind=wp), allocatable :: tn(:,:) ! tan( lat )
     ! coordinate increaments
     type (type_mat), allocatable :: dx(:,:)
     ! north-south / east-west / diagonal neighbors
-    type (type_stg), pointer :: ns, ew, di
-  end type type_stg
+    type (type_gi), pointer :: ns, ew, di
+  end type type_gi
 
-  type :: type_vstg
+  type :: type_gj
     integer :: n
     integer :: k
     ! m, grid thickness
     real (kind=wp), allocatable :: dz(:)
     ! pa, vertical coordinate increments
-    real (kind=wp), allocatable :: dp(:)
+    real (kind=wp), allocatable :: dpr(:)
     ! m, geometry height
     real (kind=wp), allocatable :: z(:)
     ! Pa, pressure, vertical coordinate
-    real (kind=wp), allocatable :: p(:)
-    type (type_vstg), pointer :: ud ! up/down neighbor grid
-  end type type_vstg
+    real (kind=wp), allocatable :: pr(:)
+    type (type_gj), pointer :: ud ! up/down neighbor grid
+  end type type_gj
 
-  type :: type_stg3d
+  type :: type_gij
     integer, allocatable :: msk(:,:,:)
     integer, allocatable :: lev(:,:)
     ! initial geopotential height at sea bottom
-    real (kind=wp), allocatable :: phib(:,:)
+    real (kind=wp), allocatable :: phih(:,:)
     ! initial pressure at sea bottom (exclude atmopheric pressure)
-    real (kind=wp), allocatable :: pb(:,:)
-    type (type_stg3d), pointer :: ns, ew, di, ud
-    type (type_stg),  pointer :: hg
-    type (type_vstg), pointer :: vg
-  end type type_stg3d
+    real (kind=wp), allocatable :: prh(:,:)
+    type (type_gij), pointer :: ns, ew, di, ud
+    type (type_gi),  pointer :: hg
+    type (type_gj), pointer :: vg
+  end type type_gij
 
   ! grid variables !{{{1
 
   type type_gvar_r2d
     real (kind=wp), allocatable :: v(:,:) ! data values
-    type (type_stg), pointer :: hg
+    type (type_gi), pointer :: hg
   end type type_gvar_r2d
 
   type type_gvar_r3d
     real (kind=wp), allocatable :: v(:,:,:) ! data values
-    type (type_stg3d), pointer :: g
+    type (type_gij), pointer :: g
   end type type_gvar_r3d
 
   type type_gvar_m2d
@@ -115,22 +138,24 @@ module mod_type
     type (type_gvar_r2d) :: fw
   end type type_bnd
 
-  ! barotropic integration at g3
-  type :: type_bintg3 
-    real (kind=wp), allocatable, dimension(:,:) :: xn, xs ! north/south of g2 at g3
-    real (kind=wp), allocatable, dimension(:,:) :: ye, yw ! east / west of g4 at g3
-  end type type_bintg3
+  ! barotropic integration at g32
+  type :: type_bintgu 
+    ! north/south of g22 at g32
+    real (kind=wp), allocatable, dimension(:,:) :: xn, xs 
+    ! east / west of g42 at g32
+    real (kind=wp), allocatable, dimension(:,:) :: ye, yw 
+  end type type_bintgu
 
   ! normalized sea bottom pressure when using stagger time scheme
-  type :: type_pbt
+  type :: type_ch
     real (kind=wp), allocatable :: tp(:,:) ! previous time step values
     real (kind=wp), allocatable :: tc(:,:) ! current  time step values
     ! mean values in 1 baroclinic step ( = pbt_st(:,:,2) of v1.0 )
     real (kind=wp), allocatable :: bc(:,:) 
     ! mean values in 2 baroclinic step ( = pbt_st(:,:,3) of v1.0 )
     real (kind=wp), allocatable :: bc2(:,:)
-    type (type_stg), pointer :: hg
-  end type type_pbt
+    type (type_gi), pointer :: hg
+  end type type_ch
 
   ! accumulated variables !{{{1
   ! for time-average output
@@ -159,15 +184,195 @@ module mod_type
     module procedure time_lt_string
   end interface
 
-  interface type_check_date
-    module procedure check_date_string
-  end interface
-
   interface type_print
     module procedure print_type_time
+    module procedure print_i3d
+    module procedure print_i2d
+    module procedure print_r3d
+    module procedure print_r2d
+    module procedure print_r1d
   end interface
 
 contains !{{{1
+
+subroutine print_r3d (var) !{{{1
+! print 3d reall array in a nice way
+  
+  real (kind=wp) :: var(:,:,:)
+  integer :: ni, nj, nk, i, j, k
+
+  ni = size(var, 1)
+  nj = size(var, 2)
+  nk = size(var, 3)
+
+  do k = 1, nk
+    do i = 1, ni
+      write(*,'(100f5.1)') var(i,:,k)
+    end do
+    write(*,*) ''
+  end do
+  
+end subroutine print_r3d
+
+subroutine print_r2d (var, opt) !{{{1
+! print 2d array in a nice way
+  
+  real (kind=wp) :: var(:,:)
+  character (len=*), optional :: opt ! print boundary 
+
+  integer :: ni, nj, i, j
+
+  ni = size(var, 1)
+  nj = size(var, 2)
+
+  if ( present(opt) )then
+
+    ! print east west boundary
+    if ( opt .eq. 'ew' ) then
+      do i = 2, ni - 1
+        write(*,'(2e7.1e1, a, 2e7.1e1)') &
+          var(i,1), var(i,2), ' . . . ', var(i,nj-1), var(i,nj)
+      end do
+    ! print north south
+    else if ( opt .eq. 'ns' ) then
+      write(*,'(a,i2, a, 100e7.1e1)') &
+        'row = ', 1, ', ', var(1,2:nj-1)
+      write(*,'(a,i2, a, 100e7.1e1)') &
+      'row = ', 2, ', ', var(2,2:nj-1)
+      write(*,'(a)') ' . . . . . . '
+      write(*,'(a,i2, a, 100e7.1e1)') &
+      'row = ', ni - 1, ', ', var(ni-1,2:nj-1)
+      write(*,'(a,i2, a, 100e7.1e1)') &
+      'row = ', ni, ', ', var(ni,2:nj-1)
+      write(*,*) ''
+    else
+      write(*,*) 'unknow option '//opt//' in routine print_r2d in module mod_io'
+      stop
+    end if
+
+  else
+
+    do i = 1, ni
+      write(*,'(100e7.1e1)') var(i,:)
+    end do
+
+  end if
+  
+end subroutine print_r2d
+
+subroutine print_r1d (var) !{{{1
+! print 1d array in a nice way
+  
+  real (kind=wp) :: var(:)
+
+  write(*,'(100i5)') int(var(:))
+
+end subroutine print_r1d
+
+subroutine print_i3d (var) !{{{1
+! print 3d integer array in a nice way
+  
+  integer :: var(:,:,:)
+  integer :: ni, nj, nk, i, j, k
+
+  ni = size(var, 1)
+  nj = size(var, 2)
+  nk = size(var, 3)
+
+  do k = 1, nk
+    do i = 1, ni
+      write(*,"(100i3)") var(i,:,k)
+    end do
+
+    write (*,*) ''
+  end do
+  
+end subroutine print_i3d
+
+subroutine print_i2d (var, opt) !{{{1
+! print 2d array in a nice way
+  
+  integer :: var(:,:)
+  character (len=*), optional :: opt ! print boundary 
+
+  integer :: ni, nj, i, j
+
+  ni = size(var, 1)
+  nj = size(var, 2)
+
+  if ( present(opt) )then
+
+    ! print east west boundary
+    if ( opt .eq. 'ew' ) then
+      do i = 2, ni - 1
+        write(*,'(2i3, a, 2i3)') &
+          var(i,1), var(i,2), ' . . . ', var(i,nj-1), var(i,nj)
+      end do
+    ! print north south
+    else if ( opt .eq. 'ns' ) then
+      write(*,'(a,i2, a, 100i3)') &
+        ', row = ', 1, ', ', var(1,2:nj-1)
+      write(*,'(a,i2, a, 100i3)') &
+      ', row = ', 2, ', ', var(2,2:nj-1)
+      write(*,'(a)') ' . . . . . . '
+      write(*,'(a,i2, a, 100i3)') &
+      ', row = ', ni - 1, ', ', var(ni-1,2:nj-1)
+      write(*,'(a,i2, a, 100i3)') &
+      ', row = ', ni, ', ', var(ni,2:nj-1)
+      write(*,*) ''
+    else
+      write(*,*) 'unknow option '//opt//' in routine print_i2d in module mod_io'
+      stop
+    end if
+
+  else
+
+    do i = 1, ni
+      write(*,'(100i3)') int(var(i,:))
+    end do
+
+  end if
+  
+end subroutine print_i2d
+
+
+function type_days_month (y, m) !{{{1
+  ! calc. days of a specific month of a specific year
+  integer, intent(in) :: y, m
+  integer :: type_days_month
+
+  integer :: days(12)
+
+!  days(:) = (/31, 28, 31, 30, &
+!              31, 30, 31, 31, &
+!              30, 31, 30, 31/)
+  days(:) = 30
+
+  type_days_month = days(m)
+
+!  if ( m == 2 ) then
+!    if ( type_days_year (y) == 366 ) type_days_month = 29
+!  end if
+
+end function type_days_month
+
+
+function type_days_year (y) !{{{1
+  ! calc. days of a specific year
+  integer, intent(in) :: y
+  integer :: type_days_year
+
+  if (y <= 0) stop 'year should be positive in function type_days_year'
+  
+  type_days_year = 365
+
+  if ( mod(y, 100) == 0 ) then
+    if ( mod(y, 400) == 0 ) type_days_year = 366
+  else
+    if ( mod(y, 4)   == 0 ) type_days_year = 366
+  end if
+
+end function type_days_year
 
 subroutine print_type_time(var) !{{{1
   ! print self defined type of type_time
@@ -227,11 +432,11 @@ function type_time2sec ( t ) !{{{1
   type_time2sec = 0
 
   do i = 1, t%y - 1
-    type_time2sec = type_time2sec + pro_days_year (i) * 24*60*60 
+    type_time2sec = type_time2sec + type_days_year (i) * 24*60*60 
   end do
 
   do i = 1, t%m - 1
-    type_time2sec = type_time2sec + pro_days_month (t%y, i) * 24*60*60 
+    type_time2sec = type_time2sec + type_days_month (t%y, i) * 24*60*60 
   end do
 
   ! day start at 1
@@ -254,35 +459,6 @@ function type_str2sec ( str ) !{{{1
 
 end function type_str2sec
 
-function time2date (time) !{{{1
-  ! time to date
-  type (type_time), intent(in)  :: time
-  type (type_date) :: time2date
-
-  write(time2date % d(1:4),   '(i4)') time % y
-  write(time2date % d(6:7),   '(i2)') time % m
-  write(time2date % d(9:10),  '(i2)') time % d
-  write(time2date % d(12:13), '(i2)') time % h
-  write(time2date % d(15:16), '(i2)') time % mi
-  write(time2date % d(18:19), '(i2)') time % s
-
-end function time2date
-
-function date2time (date) !{{{1
-  ! date to time, the string in date should be check if from user definition
-  type (type_date), intent(in)  :: date
-  type (type_time) :: date2time
-
-  read(date % d(1:4),   '(i4)') date2time % y
-  read(date % d(6:7),   '(i2)') date2time % m
-  read(date % d(9:10),  '(i2)') date2time % d
-  read(date % d(12:13), '(i2)') date2time % h
-  read(date % d(15:16), '(i2)') date2time % mi
-  read(date % d(18:19), '(i2)') date2time % s
-
-  date2time % mm = pro_days_month (date2time % y, date2time % m)
-
-end function date2time
 
 function type_str2time (str) !{{{1
   ! type_time plus an integer (in seconds)
@@ -314,7 +490,7 @@ function type_str2time (str) !{{{1
     stop 'year should be greater than 0 in the input string in function type_str2time'
 
   read(str_num(5:6), '(i2)') type_str2time % m
-  type_str2time % mm = pro_days_month (type_str2time%y, type_str2time%m)
+  type_str2time % mm = type_days_month (type_str2time%y, type_str2time%m)
   if ( type_str2time % m <= 0 .or. type_str2time % m > type_str2time % mm ) then
     write (*, '(a,i2,a)') &
       'month should be between 1-', type_str2time % mm, &
@@ -378,7 +554,7 @@ function time_plus_integer (t, dt) !{{{1
     time_plus_integer % m = 1
   end if
 
-  time_plus_integer % mm = pro_days_month (time_plus_integer%y, time_plus_integer%m)
+  time_plus_integer % mm = type_days_month (time_plus_integer%y, time_plus_integer%m)
 
   return
 
@@ -414,7 +590,7 @@ subroutine check_date_string (str) !{{{1
     stop 'year should be greater than 0 in the input string in subroutine check_date_string'
 
   read(str_num(5:6), '(i2)') m
-  mm = pro_days_month (y, m)
+  mm = type_days_month (y, m)
   if ( m <= 0 .or. m > mm ) then
     write (*, '(a,i2,a)') &
       'month should be between 1-', mm, &

@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:33:17 BJT
-! Last Change: 2016-03-29 15:43:07 BJT
+! Last Change: 2016-05-12 19:38:02 BJT
 
 module mod_con
 
@@ -14,7 +14,7 @@ module mod_con
   ! physical 
   real (kind=wp), parameter :: &
     rho0 = 1029.0, & !    rho0 = 1035, & ! kg/m^3, reference density, \citep[P.47]{Gill1982book}
-    rrho0 = 1.0/rho0, &
+    a0 = 1.0/rho0, &
     g = 9.8,     & ! m/s^2, gravity accerleration, or 9.7963, P.46 of Griffies2004 
     a = 6370e3,  & ! 6371e3 m, mean radius of Earth \citep{Griffies2008}, \citep[P.597]{Gill1982book]
     pi = 3.141592653589793, &

@@ -1,0 +1,296 @@
+
+! Description: global parameters
+!
+!      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
+!     Created: 2015-02-26 08:20:12 BJT
+! Last Change: 2015-10-26 18:20:21 BJT
+
+module mod_param
+
+  use mod_kind, only: sp, wp
+  use mpi
+
+  implicit none
+  public
+
+  ! exported variables !{{{1
+  ! mpi group, the whole world
+  type :: type_gpw
+    integer :: c, g, id   ! communicator/group/rank of the group
+    integer :: i, j, k    ! coordinate in the topology of processors
+    integer :: ni, nj, nk ! number of grid points in 3d directions
+    integer :: s, n, w, e, u, l ! south/north/west/east/upper/lower neighbor ids
+    integer :: gn, gs, gw, ge, gu, gl ! indices in the global array
+  end type type_gpw
+  type (type_gpw) :: gpw
+  type (type_gpw), allocatable :: gpws(:)
+
+  ! mpi group, vertical, the same water column
+  type :: type_gpz
+    integer :: c, g, id ! communicator/group/rank of the group
+    integer :: k        ! coordinate in the topology of processors
+    integer :: nk       ! number of grid points in 3d directions
+    integer :: u, l     ! south/north/west/east/upper/lower neighbor ids
+    integer :: gu, gl   ! indices in the global array
+  end type type_gpz
+  type (type_gpz) :: gpz
+
+  ! output variable names
+  type :: type_names
+    character (len=2) :: pt = 'pt'
+    character (len=2) :: sa = 'sa'
+  end type type_names
+  type (type_names) :: names 
+
+  ! units of variables
+  type :: type_units
+    character( len=len('degrees Celcius') ) :: pt = 'degrees Celcius'
+    character( len=len('psu') ) :: sa = 'psu'
+  end type type_units
+  type (type_units) :: units
+
+  ! namelist parameters
+  ! if you change this type definition, remember also change the following:
+  !   1. read_namelist () in main.f90
+  !   2. file namelist
+  type :: type_nm
+    ! number of Processors in 3d directions
+    integer :: py, px, pz 
+
+    ! Begin/End Date for integration, in the form of yyyy-mm-dd hh:mm:ss
+    character (len=80) :: bd, ed
+    ! BaroTropic/BaroClinic time step
+    integer :: bt, bc 
+
+    ! Filename of Initial and Output file
+    character (len=80) :: fi, fo
+    ! output PER month or PER year 
+    character (len=80) :: per
+  end type type_nm
+  type (type_nm)   :: nm
+
+  integer, parameter :: missing_int = -999
+  real (kind=sp), parameter :: missing_float = -9.99999e30
+
+  ! parallel
+  integer, parameter :: mid = 0 ! Master ID
+
+  integer :: &
+    myid,  & ! rank in the mpi_comm_world
+    np 
+
+  integer, allocatable, dimension(:,:,:) :: ids
+
+  ! dimension
+  integer :: glo_ni, glo_nj, glo_nk, ni, nj, nk, &
+    nim, njm, nkm ! minus 1, frequently used, for simplity
+
+  ! local variables !{{{1
+  integer :: is, err
+
+contains !{{{1
+
+subroutine param_set_groups ()  !{{{1
+  ! set mpi groups
+  integer :: i, idz(nm%pz)
+
+  call set_ids ()
+
+  ! set gpw
+  gpw % c  = mpi_comm_world
+  call mpi_comm_group (mpi_comm_world, gpw%g, err)
+  gpw % id = myid
+
+  call get_neighbor (gpw, ids)
+
+  ! set gpz, the vertical water colum group
+  call mpi_group_incl  (gpw%g, nm%pz, ids(gpw%i,gpw%j,:), gpz%g, err)
+  call mpi_comm_create (mpi_comm_world, gpz % g, gpz % c, err)
+  call mpi_comm_rank   (gpz % c, gpz % id, err)
+
+  forall ( i=1:nm%pz ) idz(i) = i - 1
+  call get_neighbor_z  (gpz, idz(:))
+
+  ! set gpws for mid
+  if ( myid == mid) then
+    allocate(gpws(np), stat=is); call chk(is)
+    do i = 1, np
+      gpws(i) % c  = mpi_comm_world
+      call mpi_comm_group (mpi_comm_world, gpws(i) % g, err)
+      gpws(i) % id = i - 1
+
+      call get_neighbor (gpws(i), ids)
+    end do
+  end if
+
+end subroutine param_set_groups
+
+subroutine get_neighbor (gp, ids)  !{{{1
+  ! get neighbor ids and environments in the global array
+
+  integer, intent(in) :: ids(:,:,:)
+  type (type_gpw) :: gp
+
+  integer :: ind(3), n, m, d1, d2, d3, i, j, k
+
+  d1 = size(ids, 1)
+  d2 = size(ids, 2)
+  d3 = size(ids, 3)
+
+  ! get postion in the ids topology !{{{2
+  ind(:) = maxloc(ids(:,:,:), mask = ids(:,:,:) <= gp % id)
+
+  gp % i = ind(1)
+  gp % j = ind(2)
+  gp % k = ind(3)
+
+  i = gp % i
+  j = gp % j
+  k = gp % k
+
+  ! north/south !{{{2
+  ! get neighbors !{{{3
+  if ( gp%j /= 1 )  gp % s = ids(i, j-1, k)
+  if ( gp%j == 1 )  gp % s = mpi_proc_null
+
+  if ( gp%j /= d2 ) gp % n = ids(i, j+1, k)
+  if ( gp%j == d2 ) gp % n = mpi_proc_null
+
+  ! get positions in the global array !{{{3
+  ! the first and last element in each dimension is for boundary
+  n = glo_nj / nm%py
+  m = mod(glo_nj, nm%py)
+
+  ! put the remainder m grids on the first m processors
+  if ( gp%j <= m ) then
+    gp % nj = n + 2 + 1
+    gp % gn = gp%j * (n+1)
+  else
+    gp % nj = n + 2
+    gp % gn = gp%j * n + m
+  end if
+  gp % gs = gp%gn - (gp%nj - 2) + 1
+
+  ! east-west !{{{2
+  ! east-west is wrap up
+  ! get neighbors !{{{3
+  if ( gp%i /= 1 )  gp % w = ids(i-1, j, k)
+  if ( gp%i == 1 )  gp % w = ids(d1,  j, k)
+
+  if ( gp%i /= d1 ) gp % e = ids(i+1, j, k)
+  if ( gp%i == d1 ) gp % e = ids(1,   j, k)
+
+  ! get positions in the global array !{{{3
+  n = glo_ni / nm%px
+  m = mod(glo_ni, nm%px)
+
+  if ( gp%i <= m ) then
+    gp % ni = n + 2 + 1
+    gp % ge = gp%i * (n+1)
+  else
+    gp % ni = n + 2
+    gp % ge = gp%i * n + m
+  end if
+  gp % gw = gp%ge - (gp%ni - 2) + 1
+
+  ! upper/lower !{{{2
+  ! get neighbors !{{{3
+  if ( gp%k /= 1 )  gp % u = ids(i, j, k-1)
+  if ( gp%k == 1 )  gp % u = mpi_proc_null
+
+  if ( gp%k /= d3 ) gp % l = ids(i, j, k+1)
+  if ( gp%k == d3 ) gp % l = mpi_proc_null
+
+  ! get positions in the global array !{{{3
+  n = glo_nk / nm%pz
+  m = mod(glo_nk, nm%pz)
+
+  if ( gp%k <= m ) then
+    gp % nk = n + 2 + 1
+    gp % gl = gp%k * (n+1)
+  else
+    gp % nk = n + 2
+    gp % gl = gp%k * n + m
+  end if
+  gp % gu = gp%gl - (gp%nk - 2) + 1
+
+end subroutine get_neighbor
+
+subroutine get_neighbor_z(gp, ids)  !{{{1
+  ! get neighbor ids and environments in the vertical array
+
+  integer, intent(in) :: ids(:)
+  type (type_gpz) :: gp
+
+  integer :: n, m, d3
+
+  d3 = size(ids, 1)
+  gp % k = gp % id + 1
+
+  ! get neighbors
+  if ( gp%k /= 1 )  gp % u = ids(gp%k-1)
+  if ( gp%k == 1 )  gp % u = mpi_proc_null
+
+  if ( gp%k /= d3 ) gp % l = ids(gp%k+1)
+  if ( gp%k == d3 ) gp % l = mpi_proc_null
+
+  ! get positions in the global array
+  n = glo_nk / nm%pz
+  m = mod(glo_nk, nm%pz)
+
+  if ( gp%k <= m ) then
+    gp % nk = n + 2 + 1
+    gp % gl = gp%k * (n+1)
+  else
+    gp % nk = n + 2
+    gp % gl = gp%k * n + m
+  end if
+  gp % gu = gp%gl - (gp%nk - 2) + 1
+
+end subroutine get_neighbor_z
+
+subroutine set_ids () !{{{1
+  ! if nm%px = 4, nm%py = 2, nm%pz = 2, then ids is:
+  !   (NOTE that east-west direction is wrap up, 
+  !     and the map is 'a reverse matrix')
+  !
+  !    (upper)
+  !    0 4
+  !    1 5
+  !    2 6
+  !    3 7
+  !
+  !    (lower)
+  !    8 12
+  !    9 13
+  !   10 14
+  !   11 15
+
+  integer, allocatable, dimension(:) :: ia
+  integer :: i
+
+  allocate(ids(nm%px, nm%py, nm%pz), stat=is);
+  call chk(is); ids = 0
+
+  allocate(ia(np), stat=is); call chk(is); ia = 0
+
+  forall ( i=1:np ) ia(i) = i - 1
+  ids = reshape(ia, shape(ids))
+
+end subroutine set_ids
+
+subroutine chk( ista ) !{{{1
+  ! check state of allocate array 
+
+  integer, intent(in) ::  ista
+
+  if ( ista /= 0 ) then
+    write(*,*) 'Allocate array failed. Stop'
+    stop 2
+  end if
+end subroutine chk
+
+end module mod_param !{{{1
+!-------------------------------------------------------{{{1
+! vim:fdm=marker:fdl=0:
+! vim:foldtext=getline(v\:foldstart).'...'.(v\:foldend-v\:foldstart):

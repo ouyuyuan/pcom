@@ -1963,3 +1963,269 @@ subroutine merge_out_r2d_rec (fname, varname, var, nrec) !{{{1
 
 end subroutine merge_out_r2d_rec
 
+  type :: type_date
+    character (len=19) :: d
+  end type type_date
+
+function time2date (time) !{{{1
+  ! time to date
+  type (type_time), intent(in)  :: time
+  type (type_date) :: time2date
+
+  write(time2date % d(1:4),   '(i4)') time % y
+  write(time2date % d(6:7),   '(i2)') time % m
+  write(time2date % d(9:10),  '(i2)') time % d
+  write(time2date % d(12:13), '(i2)') time % h
+  write(time2date % d(15:16), '(i2)') time % mi
+  write(time2date % d(18:19), '(i2)') time % s
+
+end function time2date
+function date2time (date) !{{{1
+  ! date to time, the string in date should be check if from user definition
+  type (type_date), intent(in)  :: date
+  type (type_time) :: date2time
+
+  read(date % d(1:4),   '(i4)') date2time % y
+  read(date % d(6:7),   '(i2)') date2time % m
+  read(date % d(9:10),  '(i2)') date2time % d
+  read(date % d(12:13), '(i2)') date2time % h
+  read(date % d(15:16), '(i2)') date2time % mi
+  read(date % d(18:19), '(i2)') date2time % s
+
+  date2time % mm = pro_days_month (date2time % y, date2time % m)
+
+end function date2time
+
+subroutine cp_shape_gr3d (va, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_r3d), intent(in) :: va
+  type (type_gvar_r3d) :: vb
+
+  integer :: d(3), is
+
+  if ( .not.allocated(vb%v) ) then
+    d = shape(va%v)
+    allocate(vb%v(d(1),d(2),d(3)), stat=is); call chk(is)
+  end if
+
+  vb%v = 0.0
+  vb%g => va%g
+
+end subroutine cp_shape_gr3d
+
+subroutine cp_shape_gr2d (va, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_r2d), intent(in) :: va
+  type (type_gvar_r2d) :: vb
+
+  integer :: d(2), is
+
+  if ( .not.allocated(vb%v) ) then
+    d = shape(va%v)
+    allocate(vb%v(d(1),d(2)), stat=is); call chk(is)
+  end if
+  vb%v = 0.0
+  vb%hg => va%hg
+
+end subroutine cp_shape_gr2d
+
+subroutine cp_shape_gr2d_gm2d (va, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_r2d), intent(in) :: va
+  type (type_gvar_m2d) :: vb
+
+  call cp_shape_gr2d( va, vb%x(1) )
+  call cp_shape_gr2d( va, vb%x(2) )
+
+end subroutine cp_shape_gr2d_gm2d
+
+subroutine cp_shape_gm3d (va, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_m3d), intent(in) :: va
+  type (type_gvar_m3d) :: vb
+
+  call cp_shape_gr3d( va%x(1), vb%x(1) )
+  call cp_shape_gr3d( va%x(2), vb%x(2) )
+
+end subroutine cp_shape_gm3d
+
+subroutine cp_shape_gr3d_gm3d (va, ga, gb, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_r3d), intent(in) :: va
+  type (type_stg3d), target :: ga, gb
+  type (type_gvar_m3d) :: vb
+
+  call cp_shape_gr3d( va, vb%x(1) )
+  vb%x(1)%g => ga
+
+  call cp_shape_gr3d( va, vb%x(2) )
+  vb%x(2)%g => gb
+
+end subroutine cp_shape_gr3d_gm3d
+
+subroutine cp_shape_gr3d_gm3d_b (va, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_r3d), intent(in) :: va
+  type (type_gvar_m3d) :: vb
+
+  call cp_shape_gr3d( va, vb%x(1) )
+  call cp_shape_gr3d( va, vb%x(2) )
+
+end subroutine cp_shape_gr3d_gm3d_b
+
+subroutine cp_shape_gm2d (va, vb) !{{{1
+  ! initialize vb as va
+  type (type_gvar_m2d), intent(in) :: va
+  type (type_gvar_m2d) :: vb
+
+  call cp_shape_gr2d( va%x(1), vb%x(1) )
+  call cp_shape_gr2d( va%x(2), vb%x(2) )
+
+end subroutine cp_shape_gm2d
+
+!  interface arrays_cp_shape
+!    module procedure cp_shape_gr2d
+!    module procedure cp_shape_gr2d_gm2d
+!    module procedure cp_shape_gr3d
+!    module procedure cp_shape_gr3d_gm3d
+!    module procedure cp_shape_gr3d_gm3d_b
+!    module procedure cp_shape_gm2d
+!    module procedure cp_shape_gm3d
+!  end interface
+
+subroutine free_gr2d (var) !{{{1
+  ! free memory of var
+  type (type_gvar_r2d) :: var
+
+  if ( allocated(var%v) ) then
+    var%hg => null()
+    deallocate( var%v )
+  end if
+
+end subroutine free_gr2d
+
+subroutine free_gr3d (var) !{{{1
+  ! free memory of var
+  type (type_gvar_r3d) :: var
+
+  if ( allocated(var%v) ) then
+    var%g => null()
+    deallocate( var%v )
+  end if
+
+end subroutine free_gr3d
+
+subroutine free_gm2d (var) !{{{1
+  ! free memory of var
+  type (type_gvar_m2d) :: var
+
+  call free_gr2d( var%x(1) )
+  call free_gr2d( var%x(2) )
+
+end subroutine free_gm2d
+
+subroutine free_gm3d (var) !{{{1
+  ! free memory of var
+  type (type_gvar_m3d) :: var
+
+  call free_gr3d( var%x(1) )
+  call free_gr3d( var%x(2) )
+
+end subroutine free_gm3d
+
+  interface arrays_free
+    module procedure free_gr2d
+    module procedure free_gr3d
+    module procedure free_gm2d
+    module procedure free_gm3d
+  end interface
+
+subroutine io_create_grdvar (ncname) !{{{1
+  ! for output grid variables, mainly for checking after 
+  !   changing lots of code
+  ! Note that this output file is mainly for code checking, 
+  !   so the coordinates will not always corresspond to the 
+  !   exact variables on which they underlying
+
+  character (len=*), intent(in) :: ncname
+
+  integer :: dimid1, dimid2, dimid3, i
+  integer :: dimids(3)
+
+  call check ( nf90_create (ncname, NF90_CLOBBER, ncid)  )
+
+  !def dim. {{{2
+  call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
+  call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
+  call check ( nf90_def_dim (ncid, 'z',   nk, dimid3) )
+
+  !def global attr. {{{2
+  call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
+    'created', "by subroutine io_create_grdvar in module mod_io") )
+
+  ! def vars  !{{{2
+
+  ! coordinates vars.
+  call check ( nf90_def_var (ncid, "lon", nf90_float, &
+    dimid1, varid) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_east') )
+
+  call check ( nf90_def_var (ncid, "lat", nf90_float, &
+    dimid2, varid) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_north') )
+
+  call check ( nf90_def_var (ncid, "z", nf90_float, &
+    dimid3, varid) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'm') )
+
+  ! 3d vars.
+  dimids = (/dimid1, dimid2, dimid3/)
+  call check ( nf90_def_var (ncid, 'tmsk', nf90_int, &
+    dimids, varid) )
+  call check ( nf90_def_var (ncid, 'umsk', nf90_int, &
+    dimids, varid) )
+
+  ! 2d vars.
+  call check ( nf90_def_var (ncid, 'itn', nf90_int, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'iun', nf90_int, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'phib', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'phibx', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'phiby', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'pbu', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'ph', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'h1', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'h2', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'h3', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+  call check ( nf90_def_var (ncid, 'h4', nf90_float, &
+    (/dimid1, dimid2/), varid) )
+
+  ! 1d vars.
+  call check ( nf90_def_var (ncid, 'vx1', nf90_float, &
+    (/dimid3/), varid) )
+  call check ( nf90_def_var (ncid, 'vx2', nf90_float, &
+    (/dimid3/), varid) )
+  call check ( nf90_def_var (ncid, 'vp1', nf90_float, &
+    (/dimid3/), varid) )
+  call check ( nf90_def_var (ncid, 'vp2', nf90_float, &
+    (/dimid3/), varid) )
+
+  !end def {{{2
+  call check (nf90_enddef(ncid) )
+
+  call check (nf90_close(ncid) )
+
+end subroutine io_create_grdvar
+

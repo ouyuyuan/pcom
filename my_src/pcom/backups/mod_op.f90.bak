@@ -1,0 +1,182 @@
+
+! Description: operators
+!
+!      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
+!     Created: 2015-10-11 15:23:38 BJT
+! Last Change: 2015-10-29 21:09:30 BJT
+
+module mod_op
+
+  ! imported variables !{{{1
+  use mod_kind, only: wp
+
+  use mod_type, only: type_vector
+
+  use mod_param, only: &
+    glo_nj, ni, nj, nk, &
+    nim, njm, nkm, &
+    gpw
+
+  use mod_arrays, only: &
+    mg1, mg2, mg3, mg4
+
+  implicit none
+  private
+
+  public  &
+    op_lap, &
+    op_div,   &
+    op_ter
+
+  ! grid 1 to grid 3
+  interface op_ter
+    module procedure ter_r3d
+    module procedure ter_r2d
+    module procedure ter_i3d
+  end interface
+
+contains !{{{1
+
+pure function op_dq ( var, gd )  !{{{1
+  ! difference quotient
+  ! grid and direction indicate by gd
+  real (kind=wp), dimension(:,:), intent(in) :: var
+  character (len=*), intent(in) :: gd
+  real (kind=wp), dimension(ni,nj) :: op_dq
+
+  if      ( gd == 'g1x1' ) then
+    ! var on grid 2, shift westward half-grid
+    op_dq(2:ni,:) = ( var(2:ni,:) - var(1:nim,:) ) / mg1(2:ni,:)%dx1
+    op_dq(1,:) = 0.0
+
+  else if ( gd == 'g4x1' ) then
+    ! var on grid 3
+    op_dq(2:ni,:) = ( var(2:ni,:) - var(1:nim,:) ) / mg4(2:ni,:)%dx1
+    op_dq(1,:) = 0.0
+
+  else if ( gd == 'g3x1' ) then
+    ! var on grid 4, shift eastward half-grid
+    ! note that the grid 'shift back' to g3, because it
+    !   was shift forward from g3 to g4, so the left hand side
+    !   is op_dq(1:nim,:), not op_dq(2:ni,:)
+    op_dq(1:nim,:) = ( var(2:ni,:) - var(1:nim,:) ) / mg3(1:nim,:)%dx1
+    op_dq(ni,:) = 0.0
+
+  else if ( gd == 'g1x2' ) then
+    op_dq(:,2:nj) = ( var(:,2:nj) - var(:,1:njm) ) / mg1(:,2:nj)%dx2
+    op_dq(:,1) = 0.0
+
+  else if ( gd == 'g2x2' ) then
+    op_dq(:,2:nj) = ( var(:,2:nj) - var(:,1:njm) ) / mg2(:,2:nj)%dx2
+    op_dq(:,1) = 0.0
+
+  else if ( gd == 'g3x2' ) then
+    op_dq(:,1:njm) = ( var(:,2:nj) - var(:,1:njm) ) / mg3(:,1:njm)%dx2
+    op_dq(:,nj) = 0.0
+  end if
+end function op_dq
+
+pure function op_div (vec) !{{{1
+  ! horizontal divergence operator for 2d vector
+  ! vector on grid 3, output ou grid 1
+  type (type_vector), dimension(:,:),   intent(in) :: vec
+  real (kind=wp), dimension(ni,nj)  :: op_div
+
+  op_div = ( op_dq( mg2%j/mg2%h1 * op_ter(vec%x1,'3->2'), 'g1x1' ) + &
+             op_dq( mg4%j/mg4%h2 * op_ter(vec%x2,'3->4'), 'g1x2' ) ) &
+             / mg1%j
+end function op_div
+
+pure function op_lap (vec) !{{{1
+  ! horizontal Laplacian operator
+  ! var on grid 3, output also on grid 3
+  type (type_vector), dimension(:,:),   intent(in) :: vec
+  real (kind=wp), dimension(ni,nj) :: op_lap
+  
+  op_div = ( op_dq( mg2%j/mg2%h1 * op_ter(x1,'3->2'), 'g1x1' ) + &
+             op_dq( mg4%j/mg4%h2 * op_ter(x2,'3->4'), 'g1x2' ) ) &
+             / mg1%j
+
+end function op_lap
+
+pure function ter_r3d(var, di) !{{{1
+  ! interpolate from one grid to another
+  ! di indicates directions
+  real (kind=wp), intent(in) :: var(:,:,:)
+  character (len=*), intent(in) :: di
+
+  real (kind=wp), dimension(ni,nj,nk) :: ter_r3d
+
+  if ( di == '1->3' ) then
+    ter_r3d(1:nim,1:njm,:) = &
+      ( var(1:nim,1:njm,:) + var(1:nim,2:nj,:) + &
+        var(2:ni, 1:njm,:) + var(2:ni, 2:nj,:) ) * 0.25
+    ter_r3d(ni,:,:) = 0.0
+    ter_r3d(:,nj,:) = 0.0
+  end if
+end function ter_r3d
+
+pure function ter_r2d(var, di) !{{{1
+  ! interpolate from one grid to another
+  ! di indicates directions
+  real (kind=wp), intent(in) :: var(:,:)
+  character (len=*), intent(in) :: di
+
+  real (kind=wp), dimension(ni,nj) :: ter_r2d
+
+  if      ( di == '1->3' ) then
+    ter_r2d(1:nim,1:njm) = &
+      ( var(1:nim,1:njm) + var(1:nim,2:nj) + &
+        var(2:ni, 1:njm) + var(2:ni, 2:nj) ) * 0.25
+    ter_r2d(ni,:) = 0.0
+    ter_r2d(:,nj) = 0.0
+
+  else if ( di == '3->1' ) then
+    ter_r2d(2:ni,2:nj) = &
+      ( var(2:ni,2:nj)  + var(1:nim,2:nj) + &
+        var(2:ni,1:njm) + var(1:nim,1:njm) ) * 0.25
+    ter_r2d(1,:) = 0.0
+    ter_r2d(:,1) = 0.0
+
+  else if ( di == '3->4' ) then
+    ter_r2d(2:ni,:) = 0.5 * ( var(2:ni,:) + var(1:nim,:) )
+    ter_r2d(1,:)    = 0.0
+
+  else if ( di == '3->2' ) then
+    ter_r2d(:,2:nj) = 0.5 * ( var(:,2:nj) + var(:,1:njm) )
+    ter_r2d(:,1)    = 0.0
+  end if
+end function ter_r2d
+
+pure function ter_i3d(var, di) !{{{1
+  ! interpolate from one grid to another
+  ! di indicates directions
+  integer, intent(in) :: var(:,:,:)
+  character (len=*), intent(in) :: di
+
+  integer, dimension(ni,nj,nk) :: ter_i3d
+
+  if ( di == '1->3' ) then
+    ter_i3d(1:nim,1:njm,:) = &
+      ( var(1:nim,1:njm,:) + var(1:nim,2:nj,:) + &
+        var(2:ni, 1:njm,:) + var(2:ni, 2:nj,:) ) * 0.25
+    ter_i3d(ni,:,:) = 0.0
+    ter_i3d(:,nj,:) = 0.0
+  end if
+end function ter_i3d
+
+subroutine chk( ista ) !{{{1
+  ! check state of allocate array 
+
+  integer, intent(in) ::  ista
+
+  if ( ista /= 0 ) then
+    write(*,*) 'Allocate array failed. Stop'
+    stop 2
+  end if
+end subroutine chk
+
+end module mod_op!{{{1
+!-------------------------------------------------------{{{1
+! vim:fdm=marker:fdl=0:
+! vim:foldtext=getline(v\:foldstart).'...'.(v\:foldend-v\:foldstart):

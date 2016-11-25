@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2016-04-06 16:15:29 BJT
+! Last Change: 2016-05-12 20:04:59 BJT
 
 module mod_mympi
 
@@ -21,14 +21,14 @@ module mod_mympi
 
   use mpi
 
-  use mod_param, only: nm, mid, myid, npro, &
+  use mod_param, only: mid, myid, npro, &
     glo_nj, glo_ni, ni, nj, nk, &
-    my, our, type_my, missing_float
+    my, our, missing_float, type_my
 
   use mod_type, only: &
     type_mat, type_accu_gm3d, type_accu_gr3d, &
     type_accu_gr2d, &
-    type_gvar_m3d, type_gvar_m2d, type_gvar_r2d, type_gvar_r3d
+    type_gvar_m3d, type_gvar_r3d
     
   implicit none
   private
