@@ -1,0 +1,36 @@
+# the environment 'NETCDF' should be set to be the root directory of netcdf installation
+NLIB = -L$(NETCDF)/lib -lnetcdf -lnetcdff
+ILIB = -I$(NETCDF)/include
+
+# FC   =  gfortran
+FC   =  gfortran-mp-6
+# FF   = -O2 -r8 -no-vec -fpe0 -traceback
+# FF   = -O2 -r8 -no-vec
+FF   = -O2 -g
+#  FF   = -O2 -r8
+# FF   = -O2 -r8 -no-vec
+# FF   = -O2 -no-vec
+
+EXE  = main
+OBJS = kind_mod.o math_extend_mod.o types_mod.o basic_mod.o netcdf_io_mod.o io_mod.o integrate_mod.o main.o
+
+.PHONY: all compile run clean
+
+# need this 'empty' line to avoid some problem when 'make'
+.SUFFIXES:
+
+.SUFFIXES: .f90 .o
+
+all: clean compile run
+
+compile: $(OBJS)
+	$(FC) $(FF) $(OBJS) -o $(EXE) $(NLIB) $(ILIB)
+
+.f90.o:
+	$(FC) $(FF) -c $< $(NLIB) $(ILIB)
+
+run:
+	./$(EXE)
+
+clean:
+	rm -f *.mod *.o *.out $(EXE)

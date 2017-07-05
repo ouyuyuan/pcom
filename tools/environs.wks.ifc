@@ -1,0 +1,6 @@
+
+source /opt/intel_cluster/bin/ifortvars.sh intel64
+source /opt/intel_cluster/impi/5.0.1.035/bin64/mpivars.sh intel64
+
+export NETCDF="/opt/local"
+export LD_LIBRARY_PATH=${NETCDF}/lib:$LD_LIBRARY_PATH

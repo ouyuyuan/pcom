@@ -1,11 +1,11 @@
 &mpi_ctrl
-npx = 8, 
-npy = 4,
+npx = 2, 
+npy = 1,
 /
 
 &time_ctrl
 bdate = '0001-01-01 00:00:00',
-edate = '0110-02-02 03:00:00',
+edate = '0001-01-01 01:02:01',
 dtbt = 60, 
 dtbc = 3600, 
 /
@@ -14,5 +14,5 @@ dtbc = 3600,
 fname_ini = 'input/initial.nc',
 fname_frc = 'input/forcing.nc',
 fname_out = 'output/results.nc',
-out_per   = 'year',
+out_per   = 'hour',
 /
