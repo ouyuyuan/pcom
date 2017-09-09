@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-07-05 21:34:47 BJT
+! Last Change: 2017-07-13 10:15:24 BJT
 
 module mod_type
 
@@ -12,7 +12,7 @@ module mod_type
   implicit none
   private
 
-  public &
+  public & !{{{1
     type_mat, &
     type_time, &
     type_tctr, &

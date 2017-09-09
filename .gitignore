@@ -3,7 +3,9 @@
 *.nc
 main
 *.mod
+*.log
 main.dSYM/*
 main.dSYM
-*.log
 backups/*
+algorithm/
+algorithm/*
