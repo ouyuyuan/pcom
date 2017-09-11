@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-06-19 16:23:05 BJT
+! Last Change: 2017-09-09 15:59:24 BJT
 
 module mod_param
 
@@ -34,6 +34,7 @@ module mod_param
     character (len=1) :: v = 'v'
     character (len=1) :: w = 'w'
     character (len=len('ssh')) :: ssh = 'ssh'
+    character (len=len('ph')) :: ph = 'ph'
   end type type_names
   type (type_names) :: names 
 
@@ -45,6 +46,7 @@ module mod_param
     character( len=len('m/s') ) :: v = 'm/s'
     character( len=len('m/s') ) :: w = 'm/s'
     character( len=len('m') ) :: ssh = 'm'
+    character( len=len('Pa') ) :: ph = 'Pa'
   end type type_units
   type (type_units) :: units
 

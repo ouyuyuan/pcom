@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-07-05 21:43:17 BJT
+! Last Change: 2017-09-10 15:58:37 BJT
 
 program main
 
@@ -14,7 +14,8 @@ program main
     cv1, cv2, &
     g1j, g2j, g3j, g4j, gtj, guj, &
     gi1, gi2, git, giw, g12, g32, gt, gu, &
-    acts, acuv, acw, acssh, am, arrays_allocate, &
+    acts, acuv, acw, acssh, acph, & 
+    am, arrays_allocate, &
     bnd, bphi, bgraphi, &
     badv, &
     frc, cor, fri, &
@@ -35,7 +36,8 @@ program main
   use mod_den, only: den_alpha, den_rho, den_prho
 
   use mod_int, only: int_trop, int_bnd, &
-    int_pgra, int_readyc, int_clin, int_ts, int_ssh
+    int_pgra, int_readyc, int_clin, int_ts, &
+    int_ssh, int_ph
 
   use mod_io, only: io_create, &
     io_get_dim_len, io_write, io_read, &
@@ -169,6 +171,9 @@ program main
     ! integrate series time steps per baroclinic time step
     call int_trop (ch, upb)
 
+    ! calc. sea bottom pressure
+    call int_ph (acph)
+
     ! prediction of baroclinic mode
     call int_clin (up, acuv, am%v)
 
@@ -181,7 +186,7 @@ program main
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
 
-    call check_output (acts, acuv, acw, acssh)
+    call check_output (acts, acuv, acw, acssh, acph)
   end do
 
   ! finish integration !{{{1
@@ -728,10 +733,10 @@ subroutine write_dim_info (fid) !{{{1
 
 end subroutine write_dim_info
 
-subroutine check_output (acts, acuv, acw, acssh) !{{{1
+subroutine check_output (acts, acuv, acw, acssh, acph) !{{{1
   type (type_accu_gm3d) :: acts, acuv
   type (type_accu_gr3d) :: acw
-  type (type_accu_gr2d) :: acssh
+  type (type_accu_gr2d) :: acssh, acph
 
   ! the print elapsed time infos if neccessary
   if ( nm%per.eq.'hour' ) then 
@@ -751,6 +756,8 @@ subroutine check_output (acts, acuv, acw, acssh) !{{{1
     call mympi_output (nm%fo, names%u, names%v, acuv, gu%msk)
 
     call mympi_output (nm%fo, names%w, acw, gu%msk)
+
+    call mympi_output (nm%fo, names%ph, acph, gt%msk(:,:,1))
 
     ! calc. fluctuation of ssh, minus global mean
     call mympi_output (nm%fo, names%ssh, acssh, &

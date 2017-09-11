@@ -4,7 +4,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-07-05 21:29:18 BJT
+! Last Change: 2017-09-10 15:40:37 BJT
 
 module mod_int
 
@@ -54,6 +54,7 @@ module mod_int
     int_pgra, &
     int_readyc, &
     int_ssh, &
+    int_ph, &
     int_bnd
     
 contains !{{{1
@@ -599,6 +600,22 @@ subroutine int_ssh (acssh, alpha) !{{{1
   acssh%n = acssh%n + 1
 
 end subroutine int_ssh
+
+subroutine int_ph (acph) !{{{1
+  ! calculate sea bottom pressure
+  ! ph = ch*prh + pa  ( 2.44 of Ou2016_phd )
+  type (type_accu_gr2d) :: acph
+
+  real (kind=wp), dimension(ni,nj) :: ph
+
+  ! prh is independence of vertical coordinate
+  ! and p, ch, pt all share the same horizontal grid
+  ph = ch%tc*gt%prh + bnd%pa%v 
+
+  acph%var%v = acph%var%v + ph
+  acph%n = acph%n + 1
+
+end subroutine int_ph
 
 subroutine upwelling( wm ) !{{{1
   ! diagnostic vertical mass advection wm

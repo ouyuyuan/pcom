@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-07-05 20:08:50 BJT
+! Last Change: 2017-09-09 16:03:27 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -103,6 +103,10 @@ subroutine io_create (ncname) !{{{1
   call check ( nf90_def_var (ncid, names%ssh, nf90_float, dimids_2d, varid) )
   call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
   call check ( nf90_put_att (ncid, varid, 'units', units%ssh) )
+  ! sea bottom pressure 
+  call check ( nf90_def_var (ncid, names%ph, nf90_float, dimids_2d, varid) )
+  call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
+  call check ( nf90_put_att (ncid, varid, 'units', units%ph) )
 
   ! define 3d variables !{{{2
   dimids = (/dimid1, dimid2, dimid3, dimid4/)
