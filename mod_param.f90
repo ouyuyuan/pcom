@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-09 15:59:24 BJT
+! Last Change: 2017-09-12 15:07:24 BJT
 
 module mod_param
 
@@ -38,6 +38,18 @@ module mod_param
   end type type_names
   type (type_names) :: names 
 
+  ! long name of variables
+  type :: type_longnames
+    character (len=len('potential temperature')) :: pt = 'potential temperature'
+    character (len=len('salinity')) :: sa = 'salinity'
+    character (len=len('zonal velocity')) :: u = 'zonal velocity'
+    character (len=len('meridional velocity')) :: v = 'meridional velocity'
+    character (len=len('vertical velocity')) :: w = 'vertical velocity'
+    character (len=len('sea surface height')) :: ssh = 'sea surface height'
+    character (len=len('sea bottom pressure')) :: ph = 'sea bottom pressure'
+  end type type_longnames
+  type (type_longnames) :: longnames 
+
   ! units of variables
   type :: type_units
     character( len=len('degrees Celcius') ) :: pt = 'degrees Celcius'
@@ -64,8 +76,9 @@ module mod_param
     ! BaroTropic/BaroClinic time step
     integer :: bt, bc 
 
-    ! Filename of Initial/Forcing/Output file
-    character (len=80) :: fi, ff, fo
+    ! Filename of Initial/Forcing file
+    ! directory name of output files
+    character (len=80) :: fi, ff, od
     ! output PER month or PER year 
     character (len=80) :: per
   end type type_nm
@@ -123,14 +136,14 @@ subroutine param_set_nm ( nm ) !{{{1
   character (len=80) :: bdate, edate
   integer :: dtbt, dtbc
 
-  character (len=80) :: fname_ini, fname_frc, fname_out, out_per
+  character (len=80) :: fname_ini, fname_frc, out_dir, out_per
 
   ! it can't use the syntax % for namelist /.../ statesment
   !    so we redefine namelist parameters
 
   namelist /mpi_ctrl/ npy, npx
   namelist /time_ctrl/ bdate, edate, dtbt, dtbc
-  namelist /io_ctrl/ fname_ini, fname_frc, fname_out, out_per
+  namelist /io_ctrl/ fname_ini, fname_frc, out_dir, out_per
 
   open(fid_nam, file='namelist')
   read(fid_nam, mpi_ctrl)
@@ -159,7 +172,7 @@ subroutine param_set_nm ( nm ) !{{{1
 
   nm%fi = fname_ini
   nm%ff = fname_frc
-  nm%fo = fname_out
+  nm%od = out_dir
   nm%per= out_per
 
 end subroutine param_set_nm

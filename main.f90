@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-09-10 15:58:37 BJT
+! Last Change: 2017-09-12 15:18:41 BJT
 
 program main
 
@@ -40,7 +40,7 @@ program main
     int_ssh, int_ph
 
   use mod_io, only: io_create, &
-    io_get_dim_len, io_write, io_read, &
+    io_get_dim_len, io_read, &
     io_quick_output
 
   use mod_kind, only: wp, zero, lint
@@ -127,12 +127,8 @@ program main
 
   ! create output file
   if ( myid == mid ) then
-    call io_create (nm%fo)
-    write(fid_dia, '(a)') 'created output file '//nm%fo
-
-    call io_write (trim(nm%fo), 'lon', glo_lon)
-    call io_write (trim(nm%fo), 'lat', glo_lat)
-    call io_write (trim(nm%fo), 'z',   z)
+    call io_create (nm%od, glo_lon, glo_lat, z)
+    write(fid_dia, '(a)') 'created output files in '//nm%od
   end if
 
   ! integration cycle !{{{1
@@ -226,7 +222,7 @@ subroutine init () !{{{1
 
   call mympi_bcast (nm%fi)
   call mympi_bcast (nm%ff)
-  call mympi_bcast (nm%fo)
+  call mympi_bcast (nm%od)
 
   call mympi_bcast (nm%per)
 
@@ -751,17 +747,22 @@ subroutine check_output (acts, acuv, acw, acssh, acph) !{{{1
        ((tctr%ct%m/=tctr%pt%m).and.(nm%per.eq.'month')) .or. &
        ((tctr%ct%y/=tctr%pt%y).and.(nm%per.eq.'year')) ) then
 
-    call mympi_output (nm%fo, names%pt, names%sa, acts)
+    call mympi_output (trim(nm%od)//names%pt//'.nc', names%pt, &
+                       trim(nm%od)//names%sa//'.nc', names%sa, &
+                       acts)
 
-    call mympi_output (nm%fo, names%u, names%v, acuv, gu%msk)
+    call mympi_output (trim(nm%od)//names%u//'.nc', names%u, &
+                       trim(nm%od)//names%v//'.nc', names%v, & 
+                       acuv, gu%msk)
+    call mympi_output (trim(nm%od)//names%w//'.nc', names%w, &
+                       acw, gu%msk)
 
-    call mympi_output (nm%fo, names%w, acw, gu%msk)
-
-    call mympi_output (nm%fo, names%ph, acph, gt%msk(:,:,1))
+    call mympi_output (trim(nm%od)//names%ph//'.nc', names%ph, &
+                       acph, gt%msk(:,:,1))
 
     ! calc. fluctuation of ssh, minus global mean
-    call mympi_output (nm%fo, names%ssh, acssh, &
-      acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
+    call mympi_output (trim(nm%od)//names%ssh//'.nc', names%ssh, &
+      acssh, acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
 
   end if
 

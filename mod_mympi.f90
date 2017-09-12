@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-07-05 20:18:41 BJT
+! Last Change: 2017-09-12 15:05:32 BJT
 
 module mod_mympi
 
@@ -126,16 +126,16 @@ subroutine bcast_string (var)!{{{1
   call mpi_bcast(var, len(var), mpi_byte, mid, mpi_comm_world, err)
 end subroutine bcast_string
 
-subroutine merge_out_accu_gm3d (fname, vname1, vname2, var) !{{{1
+subroutine merge_out_accu_gm3d (fname1, vname1, fname2, vname2, var) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*) :: fname, vname1, vname2
+  character (len=*) :: fname1, fname2, vname1, vname2
   type (type_accu_gm3d) :: var
 
   var%var%x(1)%v = var%var%x(1)%v / var%n
   var%var%x(2)%v = var%var%x(2)%v / var%n
 
-  call merge_out_r3d (fname, vname1, var%var%x(1)%v, var%nrec + 1)
-  call merge_out_r3d (fname, vname2, var%var%x(2)%v, var%nrec + 1)
+  call merge_out_r3d (fname1, vname1, var%var%x(1)%v, var%nrec + 1)
+  call merge_out_r3d (fname2, vname2, var%var%x(2)%v, var%nrec + 1)
 
   var%var%x(1)%v = 0.0 ! reset accumulated value
   var%var%x(2)%v = 0.0
@@ -144,10 +144,10 @@ subroutine merge_out_accu_gm3d (fname, vname1, vname2, var) !{{{1
 
 end subroutine merge_out_accu_gm3d
 
-subroutine merge_out_accu_gm3d_mask (fname, vname1, vname2, var, mask) !{{{1
+subroutine merge_out_accu_gm3d_mask (fname1, vname1, fname2, vname2, var, mask) !{{{1
   ! merge 3d array from other domains to mid
   ! mask out the land points
-  character (len=*) :: fname, vname1, vname2
+  character (len=*) :: fname1, fname2, vname1, vname2
   type (type_accu_gm3d) :: var
   integer, dimension(:,:,:), intent(in) :: mask
 
@@ -159,8 +159,8 @@ subroutine merge_out_accu_gm3d_mask (fname, vname1, vname2, var, mask) !{{{1
     var%var%x(2)%v = missing_float
   end where
 
-  call merge_out_r3d (fname, vname1, var%var%x(1)%v, var%nrec + 1)
-  call merge_out_r3d (fname, vname2, var%var%x(2)%v, var%nrec + 1)
+  call merge_out_r3d (fname1, vname1, var%var%x(1)%v, var%nrec + 1)
+  call merge_out_r3d (fname2, vname2, var%var%x(2)%v, var%nrec + 1)
 
   var%var%x(1)%v = 0.0 ! reset accumulated value
   var%var%x(2)%v = 0.0

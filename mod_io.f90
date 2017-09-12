@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-09-09 16:03:27 BJT
+! Last Change: 2017-09-12 15:49:25 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -12,7 +12,7 @@ module mod_io !{{{1
   use mod_kind, only: wp
 
   use mod_param, only: &
-    glo_ni, glo_nj, nk, names, units, &
+    glo_ni, glo_nj, nk, names, longnames, units, &
     missing_int, missing_float
 
   implicit none
@@ -62,12 +62,14 @@ module mod_io !{{{1
 contains !{{{1
 !-------------------------------------------------------{{{1
 
-subroutine io_create (ncname) !{{{1
+subroutine create_r3d (ncname, varname, unitname, longname, lon, lat, z) !{{{1
+  ! create the output file for 3d variable
 
-  character (len=*), intent(in) :: ncname
+  character (len=*), intent(in) :: ncname, varname, unitname, longname
+  real (kind=wp), intent(in), dimension(:) :: lon, lat, z 
 
   integer :: dimid1, dimid2, dimid3, dimid4
-  integer :: dimids(4), dimids_2d(3)
+  integer :: dimids(4)
 
   call check ( nf90_create (ncname, NF90_CLOBBER, ncid)  )
 
@@ -79,73 +81,139 @@ subroutine io_create (ncname) !{{{1
 
   !def global attr. {{{2
   call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
-    'created', "by subroutine io_create in module mod_io") )
+    'created', "by subroutine create_r3d in module mod_io") )
 
   ! def vars  !{{{2
   call check ( nf90_def_var (ncid, "lon", nf90_float, &
     dimid1, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'longitude') )
   call check ( nf90_put_att (ncid, varid, 'units', &
     'degree_east') )
 
   call check ( nf90_def_var (ncid, "lat", nf90_float, &
     dimid2, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'latitude') )
   call check ( nf90_put_att (ncid, varid, 'units', &
     'degree_north') )
 
   call check ( nf90_def_var (ncid, "z", nf90_float, &
     dimid3, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'depth') )
   call check ( nf90_put_att (ncid, varid, 'units', &
     'm') )
 
-  ! define 2d variables !{{{2
-  dimids_2d = (/dimid1, dimid2, dimid4/)
-  ! sea surface height
-  call check ( nf90_def_var (ncid, names%ssh, nf90_float, dimids_2d, varid) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', units%ssh) )
-  ! sea bottom pressure 
-  call check ( nf90_def_var (ncid, names%ph, nf90_float, dimids_2d, varid) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', units%ph) )
-
-  ! define 3d variables !{{{2
   dimids = (/dimid1, dimid2, dimid3, dimid4/)
 
-  ! potential temperature
-  call check ( nf90_def_var (ncid, names%pt, nf90_float, &
+  call check ( nf90_def_var (ncid, varname, nf90_float, &
     dimids, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    longname) )
   call check ( nf90_put_att (ncid, varid, '_FillValue', &
     missing_float) )
   call check ( nf90_put_att (ncid, varid, 'units', &
-    units%pt) )
-
-  ! salinity
-  call check ( nf90_def_var (ncid, names%sa, nf90_float, &
-    dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', &
-    missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    units%sa) )
-
-  ! zonal velocity
-  call check ( nf90_def_var (ncid, names%u, nf90_float, dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', units%u) )
-
-  ! meridional velocity
-  call check ( nf90_def_var (ncid, names%v, nf90_float, dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', units%v) )
-
-  ! vertical velocity
-  call check ( nf90_def_var (ncid, names%w, nf90_float, dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', units%w) )
+    unitname) )
 
   !end def {{{2
   call check (nf90_enddef(ncid) )
 
   call check (nf90_close(ncid) )
+
+  ! write coordinates {{{2
+  call write_r1d (ncname, 'lon', lon)
+  call write_r1d (ncname, 'lat', lat)
+  call write_r1d (ncname, 'z', z)
+
+end subroutine create_r3d
+
+subroutine create_r2d (ncname, varname, unitname, longname, lon, lat) !{{{1
+  ! create the output file for 2d variable
+
+  character (len=*), intent(in) :: ncname, varname, unitname, longname
+  real (kind=wp), intent(in), dimension(:) :: lon, lat
+
+  integer :: dimid1, dimid2, dimid3
+  integer :: dimids(3)
+
+  call check ( nf90_create (ncname, NF90_CLOBBER, ncid)  )
+
+  !def dim. {{{2
+  call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
+  call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
+  call check ( nf90_def_dim (ncid, 't', NF90_UNLIMITED, dimid3) )
+
+  !def global attr. {{{2
+  call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
+    'created', "by subroutine create_r2d in module mod_io") )
+
+  ! def vars  !{{{2
+  call check ( nf90_def_var (ncid, "lon", nf90_float, &
+    dimid1, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'longitude') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_east') )
+
+  call check ( nf90_def_var (ncid, "lat", nf90_float, &
+    dimid2, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'latitude') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_north') )
+
+  dimids = (/dimid1, dimid2, dimid3/)
+
+  call check ( nf90_def_var (ncid, varname, nf90_float, &
+    dimids, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    longname) )
+  call check ( nf90_put_att (ncid, varid, '_FillValue', &
+    missing_float) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    unitname) )
+
+  !end def {{{2
+  call check (nf90_enddef(ncid) )
+
+  call check (nf90_close(ncid) )
+
+  ! write coordinates {{{2
+  call write_r1d (ncname, 'lon', lon)
+  call write_r1d (ncname, 'lat', lat)
+end subroutine create_r2d
+
+subroutine io_create (outdir, lon, lat, z) !{{{1
+  ! create all the output files
+
+  character (len=*), intent(in) :: outdir
+  real (kind=wp), intent(in), dimension(:) :: lon, lat, z 
+
+  ! sea surface height
+  call create_r2d (trim(outdir)//names%ssh//'.nc', &
+    names%ssh, units%ssh, longnames%ssh, lon, lat)
+  ! sea bottom pressure 
+  call create_r2d (trim(outdir)//names%ph//'.nc', &
+    names%ph, units%ph, longnames%ph, lon, lat)
+
+
+  ! potential temperature
+  call create_r3d (trim(outdir)//names%pt//'.nc', &
+    names%pt, units%pt, longnames%pt, lon, lat, z)
+  ! salinity
+  call create_r3d (trim(outdir)//names%sa//'.nc', &
+    names%sa, units%sa, longnames%sa, lon, lat, z)
+
+  ! zonal velocity
+  call create_r3d (trim(outdir)//names%u//'.nc', &
+    names%u, units%u, longnames%u, lon, lat, z)
+  ! meridional velocity
+  call create_r3d (trim(outdir)//names%v//'.nc', &
+    names%v, units%v, longnames%v, lon, lat, z)
+  ! vertical velocity
+  call create_r3d (trim(outdir)//names%w//'.nc', &
+    names%w, units%w, longnames%w, lon, lat, z)
 
 end subroutine io_create
 
@@ -156,8 +224,8 @@ subroutine write_r3d(ncname, varname, var, nrec) !{{{1
 
   integer :: stt(4), cnt(4), nrec
 
-  write(*,'(a,i3,a)') '*** Output '//varname//' to file: '//ncname//' for the ', &
-    nrec, 'th record ......' 
+  write(*,'(a,i3,a)') '*** Output '//varname//' to file: '//&
+    ncname//' for the ', nrec, 'th record ......' 
 
   ndim1 = size(var, 1)
   ndim2 = size(var, 2)
@@ -166,7 +234,7 @@ subroutine write_r3d(ncname, varname, var, nrec) !{{{1
   stt  = (/1, 1, 1, nrec/)
   cnt  = (/ndim1, ndim2, ndim3, 1/)
 
-  call check (nf90_open(ncname, nf90_write, ncid)  )
+  call check (nf90_open (ncname, nf90_write, ncid)  )
 
   call check (nf90_inq_varid(ncid, varname, varid) )
 
@@ -242,8 +310,6 @@ subroutine write_r1d(ncname, varname, var) !{{{1
   call check (nf90_put_var(ncid, varid, var) )
 
   call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
 
 end subroutine write_r1d
 

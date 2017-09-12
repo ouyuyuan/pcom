@@ -5,6 +5,7 @@ main
 *.mod
 *.log
 main.dSYM/*
+.DS_Store
 main.dSYM
 backups/*
 algorithm/
