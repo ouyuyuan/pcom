@@ -3,13 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2017-09-13 13:46:43 BJT
+! Last Change: 2017-09-13 16:34:44 BJT
 
 module mod_den
 
   use mod_arrays, only: &
     gi2, git, &
-    bnd, ts, ch
+    ts, ch
 
   use mod_con, only: deltat, deltas
 
@@ -47,7 +47,7 @@ subroutine den_alpha (alpha, ts, ch, mask)!{{{1
       alpha(i,j,k) = 1.0 /   &
         den_rho( ts%x(1)%v(i,j,k), &
                  ts%x(2)%v(i,j,k), &
-                 ch(i,j) * git%pr(k) + bnd%pa%v(i,j) )
+                 ch(i,j) * git%pr(k) )
   end do
   end do
   end do
