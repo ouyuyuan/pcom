@@ -1,11 +1,11 @@
 &mpi_ctrl
-npx = 2, 
-npy = 1,
+npx = 8, 
+npy = 4,
 /
 
 &time_ctrl
 bdate = '0001-01-01 00:00:00',
-edate = '0101-01-01 00:02:01',
+edate = '1001-01-01 00:02:01',
 dtbt = 60, 
 dtbc = 3600, 
 /
