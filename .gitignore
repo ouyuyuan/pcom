@@ -11,3 +11,6 @@ backups/*
 algorithm/
 algorithm/*
 output/*
+output*
+input/
+input/*

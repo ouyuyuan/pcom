@@ -1,19 +1,13 @@
-NETCDF  = /usr/local
-# MPI_LIB = /opt/local/lib/openmpi-mp
-MPI_LIB = /opt/local/lib/openmpi-devel-mp
-# MPIRUN  = mpirun-openmpi-mp
-MPIRUN  = mpirun-openmpi-devel-mp
+NETCDF  = /opt/local
+MPI_LIB = /opt/intel_cluster/impi/5.0.1.035/intel64/include
+MPIRUN  = mpirun
 
-# FC   =  gfortran
-# FC   =  mpif90-openmpi-mp
-FC   =  mpifort-openmpi-devel-mp
+FC   =  mpiifort
 
-FF = -O2 -g -Wall\
-	-I$(NETCDF)/include -L$(NETCDF)/lib -lnetcdf -lnetcdff \
-	-L$(MPI_LIB) -lmpi
-# FF   = -O2 -r8 -no-vec -fpe0 -traceback
-# FF = -stack_temps -safe_cray_ptr -ftz -assume byterecl -fp-model precise -O2 -i4 -r8 -I$(NETCDF)/include -L$(NETCDF)/lib -lnetcdf -lnetcdff
-# FF   = -O2 -r8 -no-vec
+# FF = -O2 -g -Wall\
+#   -I$(NETCDF)/include -L$(NETCDF)/lib -lnetcdf -lnetcdff \
+#   -L$(MPI_LIB) -lmpi
+FF = -stack_temps -safe_cray_ptr -ftz -assume byterecl -fp-model precise -O2 -i4 -r8 -I$(NETCDF)/include -L$(NETCDF)/lib -lnetcdf -lnetcdff
 
 EXE  = main
 OBJS = mod_kind.o \

@@ -5,7 +5,7 @@ npy = 1,
 
 &time_ctrl
 bdate = '0001-01-01 00:00:00',
-edate = '0001-01-02 00:02:01',
+edate = '0101-01-01 00:02:01',
 dtbt = 60, 
 dtbc = 3600, 
 /
@@ -13,6 +13,6 @@ dtbc = 3600,
 &io_ctrl
 fname_ini = 'input/initial.nc',
 fname_frc = 'input/forcing.nc',
-out_dir = 'output/',
-out_per   = 'hour',
+out_dir = 'output_2.2.3/',
+out_per   = 'month',
 /
