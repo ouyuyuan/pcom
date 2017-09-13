@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-09-13 14:03:16 BJT
+! Last Change: 2017-09-13 15:31:23 BJT
 
 program main
 
@@ -793,7 +793,7 @@ subroutine print_time_per_day (tctr)
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
       'integrate for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ' use ', tctr%t2 - tctr%t1, &
+      '-', tctr%pt%d, ' used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2

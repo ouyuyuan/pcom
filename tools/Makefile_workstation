@@ -1,12 +1,8 @@
 NETCDF  = /opt/local
-MPI_LIB = /opt/intel_cluster/impi/5.0.1.035/intel64/include
 MPIRUN  = mpirun
 
 FC   =  mpiifort
 
-# FF = -O2 -g -Wall\
-#   -I$(NETCDF)/include -L$(NETCDF)/lib -lnetcdf -lnetcdff \
-#   -L$(MPI_LIB) -lmpi
 FF = -stack_temps -safe_cray_ptr -ftz -assume byterecl -fp-model precise -O2 -i4 -r8 -I$(NETCDF)/include -L$(NETCDF)/lib -lnetcdf -lnetcdff
 
 EXE  = main
@@ -34,7 +30,7 @@ compile: $(OBJS)
 	$(FC) $(FF) -c $<
 
 run:
-	$(MPIRUN) -n 2 $(EXE)
+	$(MPIRUN) -n 32 ./$(EXE)
 
 view:
 	ncview output/test.nc

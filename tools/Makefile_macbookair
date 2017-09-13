@@ -40,7 +40,7 @@ compile: $(OBJS)
 	$(FC) $(FF) -c $<
 
 run:
-	$(MPIRUN) -n 2 $(EXE)
+	$(MPIRUN) -n 2 ./$(EXE)
 
 view:
 	ncview output/test.nc

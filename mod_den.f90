@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2017-09-13 13:46:43 BJT
+! Last Change: 2017-09-13 14:22:15 BJT
 
 module mod_den
 
@@ -62,7 +62,7 @@ pure function den_rho (t, s, p0) !{{{1
   !
   ! t = potential temperature, Degrees centigrade
   ! s = salinity, practical salinity units
-  ! p = pressure, Pa
+  ! p = pressure, preclude surface atmaspheric pressure, in Pa
   !
   ! output  dens: kg / m^3
   !
