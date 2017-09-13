@@ -13,6 +13,6 @@ dtbc = 3600,
 &io_ctrl
 fname_ini = 'input/initial.nc',
 fname_frc = 'input/forcing.nc',
-out_dir = 'output_2.2.3/',
+out_dir = 'output_2.2.3r1/',
 out_per   = 'month',
 /
