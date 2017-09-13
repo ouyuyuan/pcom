@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-09-12 15:18:41 BJT
+! Last Change: 2017-09-13 14:03:16 BJT
 
 program main
 
@@ -14,7 +14,7 @@ program main
     cv1, cv2, &
     g1j, g2j, g3j, g4j, gtj, guj, &
     gi1, gi2, git, giw, g12, g32, gt, gu, &
-    acts, acuv, acw, acssh, acph, & 
+    acts, acuv, acw, acrho, acssh, acph, & 
     am, arrays_allocate, &
     bnd, bphi, bgraphi, &
     badv, &
@@ -177,12 +177,12 @@ program main
     call int_ssh (acssh, alpha%v)
 
     ! prediction of temperature and salinity
-    call int_ts (ts, acts, acw, wm)
+    call int_ts (ts, acts, acrho, acw, wm)
 
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
 
-    call check_output (acts, acuv, acw, acssh, acph)
+    call check_output (acts, acuv, acw, acrho, acssh, acph)
   end do
 
   ! finish integration !{{{1
@@ -729,9 +729,9 @@ subroutine write_dim_info (fid) !{{{1
 
 end subroutine write_dim_info
 
-subroutine check_output (acts, acuv, acw, acssh, acph) !{{{1
+subroutine check_output (acts, acuv, acw, acrho, acssh, acph) !{{{1
   type (type_accu_gm3d) :: acts, acuv
-  type (type_accu_gr3d) :: acw
+  type (type_accu_gr3d) :: acrho, acw
   type (type_accu_gr2d) :: acssh, acph
 
   ! the print elapsed time infos if neccessary
@@ -750,6 +750,9 @@ subroutine check_output (acts, acuv, acw, acssh, acph) !{{{1
     call mympi_output (trim(nm%od)//names%pt//'.nc', names%pt, &
                        trim(nm%od)//names%sa//'.nc', names%sa, &
                        acts)
+
+    call mympi_output (trim(nm%od)//names%rho//'.nc', names%rho, &
+                       acrho, gt%msk)
 
     call mympi_output (trim(nm%od)//names%u//'.nc', names%u, &
                        trim(nm%od)//names%v//'.nc', names%v, & 

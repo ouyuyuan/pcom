@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-26 15:40:39 BJT
-! Last Change: 2017-09-09 16:06:02 BJT
+! Last Change: 2017-09-13 13:59:32 BJT
 
 module mod_arrays
 
@@ -60,7 +60,8 @@ module mod_arrays
     acts, & ! accumulated (T, S)
     acuv ! ... unweighted horizontal velocity
   type (type_accu_gr3d) :: &
-    acw   ! m/s, vertical velocity, bottom is assume to be zero, so it is nk layer, not nkp layer
+    acrho, & ! kg/m^3, density of sea water
+    acw   ! m/s, vertical velocity, bottom is assume to be zero, so it is nk layers, not nkp layers
   type (type_accu_gr2d) :: &
     acssh, & ! m, sea surface height
     acph     ! Pa, sea bottom pressure
@@ -243,6 +244,9 @@ subroutine arrays_allocate () !{{{1
   ! acw lies on g32 just for output, this is ad hoc
   call arrays_init( acw%var, ni,nj,nk, zero, g32 )
   acw%n = 0; acw%nrec = 0
+
+  call arrays_init( acrho%var, ni,nj,nk, zero, g12 )
+  acrho%n = 0; acrho%nrec = 0
 
   call arrays_init( acssh%var, ni,nj, zero, g1j )
   acssh%n = 0; acssh%nrec = 0

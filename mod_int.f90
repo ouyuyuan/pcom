@@ -4,11 +4,11 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-09-10 15:40:37 BJT
+! Last Change: 2017-09-13 13:55:50 BJT
 
 module mod_int
 
-  use mod_den, only: den_alpha
+  use mod_den, only: den_alpha, den_rho
 
   use mod_arrays, only: &
     g1j, g2j, g3j, g4j, &
@@ -419,16 +419,17 @@ subroutine smag( am, u, v ) !{{{2
 
 end subroutine smag
 
-subroutine int_ts (ts, acts, acw, wm) !{{{1
+subroutine int_ts (ts, acts, acrho, acw, wm) !{{{1
   ! prognose of temperature and salinity
   type (type_gvar_m3d) :: ts(2)
   type (type_accu_gm3d) :: acts
-  type (type_accu_gr3d) :: acw
+  type (type_accu_gr3d) :: acrho, acw
   type (type_gvar_r3d) :: wm
 
   type (type_mat), dimension(ni,nj,nk) :: &
     pts, & ! tendency of tracer
     wkm
+  real (kind=wp), dimension(ni,nj,nk) :: wk
   real (kind=wp), dimension(ni,nj) :: pbnd
   integer :: k
 
@@ -480,7 +481,11 @@ subroutine int_ts (ts, acts, acw, wm) !{{{1
   acts%var%x(2)%v = acts%var%x(2)%v + ts(tc)%x(2)%v
   acts%n = acts%n + 1
 
-  ! calc. density and surface height
+  ! calc. density 
+  call den_alpha (wk, ts(tp), ch%tc, gt%msk)
+  
+  acrho%var%v = acrho%var%v + 1.0/wk
+  acrho%n = acrho%n + 1 
 
 end subroutine int_ts
 

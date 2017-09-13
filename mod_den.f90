@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2016-05-12 19:43:33 BJT
+! Last Change: 2017-09-13 13:46:43 BJT
 
 module mod_den
 
@@ -88,8 +88,7 @@ pure function den_rho (t, s, p0) !{{{1
     r0, r, a, b, k
 
   ! convert Pa to bar
-  p = p0 * 1e-5 + 1.013
-!  p = p0 * 1e-5
+  p = p0 * 1e-5
 
   p2  = p*p
   t2  = t*t

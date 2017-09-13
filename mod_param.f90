@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-12 15:07:24 BJT
+! Last Change: 2017-09-13 14:00:12 BJT
 
 module mod_param
 
@@ -33,6 +33,7 @@ module mod_param
     character (len=1) :: u = 'u'
     character (len=1) :: v = 'v'
     character (len=1) :: w = 'w'
+    character (len=len('rho')) :: rho = 'rho'
     character (len=len('ssh')) :: ssh = 'ssh'
     character (len=len('ph')) :: ph = 'ph'
   end type type_names
@@ -45,6 +46,7 @@ module mod_param
     character (len=len('zonal velocity')) :: u = 'zonal velocity'
     character (len=len('meridional velocity')) :: v = 'meridional velocity'
     character (len=len('vertical velocity')) :: w = 'vertical velocity'
+    character (len=len('sea water density')) :: rho = 'sea water density'
     character (len=len('sea surface height')) :: ssh = 'sea surface height'
     character (len=len('sea bottom pressure')) :: ph = 'sea bottom pressure'
   end type type_longnames
@@ -57,6 +59,7 @@ module mod_param
     character( len=len('m/s') ) :: u = 'm/s'
     character( len=len('m/s') ) :: v = 'm/s'
     character( len=len('m/s') ) :: w = 'm/s'
+    character( len=len('kg/m^3') ) :: rho = 'kg/m^3'
     character( len=len('m') ) :: ssh = 'm'
     character( len=len('Pa') ) :: ph = 'Pa'
   end type type_units

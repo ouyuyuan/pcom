@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-09-12 15:49:25 BJT
+! Last Change: 2017-09-13 14:01:23 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -204,6 +204,9 @@ subroutine io_create (outdir, lon, lat, z) !{{{1
   ! salinity
   call create_r3d (trim(outdir)//names%sa//'.nc', &
     names%sa, units%sa, longnames%sa, lon, lat, z)
+  ! density
+  call create_r3d (trim(outdir)//names%rho//'.nc', &
+    names%rho, units%rho, longnames%rho, lon, lat, z)
 
   ! zonal velocity
   call create_r3d (trim(outdir)//names%u//'.nc', &
