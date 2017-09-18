@@ -4,7 +4,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-09-13 13:55:50 BJT
+! Last Change: 2017-09-18 20:27:18 BJT
 
 module mod_int
 
@@ -608,14 +608,16 @@ end subroutine int_ssh
 
 subroutine int_ph (acph) !{{{1
   ! calculate sea bottom pressure
-  ! ph = ch*prh + pa  ( 2.44 of Ou2016_phd )
+  ! preclude the atmospheric pressure ( bnd%pa%v )
+  ! ph = ch*prh ( 2.44 of Ou2016_phd )
   type (type_accu_gr2d) :: acph
 
   real (kind=wp), dimension(ni,nj) :: ph
 
   ! prh is independence of vertical coordinate
   ! and p, ch, pt all share the same horizontal grid
-  ph = ch%tc*gt%prh + bnd%pa%v 
+
+  ph = ch%tc*gt%prh
 
   acph%var%v = acph%var%v + ph
   acph%n = acph%n + 1
