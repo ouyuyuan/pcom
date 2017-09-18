@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-09-13 14:01:23 BJT
+! Last Change: 2017-09-18 18:06:59 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -11,9 +11,10 @@ module mod_io !{{{1
   use netcdf
   use mod_kind, only: wp
 
+  use mod_type, only: tctr
   use mod_param, only: &
     glo_ni, glo_nj, nk, names, longnames, units, &
-    missing_int, missing_float
+    missing_int, missing_float, nm
 
   implicit none
   private
@@ -77,7 +78,7 @@ subroutine create_r3d (ncname, varname, unitname, longname, lon, lat, z) !{{{1
   call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
   call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
   call check ( nf90_def_dim (ncid, 'z',   nk, dimid3) )
-  call check ( nf90_def_dim (ncid, 't', NF90_UNLIMITED, dimid4) )
+  call check ( nf90_def_dim (ncid, 'time', NF90_UNLIMITED, dimid4) )
 
   !def global attr. {{{2
   call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
@@ -104,6 +105,11 @@ subroutine create_r3d (ncname, varname, unitname, longname, lon, lat, z) !{{{1
     'depth') )
   call check ( nf90_put_att (ncid, varid, 'units', &
     'm') )
+
+  call check ( nf90_def_var (ncid, "time", nf90_float, &
+    dimid4, varid) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'hours since 0001-01-01 00:00:00') )
 
   dimids = (/dimid1, dimid2, dimid3, dimid4/)
 
@@ -142,7 +148,7 @@ subroutine create_r2d (ncname, varname, unitname, longname, lon, lat) !{{{1
   !def dim. {{{2
   call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
   call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
-  call check ( nf90_def_dim (ncid, 't', NF90_UNLIMITED, dimid3) )
+  call check ( nf90_def_dim (ncid, 'time', NF90_UNLIMITED, dimid3) )
 
   !def global attr. {{{2
   call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
@@ -162,6 +168,11 @@ subroutine create_r2d (ncname, varname, unitname, longname, lon, lat) !{{{1
     'latitude') )
   call check ( nf90_put_att (ncid, varid, 'units', &
     'degree_north') )
+
+  call check ( nf90_def_var (ncid, "time", nf90_float, &
+    dimid3, varid) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'hours since 0001-01-01 00:00:00') )
 
   dimids = (/dimid1, dimid2, dimid3/)
 
@@ -226,6 +237,7 @@ subroutine write_r3d(ncname, varname, var, nrec) !{{{1
   real (kind=wp), intent(in) :: var(:,:,:)
 
   integer :: stt(4), cnt(4), nrec
+  real (kind=wp) :: hour
 
   write(*,'(a,i3,a)') '*** Output '//varname//' to file: '//&
     ncname//' for the ', nrec, 'th record ......' 
@@ -244,6 +256,12 @@ subroutine write_r3d(ncname, varname, var, nrec) !{{{1
   call check (nf90_put_var(ncid, varid, var, &
     start = stt, count = cnt) )
 
+  ! increase time record
+  hour = real(tctr%i) * real(nm%bc) / 3600.0
+  call check (nf90_inq_varid(ncid, 'time', varid) )
+  call check (nf90_put_var(ncid, varid, hour, &
+    start = (/nrec/) ) )
+
   call check (nf90_close(ncid) )
 
 end subroutine write_r3d
@@ -254,6 +272,7 @@ subroutine write_r2d_rec(ncname, varname, var, nrec) !{{{1
   real (kind=wp), intent(in) :: var(:,:)
 
   integer :: stt(3), cnt(3), nrec
+  real (kind=wp) :: hour
 
   write(*,'(a,i3,a)') '*** Output '//varname//' to file: '//ncname//' for the ', &
     nrec, 'th record ......' 
@@ -270,6 +289,12 @@ subroutine write_r2d_rec(ncname, varname, var, nrec) !{{{1
 
   call check (nf90_put_var(ncid, varid, var, &
     start = stt, count = cnt) )
+
+  ! increase time record
+  hour = real(tctr%i) * real(nm%bc) / 3600.0
+  call check (nf90_inq_varid(ncid, 'time', varid) )
+  call check (nf90_put_var(ncid, varid, hour, &
+    start = (/nrec/)) )
 
   call check (nf90_close(ncid) )
 
