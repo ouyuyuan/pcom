@@ -12,14 +12,14 @@ module mod_kind
 
   public &
     sglp, wp,  &
-    one,  zero, int12
+    one,  zero, lint
 
   !precision control for real number
   ! single precision
   integer, parameter :: sglp = selected_real_kind( 6,  37) 
   ! double precision
   integer, parameter :: dblp = selected_real_kind(12, 307) 
-  integer, parameter :: int12 = selected_int_kind(12) 
+  integer, parameter :: lint = selected_int_kind(12) 
   integer, parameter :: wp = dblp ! working precision
 
   ! for type coertion, e.g. 0.0*one will change 0.0 to a specific 'kind'

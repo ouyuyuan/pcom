@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-09-13 15:31:23 BJT
+! Last Change: 2017-09-21 16:39:17 BJT
 
 program main
 
@@ -39,8 +39,7 @@ program main
     int_pgra, int_readyc, int_clin, int_ts, &
     int_ssh, int_ph
 
-  use mod_io, only: io_create, &
-    io_get_dim_len, io_read, &
+  use mod_io, only: io_get_dim_len, io_read, &
     io_quick_output
 
   use mod_kind, only: wp, zero, lint
@@ -57,9 +56,9 @@ program main
   use mod_param, only: &
     nm, my, missing_float, &
     glo_ni, glo_nj, &
-    ni, nj, nk, nim, njm, nkp, &
-    myid, npro, mid, names, &
-    param_set_my, param_set_nm, &
+    ni, nj, nk, nim, njm, nkp, vars_info, &
+    myid, npro, mid, &
+    param_set_my, param_set_nm, param_set_nc_vars, &
     print_my, &
     tc, tp
 
@@ -124,12 +123,6 @@ program main
 
   ! prepare initial state of the ocean
   call inistat(ts, frc, graphih)
-
-  ! create output file
-  if ( myid == mid ) then
-    call io_create (nm%od, glo_lon, glo_lat, z)
-    write(fid_dia, '(a)') 'created output files in '//nm%od
-  end if
 
   ! integration cycle !{{{1
 
@@ -199,6 +192,11 @@ contains  !{{{1
 
 subroutine init () !{{{1
   ! initialize model environment
+  
+  ! set nc_variable infomations !{{{2
+  if ( myid == mid ) then
+    call param_set_nc_vars ( )
+  end if
 
   ! get namelist !{{{2
 
@@ -747,24 +745,17 @@ subroutine check_output (acts, acuv, acw, acrho, acssh, acph) !{{{1
        ((tctr%ct%m/=tctr%pt%m).and.(nm%per.eq.'month')) .or. &
        ((tctr%ct%y/=tctr%pt%y).and.(nm%per.eq.'year')) ) then
 
-    call mympi_output (trim(nm%od)//names%pt//'.nc', names%pt, &
-                       trim(nm%od)//names%sa//'.nc', names%sa, &
-                       acts)
+    call mympi_output (vars_info%pt, vars_info%sa, acts)
 
-    call mympi_output (trim(nm%od)//names%rho//'.nc', names%rho, &
-                       acrho, gt%msk)
+    call mympi_output (vars_info%rho, acrho, gt%msk)
 
-    call mympi_output (trim(nm%od)//names%u//'.nc', names%u, &
-                       trim(nm%od)//names%v//'.nc', names%v, & 
-                       acuv, gu%msk)
-    call mympi_output (trim(nm%od)//names%w//'.nc', names%w, &
-                       acw, gu%msk)
+    call mympi_output (vars_info%u, vars_info%v, acuv, gu%msk)
+    call mympi_output (vars_info%w, acw, gu%msk)
 
-    call mympi_output (trim(nm%od)//names%ph//'.nc', names%ph, &
-                       acph, gt%msk(:,:,1))
+    call mympi_output (vars_info%ph, acph, gt%msk(:,:,1))
 
     ! calc. fluctuation of ssh, minus global mean
-    call mympi_output (trim(nm%od)//names%ssh//'.nc', names%ssh, &
+    call mympi_output (vars_info%ssh, &
       acssh, acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
 
   end if

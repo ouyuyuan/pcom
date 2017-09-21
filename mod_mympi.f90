@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-09-12 15:05:32 BJT
+! Last Change: 2017-09-21 16:38:50 BJT
 
 module mod_mympi
 
@@ -27,7 +27,7 @@ module mod_mympi
 
   use mod_type, only: &
     type_mat, type_accu_gm3d, type_accu_gr3d, &
-    type_accu_gr2d, &
+    type_accu_gr2d, type_var_info, &
     type_gvar_m3d, type_gvar_r3d
     
   implicit none
@@ -89,7 +89,6 @@ module mod_mympi
     module procedure merge_out_accu_gr2d_mask
     module procedure merge_out_accu_gr2d_weight
     module procedure merge_out_r3d
-    module procedure merge_out_r2d
     module procedure merge_out_i3d
     module procedure merge_out_i2d
   end interface
@@ -126,16 +125,16 @@ subroutine bcast_string (var)!{{{1
   call mpi_bcast(var, len(var), mpi_byte, mid, mpi_comm_world, err)
 end subroutine bcast_string
 
-subroutine merge_out_accu_gm3d (fname1, vname1, fname2, vname2, var) !{{{1
+subroutine merge_out_accu_gm3d (var1_info, var2_info, var) ! {{{1
   ! merge 3d array from other domains to mid
-  character (len=*) :: fname1, fname2, vname1, vname2
+  type (type_var_info), intent(in) :: var1_info, var2_info
   type (type_accu_gm3d) :: var
 
   var%var%x(1)%v = var%var%x(1)%v / var%n
   var%var%x(2)%v = var%var%x(2)%v / var%n
 
-  call merge_out_r3d (fname1, vname1, var%var%x(1)%v, var%nrec + 1)
-  call merge_out_r3d (fname2, vname2, var%var%x(2)%v, var%nrec + 1)
+  call merge_out_r3d (var1_info, var%var%x(1)%v, var%nrec + 1)
+  call merge_out_r3d (var2_info, var%var%x(2)%v, var%nrec + 1)
 
   var%var%x(1)%v = 0.0 ! reset accumulated value
   var%var%x(2)%v = 0.0
@@ -144,10 +143,10 @@ subroutine merge_out_accu_gm3d (fname1, vname1, fname2, vname2, var) !{{{1
 
 end subroutine merge_out_accu_gm3d
 
-subroutine merge_out_accu_gm3d_mask (fname1, vname1, fname2, vname2, var, mask) !{{{1
+subroutine merge_out_accu_gm3d_mask (var1_info, var2_info, var, mask) !{{{1
   ! merge 3d array from other domains to mid
   ! mask out the land points
-  character (len=*) :: fname1, fname2, vname1, vname2
+  type (type_var_info), intent(in) :: var1_info, var2_info
   type (type_accu_gm3d) :: var
   integer, dimension(:,:,:), intent(in) :: mask
 
@@ -159,8 +158,8 @@ subroutine merge_out_accu_gm3d_mask (fname1, vname1, fname2, vname2, var, mask) 
     var%var%x(2)%v = missing_float
   end where
 
-  call merge_out_r3d (fname1, vname1, var%var%x(1)%v, var%nrec + 1)
-  call merge_out_r3d (fname2, vname2, var%var%x(2)%v, var%nrec + 1)
+  call merge_out_r3d (var1_info, var%var%x(1)%v, var%nrec + 1)
+  call merge_out_r3d (var2_info, var%var%x(2)%v, var%nrec + 1)
 
   var%var%x(1)%v = 0.0 ! reset accumulated value
   var%var%x(2)%v = 0.0
@@ -169,14 +168,14 @@ subroutine merge_out_accu_gm3d_mask (fname1, vname1, fname2, vname2, var, mask) 
 
 end subroutine merge_out_accu_gm3d_mask
 
-subroutine merge_out_accu_gr3d (fname, vname, var) !{{{1
+subroutine merge_out_accu_gr3d (var_info, var) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*) :: fname, vname
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr3d) :: var
 
   var%var%v = var%var%v / var%n
 
-  call merge_out_r3d (fname, vname, var%var%v, var%nrec + 1)
+  call merge_out_r3d (var_info, var%var%v, var%nrec + 1)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
@@ -184,10 +183,10 @@ subroutine merge_out_accu_gr3d (fname, vname, var) !{{{1
 
 end subroutine merge_out_accu_gr3d
 
-subroutine merge_out_accu_gr3d_mask (fname, vname, var, mask) !{{{1
+subroutine merge_out_accu_gr3d_mask (var_info, var, mask) !{{{1
   ! merge 3d array from other domains to mid
   ! mask out the land points
-  character (len=*) :: fname, vname
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr3d) :: var
   integer, dimension(:,:,:), intent(in) :: mask
 
@@ -196,7 +195,7 @@ subroutine merge_out_accu_gr3d_mask (fname, vname, var, mask) !{{{1
     var%var%v = missing_float
   end where
 
-  call merge_out_r3d (fname, vname, var%var%v, var%nrec + 1)
+  call merge_out_r3d (var_info, var%var%v, var%nrec + 1)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
@@ -204,10 +203,10 @@ subroutine merge_out_accu_gr3d_mask (fname, vname, var, mask) !{{{1
 
 end subroutine merge_out_accu_gr3d_mask
 
-subroutine merge_out_accu_gr2d_mask (fname, vname, var, mask) !{{{1
+subroutine merge_out_accu_gr2d_mask (var_info, var, mask) !{{{1
   ! merge 2d array from other domains to mid
   ! mask out the land points
-  character (len=*) :: fname, vname
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr2d) :: var
   integer, dimension(:,:), intent(in) :: mask
 
@@ -216,7 +215,7 @@ subroutine merge_out_accu_gr2d_mask (fname, vname, var, mask) !{{{1
     var%var%v = missing_float
   end where
 
-  call merge_out_r2d_rec (fname, vname, var%var%v, var%nrec + 1)
+  call merge_out_r2d_rec (var_info, var%var%v, var%nrec + 1)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
@@ -224,10 +223,10 @@ subroutine merge_out_accu_gr2d_mask (fname, vname, var, mask) !{{{1
 
 end subroutine merge_out_accu_gr2d_mask
 
-subroutine merge_out_accu_gr2d_weight (fname, vname, var, wg, mask) !{{{1
+subroutine merge_out_accu_gr2d_weight (var_info, var, wg, mask) !{{{1
   ! merge 2d array from other domains to mid
   ! mask out the land points, remove global mean
-  character (len=*) :: fname, vname
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr2d) :: var
   real (kind=wp), dimension(:,:), intent(in) :: wg
   integer, dimension(:,:), intent(in) :: mask
@@ -237,7 +236,7 @@ subroutine merge_out_accu_gr2d_weight (fname, vname, var, wg, mask) !{{{1
     var%var%v = missing_float
   end where
 
-  call merge_out_r2d_weight (fname, vname, var%var%v, wg, var%nrec + 1)
+  call merge_out_r2d_weight (var_info, var%var%v, wg, var%nrec + 1)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
@@ -245,9 +244,9 @@ subroutine merge_out_accu_gr2d_weight (fname, vname, var, wg, mask) !{{{1
 
 end subroutine merge_out_accu_gr2d_weight
 
-subroutine merge_out_r3d (fname, varname, var, nrec) !{{{1
+subroutine merge_out_r3d (var_info, var, nrec) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*), intent(in) :: fname, varname
+  type (type_var_info), intent(in) :: var_info
   real (kind=wp), dimension(ni,nj,nk), intent(in) :: var
   integer, intent(in) :: nrec
 
@@ -274,7 +273,7 @@ subroutine merge_out_r3d (fname, varname, var, nrec) !{{{1
       end if
     end do
 
-    call io_write (trim(fname), trim(varname), glo_var, nrec)
+    call io_write (var_info, glo_var, nrec)
 
     deallocate(glo_var)
 
@@ -286,9 +285,9 @@ subroutine merge_out_r3d (fname, varname, var, nrec) !{{{1
 
 end subroutine merge_out_r3d
 
-subroutine merge_out_r2d_weight (fname, varname, var, wg, nrec) !{{{1
+subroutine merge_out_r2d_weight (var_info, var, wg, nrec) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*), intent(in) :: fname, varname
+  type (type_var_info), intent(in) :: var_info
   real (kind=wp), dimension(ni,nj), intent(in) :: var
   real (kind=wp), dimension(ni,nj), intent(in) :: wg
   integer, intent(in) :: nrec
@@ -310,7 +309,7 @@ subroutine merge_out_r2d_weight (fname, varname, var, wg, nrec) !{{{1
     mean = sum(glo_var*glo_wg)/sum(glo_wg)
     where (glo_var /= missing_float) glo_var = glo_var - mean
 
-    call io_write (trim(fname), trim(varname), glo_var, nrec)
+    call io_write (var_info, glo_var, nrec)
 
     deallocate(glo_var)
     deallocate(glo_wg)
@@ -324,9 +323,9 @@ subroutine merge_out_r2d_weight (fname, varname, var, wg, nrec) !{{{1
 
 end subroutine merge_out_r2d_weight
 
-subroutine merge_out_r2d_rec (fname, varname, var, nrec) !{{{1
+subroutine merge_out_r2d_rec (var_info, var, nrec) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*), intent(in) :: fname, varname
+  type (type_var_info), intent(in) :: var_info
   real (kind=wp), dimension(ni,nj), intent(in) :: var
   integer, intent(in) :: nrec
 
@@ -353,7 +352,7 @@ subroutine merge_out_r2d_rec (fname, varname, var, nrec) !{{{1
       end if
     end do
 
-    call io_write (trim(fname), trim(varname), glo_var, nrec)
+    call io_write (var_info, glo_var, nrec)
     deallocate(glo_var)
 
   else
@@ -363,45 +362,6 @@ subroutine merge_out_r2d_rec (fname, varname, var, nrec) !{{{1
   end if
 
 end subroutine merge_out_r2d_rec
-
-subroutine merge_out_r2d (fname, varname, var) !{{{1
-  ! merge 2d array from other domains to mid
-  character (len=*), intent(in) :: fname, varname
-  real (kind=wp), dimension(ni,nj), intent(in) :: var
-
-  real (kind=wp), allocatable, dimension(:,:) :: glo_var
-
-  integer, parameter :: tag = 30
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-
-    allocate( glo_var(glo_ni, glo_nj), stat=is)
-    call chk(is); glo_var = 0.0
-
-    do n = 1, npro
-      d = our(n)
-      leng  = (d%ge-d%gw+1) * (d%gn-d%gs+1)
-      if ( d%id == mid ) then
-        glo_var(d%gw:d%ge, d%gs:d%gn) = &
-          var(2:d%ni-1, 2:d%nj-1)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn), &
-          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-
-    call io_write (trim(fname), trim(varname), glo_var)
-    deallocate(glo_var)
-
-  else
-    leng  = (my%ge-my%gw+1) * (my%gn-my%gs+1)
-    call mpi_ssend (var(2:my%ni-1,2:my%nj-1), leng, &
-      mpi_real8, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine merge_out_r2d
 
 subroutine merge_out_i3d (fname, varname, var) !{{{1
   ! merge 3d array from other domains to mid

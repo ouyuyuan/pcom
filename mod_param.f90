@@ -3,12 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-13 14:00:12 BJT
+! Last Change: 2017-09-21 16:23:41 BJT
 
 module mod_param
 
   use mpi
   use mod_kind, only: sglp, wp
+  use mod_type, only: type_vars_info
 
   implicit none
   public
@@ -26,45 +27,9 @@ module mod_param
   type (type_my) :: my
   type (type_my), allocatable :: our(:)
 
-  ! output variable names
-  type :: type_names
-    character (len=2) :: pt = 'pt'
-    character (len=2) :: sa = 'sa'
-    character (len=1) :: u = 'u'
-    character (len=1) :: v = 'v'
-    character (len=1) :: w = 'w'
-    character (len=len('rho')) :: rho = 'rho'
-    character (len=len('ssh')) :: ssh = 'ssh'
-    character (len=len('ph')) :: ph = 'ph'
-  end type type_names
-  type (type_names) :: names 
-
-  ! long name of variables
-  type :: type_longnames
-    character (len=len('potential temperature')) :: pt = 'potential temperature'
-    character (len=len('salinity')) :: sa = 'salinity'
-    character (len=len('zonal velocity')) :: u = 'zonal velocity'
-    character (len=len('meridional velocity')) :: v = 'meridional velocity'
-    character (len=len('vertical velocity')) :: w = 'vertical velocity'
-    character (len=len('sea water density')) :: rho = 'sea water density'
-    character (len=len('sea surface height')) :: ssh = 'sea surface height'
-    character (len=len('sea bottom pressure')) :: ph = 'sea bottom pressure'
-  end type type_longnames
-  type (type_longnames) :: longnames 
-
-  ! units of variables
-  type :: type_units
-    character( len=len('degrees Celcius') ) :: pt = 'degrees Celcius'
-    character( len=len('psu') ) :: sa = 'psu'
-    character( len=len('m/s') ) :: u = 'm/s'
-    character( len=len('m/s') ) :: v = 'm/s'
-    character( len=len('m/s') ) :: w = 'm/s'
-    character( len=len('kg/m^3') ) :: rho = 'kg/m^3'
-    character( len=len('m') ) :: ssh = 'm'
-    character( len=len('Pa') ) :: ph = 'Pa'
-  end type type_units
-  type (type_units) :: units
-
+  ! output variable informations
+  type (type_vars_info) :: vars_info
+  
   ! namelist parameters
   ! if you change this type definition, remember also change the following:
   !   1. read_namelist () in main.f90
@@ -112,6 +77,43 @@ module mod_param
   integer :: is, err
 
 contains !{{{1
+
+subroutine param_set_nc_vars ( ) !{{{1
+  ! set output infomations
+
+  vars_info%pt%name = 'pt'
+  vars_info%pt%longname = 'potential temperature'
+  vars_info%pt%units = 'degrees Celcius'
+
+  vars_info%sa%name = 'sa'
+  vars_info%sa%longname = 'salinity'
+  vars_info%sa%units = 'psu'
+
+  vars_info%u%name = 'u'
+  vars_info%u%longname = 'zonal velocity'
+  vars_info%u%units = 'm/s'
+
+  vars_info%v%name = 'v'
+  vars_info%v%longname = 'meridional velocity'
+  vars_info%v%units = 'm/s'
+
+  vars_info%w%name = 'w'
+  vars_info%w%longname = 'vertical velocity'
+  vars_info%w%units = 'm/s'
+
+  vars_info%rho%name = 'rho'
+  vars_info%rho%longname = 'sea water density'
+  vars_info%rho%units = 'kg/m^3'
+
+  vars_info%ssh%name = 'ssh'
+  vars_info%ssh%longname = 'sea surface height'
+  vars_info%ssh%units = 'm'
+
+  vars_info%ph%name = 'ph'
+  vars_info%ph%longname = 'sea bottom pressure'
+  vars_info%ph%units = 'Pa'
+  
+end subroutine param_set_nc_vars
 
 subroutine print_my (one) !{{{1
   ! print one define in mod_param

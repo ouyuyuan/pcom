@@ -1,6 +1,0 @@
-
-FC = mpiifort
-FFLAGS = -stack_temps -safe_cray_ptr -ftz -i_dynamic -assume byterecl -fp-model precise -O2 -i4 -r8 -w95 -I${NETCDF}/include -L${NETCDF}/lib -lnetcdf -lnetcdff
-
-LD = mpiifort
-LDFLAGS = -L${NETCDF}/lib -lnetcdf -lnetcdff -L${MPI}/lib64 -lmpi

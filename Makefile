@@ -17,8 +17,10 @@ FF = -O2 -g -Wall\
 
 EXE  = main
 OBJS = mod_kind.o \
-	mod_type.o mod_param.o mod_con.o \
-	mod_io.o mod_arrays.o \
+	mod_type.o \
+	mod_param.o mod_con.o \
+	mod_arrays.o \
+	mod_io.o \
 	mod_mympi.o mod_den.o \
 	mod_op.o \
 	mod_int.o \

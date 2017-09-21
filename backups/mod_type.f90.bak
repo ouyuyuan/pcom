@@ -3,16 +3,17 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-07-05 21:34:47 BJT
+! Last Change: 2017-09-20 18:07:14 BJT
 
 module mod_type
 
-  use mod_kind, only: sglp, wp, int12
+  use mod_kind, only: sglp, wp, lint
 
   implicit none
   private
 
-  public &
+  public & !{{{1
+    type_nc_vars, &
     type_mat, &
     type_time, &
     type_tctr, &
@@ -40,6 +41,16 @@ module mod_type
     type_str2time, &
     type_check_date
 
+  ! netcdf variable infomation
+  type type_nc_var
+    character (len=80) :: name, unit, longname
+  end type type_nc_var
+
+  type type_nc_vars
+    type (type_nc_var) :: &
+      pt, sa, u, v, w, rho, ssh, ph
+  end type type_nc_vars
+
   ! matrix structure !{{{1
   ! for horizontal (u,v) and tracer (theta,s)
   type :: type_mat
@@ -57,8 +68,8 @@ module mod_type
   type :: type_tctr
     type (type_time) :: pt, ct ! time of previous/current baroclinic step
     real (kind=wp)   :: t1, t2 ! mpi time barrier
-    integer (kind=int12) :: nt     ! total baroclinic time steps
-    integer (kind=int12) :: i      ! current baroclinic time steps
+    integer (kind=lint) :: nt     ! total baroclinic time steps
+    integer (kind=lint) :: i      ! current baroclinic time steps
   end type
   type (type_tctr) :: tctr
 
@@ -426,7 +437,7 @@ function type_time2sec ( t ) !{{{1
   !                  OU Niansen  2015-09-24
 
   type (type_time) :: t
-  integer (kind=int12) :: type_time2sec
+  integer (kind=lint) :: type_time2sec
 
   integer :: i
 
@@ -451,7 +462,7 @@ end function type_time2sec
 function type_str2sec ( str ) !{{{1
   ! how many seconds from string like "0001-01-01 00:00:00"
   character (len=*), intent(in) :: str
-  integer (kind=int12) :: type_str2sec
+  integer (kind=lint) :: type_str2sec
 
   type (type_time) :: t
 

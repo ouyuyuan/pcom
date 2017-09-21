@@ -3,12 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-06-19 16:23:05 BJT
+! Last Change: 2017-09-20 17:55:29 BJT
 
 module mod_param
 
   use mpi
   use mod_kind, only: sglp, wp
+  use mod_type, only: type_nc_vars
 
   implicit none
   public
@@ -26,6 +27,9 @@ module mod_param
   type (type_my) :: my
   type (type_my), allocatable :: our(:)
 
+  ! output variable informations
+  type (type_nc_vars) :: nc_vars
+  
   ! output variable names
   type :: type_names
     character (len=2) :: pt = 'pt'
@@ -33,9 +37,24 @@ module mod_param
     character (len=1) :: u = 'u'
     character (len=1) :: v = 'v'
     character (len=1) :: w = 'w'
+    character (len=len('rho')) :: rho = 'rho'
     character (len=len('ssh')) :: ssh = 'ssh'
+    character (len=len('ph')) :: ph = 'ph'
   end type type_names
   type (type_names) :: names 
+
+  ! long name of variables
+  type :: type_longnames
+    character (len=len('potential temperature')) :: pt = 'potential temperature'
+    character (len=len('salinity')) :: sa = 'salinity'
+    character (len=len('zonal velocity')) :: u = 'zonal velocity'
+    character (len=len('meridional velocity')) :: v = 'meridional velocity'
+    character (len=len('vertical velocity')) :: w = 'vertical velocity'
+    character (len=len('sea water density')) :: rho = 'sea water density'
+    character (len=len('sea surface height')) :: ssh = 'sea surface height'
+    character (len=len('sea bottom pressure')) :: ph = 'sea bottom pressure'
+  end type type_longnames
+  type (type_longnames) :: longnames 
 
   ! units of variables
   type :: type_units
@@ -44,7 +63,9 @@ module mod_param
     character( len=len('m/s') ) :: u = 'm/s'
     character( len=len('m/s') ) :: v = 'm/s'
     character( len=len('m/s') ) :: w = 'm/s'
+    character( len=len('kg/m^3') ) :: rho = 'kg/m^3'
     character( len=len('m') ) :: ssh = 'm'
+    character( len=len('Pa') ) :: ph = 'Pa'
   end type type_units
   type (type_units) :: units
 
@@ -62,8 +83,9 @@ module mod_param
     ! BaroTropic/BaroClinic time step
     integer :: bt, bc 
 
-    ! Filename of Initial/Forcing/Output file
-    character (len=80) :: fi, ff, fo
+    ! Filename of Initial/Forcing file
+    ! directory name of output files
+    character (len=80) :: fi, ff, od
     ! output PER month or PER year 
     character (len=80) :: per
   end type type_nm
@@ -95,6 +117,43 @@ module mod_param
 
 contains !{{{1
 
+subroutine param_set_nc_vars ( ) !{{{1
+  ! set output infomations
+
+  nc_vars%pt%name = 'pt'
+  nc_vars%pt%longname = 'potential temperature'
+  nc_vars%pt%unit = 'degrees Celcius'
+
+  nc_vars%sa%name = 'sa'
+  nc_vars%sa%longname = 'salinity'
+  nc_vars%sa%unit = 'psu'
+
+  nc_vars%u%name = 'u'
+  nc_vars%u%longname = 'zonal velocity'
+  nc_vars%u%unit = 'm/s'
+
+  nc_vars%v%name = 'v'
+  nc_vars%v%longname = 'meridional velocity'
+  nc_vars%v%unit = 'm/s'
+
+  nc_vars%w%name = 'w'
+  nc_vars%w%longname = 'vertical velocity'
+  nc_vars%w%unit = 'm/s'
+
+  nc_vars%rho%name = 'rho'
+  nc_vars%rho%longname = 'sea water density'
+  nc_vars%rho%unit = 'kg/m^3'
+
+  nc_vars%ssh%name = 'ssh'
+  nc_vars%ssh%longname = 'sea surface height'
+  nc_vars%ssh%unit = 'm'
+
+  nc_vars%ph%name = 'ph'
+  nc_vars%ph%longname = 'sea bottom pressure'
+  nc_vars%ph%unit = 'Pa'
+  
+end subroutine param_set_nc_vars
+
 subroutine print_my (one) !{{{1
   ! print one define in mod_param
   type (type_my) :: one
@@ -121,14 +180,14 @@ subroutine param_set_nm ( nm ) !{{{1
   character (len=80) :: bdate, edate
   integer :: dtbt, dtbc
 
-  character (len=80) :: fname_ini, fname_frc, fname_out, out_per
+  character (len=80) :: fname_ini, fname_frc, out_dir, out_per
 
   ! it can't use the syntax % for namelist /.../ statesment
   !    so we redefine namelist parameters
 
   namelist /mpi_ctrl/ npy, npx
   namelist /time_ctrl/ bdate, edate, dtbt, dtbc
-  namelist /io_ctrl/ fname_ini, fname_frc, fname_out, out_per
+  namelist /io_ctrl/ fname_ini, fname_frc, out_dir, out_per
 
   open(fid_nam, file='namelist')
   read(fid_nam, mpi_ctrl)
@@ -157,7 +216,7 @@ subroutine param_set_nm ( nm ) !{{{1
 
   nm%fi = fname_ini
   nm%ff = fname_frc
-  nm%fo = fname_out
+  nm%od = out_dir
   nm%per= out_per
 
 end subroutine param_set_nm
