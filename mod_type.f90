@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-21 16:22:43 BJT
+! Last Change: 2017-10-24 10:21:57 BJT
 
 module mod_type
 
@@ -49,7 +49,8 @@ module mod_type
 
   type type_vars_info
     type (type_var_info) :: &
-      pt, sa, u, v, w, rho, ssh, ph
+      pt, sa, u, v, w, rho, &
+      ssh, ch, prh
   end type type_vars_info
 
   ! matrix structure !{{{1

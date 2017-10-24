@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-21 16:23:41 BJT
+! Last Change: 2017-10-24 10:23:37 BJT
 
 module mod_param
 
@@ -109,9 +109,13 @@ subroutine param_set_nc_vars ( ) !{{{1
   vars_info%ssh%longname = 'sea surface height'
   vars_info%ssh%units = 'm'
 
-  vars_info%ph%name = 'ph'
-  vars_info%ph%longname = 'sea bottom pressure'
-  vars_info%ph%units = 'Pa'
+  vars_info%ch%name = 'ch'
+  vars_info%ch%longname = 'normalized sea bottom pressure'
+  vars_info%ch%units = ''
+  
+  vars_info%prh%name = 'prh'
+  vars_info%prh%longname = 'reference state: sea bottom pressure (T-grid)'
+  vars_info%prh%units = 'Pa'
   
 end subroutine param_set_nc_vars
 

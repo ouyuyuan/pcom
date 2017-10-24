@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-09-21 16:38:50 BJT
+! Last Change: 2017-09-22 09:41:52 BJT
 
 module mod_mympi
 
@@ -86,10 +86,11 @@ module mod_mympi
     module procedure merge_out_accu_gm3d_mask
     module procedure merge_out_accu_gr3d
     module procedure merge_out_accu_gr3d_mask
-    module procedure merge_out_accu_gr2d_mask
-    module procedure merge_out_accu_gr2d_weight
     module procedure merge_out_r3d
     module procedure merge_out_i3d
+    module procedure merge_out_accu_gr2d_mask
+    module procedure merge_out_accu_gr2d_weight
+    module procedure merge_out_r2d_mask
     module procedure merge_out_i2d
   end interface
 
@@ -362,6 +363,50 @@ subroutine merge_out_r2d_rec (var_info, var, nrec) !{{{1
   end if
 
 end subroutine merge_out_r2d_rec
+
+subroutine merge_out_r2d_mask(var_info, var, mask) !{{{1
+  ! merge 3d array from other domains to mid
+  type (type_var_info), intent(in) :: var_info
+  real (kind=wp), dimension(ni,nj) :: var
+  integer, dimension(:,:), intent(in) :: mask
+
+  real (kind=wp), allocatable, dimension(:,:) :: glo_var
+
+  integer, parameter :: tag = 30
+  type (type_my) :: d
+  integer :: n, leng
+
+  where (mask == 0)
+    var = missing_float
+  end where
+
+  if (myid == mid) then
+
+    allocate( glo_var(glo_ni, glo_nj), stat=is)
+    call chk(is); glo_var = 0.0
+
+    do n = 1, npro
+      d = our(n)
+      leng  = (d%ge-d%gw+1) * (d%gn-d%gs+1)
+      if ( d%id == mid ) then
+        glo_var(d%gw:d%ge, d%gs:d%gn) = &
+          var(2:d%ni-1, 2:d%nj-1)
+      else
+        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn), &
+          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
+      end if
+    end do
+
+    call io_write (var_info, glo_var)
+    deallocate(glo_var)
+
+  else
+    leng  = (my%ge-my%gw+1) * (my%gn-my%gs+1)
+    call mpi_ssend (var(2:my%ni-1,2:my%nj-1), leng, &
+      mpi_real8, mid, tag, mpi_comm_world, err)
+  end if
+
+end subroutine merge_out_r2d_mask
 
 subroutine merge_out_i3d (fname, varname, var) !{{{1
   ! merge 3d array from other domains to mid

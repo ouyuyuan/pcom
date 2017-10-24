@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-09-21 16:39:17 BJT
+! Last Change: 2017-10-24 10:24:40 BJT
 
 program main
 
@@ -14,7 +14,7 @@ program main
     cv1, cv2, &
     g1j, g2j, g3j, g4j, gtj, guj, &
     gi1, gi2, git, giw, g12, g32, gt, gu, &
-    acts, acuv, acw, acrho, acssh, acph, & 
+    acts, acuv, acw, acrho, acssh, acch, & 
     am, arrays_allocate, &
     bnd, bphi, bgraphi, &
     badv, &
@@ -37,7 +37,7 @@ program main
 
   use mod_int, only: int_trop, int_bnd, &
     int_pgra, int_readyc, int_clin, int_ts, &
-    int_ssh, int_ph
+    int_ssh
 
   use mod_io, only: io_get_dim_len, io_read, &
     io_quick_output
@@ -115,6 +115,9 @@ program main
   call set_vgrid (gi1, gi2, git, giw)
   call set_grid  (g12, g32, gt, gu)
 
+  ! output sea bottom pressure of reference state
+  call mympi_output (vars_info%prh, gt%prh, gt%msk(:,:,1))
+  
   ! calc. grid variables
   call calc_cf( cv1, cv2 )
 
@@ -158,10 +161,7 @@ program main
 !      badv%x(1)%v, glo_lon, glo_lat) !DEBUG
 
     ! integrate series time steps per baroclinic time step
-    call int_trop (ch, upb)
-
-    ! calc. sea bottom pressure
-    call int_ph (acph)
+    call int_trop (ch, upb, acch)
 
     ! prediction of baroclinic mode
     call int_clin (up, acuv, am%v)
@@ -175,7 +175,7 @@ program main
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
 
-    call check_output (acts, acuv, acw, acrho, acssh, acph)
+    call check_output (acts, acuv, acw, acrho, acssh, acch)
   end do
 
   ! finish integration !{{{1
@@ -727,10 +727,10 @@ subroutine write_dim_info (fid) !{{{1
 
 end subroutine write_dim_info
 
-subroutine check_output (acts, acuv, acw, acrho, acssh, acph) !{{{1
+subroutine check_output (acts, acuv, acw, acrho, acssh, acch) !{{{1
   type (type_accu_gm3d) :: acts, acuv
   type (type_accu_gr3d) :: acrho, acw
-  type (type_accu_gr2d) :: acssh, acph
+  type (type_accu_gr2d) :: acssh, acch
 
   ! the print elapsed time infos if neccessary
   if ( nm%per.eq.'hour' ) then 
@@ -752,7 +752,7 @@ subroutine check_output (acts, acuv, acw, acrho, acssh, acph) !{{{1
     call mympi_output (vars_info%u, vars_info%v, acuv, gu%msk)
     call mympi_output (vars_info%w, acw, gu%msk)
 
-    call mympi_output (vars_info%ph, acph, gt%msk(:,:,1))
+    call mympi_output (vars_info%ch, acch, gt%msk(:,:,1))
 
     ! calc. fluctuation of ssh, minus global mean
     call mympi_output (vars_info%ssh, &

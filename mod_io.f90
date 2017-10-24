@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-09-21 17:20:40 BJT
+! Last Change: 2017-09-26 19:29:43 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -38,6 +38,7 @@ module mod_io !{{{1
     module procedure write_scalar
     module procedure write_r3d
     module procedure write_r2d_rec
+    module procedure write_r2d
     module procedure write_r1d
     module procedure write_i3d
     module procedure write_i2d
@@ -137,7 +138,7 @@ subroutine create_r3d (var_info, nrec) !{{{1
 
 end subroutine create_r3d
 
-subroutine create_r2d (var_info, nrec) !{{{1
+subroutine create_r2d_nrec (var_info, nrec) !{{{1
   ! create the output file for 2d variable
 
   type (type_var_info), intent(in) :: var_info
@@ -159,7 +160,7 @@ subroutine create_r2d (var_info, nrec) !{{{1
 
   !def global attr. {{{2
   call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
-    'created', "by subroutine create_r2d in module mod_io") )
+    'created', "by subroutine create_r2d_nrec in module mod_io") )
 
   ! def vars  !{{{2
   call check ( nf90_def_var (ncid, "lon", nf90_float, &
@@ -200,6 +201,63 @@ subroutine create_r2d (var_info, nrec) !{{{1
   ! write coordinates {{{2
   call write_r1d (ncname, 'lon', glo_lon)
   call write_r1d (ncname, 'lat', glo_lat)
+end subroutine create_r2d_nrec
+
+subroutine create_r2d(var_info) !{{{1
+  ! create the output file for 2d variable
+
+  type (type_var_info), intent(in) :: var_info
+
+  integer :: dimid1, dimid2
+  integer :: dimids(2)
+  character (len=80) :: ncname
+
+  ncname = trim(nm%od)//trim(var_info%name)//'.nc'
+
+  call check ( nf90_create (trim(ncname), NF90_CLOBBER, ncid)  )
+
+  !def dim. {{{2
+  call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
+  call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
+
+  !def global attr. {{{2
+  call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
+    'created', "by subroutine create_r2d in module mod_io") )
+
+  ! def vars  !{{{2
+  call check ( nf90_def_var (ncid, "lon", nf90_float, &
+    dimid1, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'longitude') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_east') )
+
+  call check ( nf90_def_var (ncid, "lat", nf90_float, &
+    dimid2, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'latitude') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_north') )
+
+  dimids = (/dimid1, dimid2/)
+
+  call check ( nf90_def_var (ncid, trim(var_info%name), &
+    nf90_float, dimids, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    var_info%longname) )
+  call check ( nf90_put_att (ncid, varid, '_FillValue', &
+    missing_float) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    var_info%units) )
+
+  !end def {{{2
+  call check (nf90_enddef(ncid) )
+
+  call check (nf90_close(ncid) )
+
+  ! write coordinates {{{2
+  call write_r1d (ncname, 'lon', glo_lon)
+  call write_r1d (ncname, 'lat', glo_lat)
 end subroutine create_r2d
 
 subroutine write_r3d(var_info, var, nrec) !{{{1
@@ -215,7 +273,7 @@ subroutine write_r3d(var_info, var, nrec) !{{{1
   write(ncname,'(a,i0.4,a)') &
     trim(nm%od)//trim(var_info%name)//'_', nrec, '.nc'
 
-  write(*,'(a,i3,a)') '*** Output '//trim(var_info%name)//' to file: '//&
+  write(*,'(a,i6,a)') '*** Output '//trim(var_info%name)//' to file: '//&
     trim(ncname)//' for the ', nrec, 'th record ......' 
 
   ndim1 = size(var, 1)
@@ -257,8 +315,8 @@ subroutine write_r2d_rec(var_info, var, nrec) !{{{1
   write(ncname,'(a,i0.4,a)') &
     trim(nm%od)//trim(var_info%name)//'_', nrec, '.nc'
 
-  write(*,'(a,i3,a)') '*** Output '//trim(var_info%name)//&
-    ' to file: '//ncname//' for the ', nrec, 'th record ......' 
+  write(*,'(a,i6,a)') '*** Output '//trim(var_info%name)//&
+    ' to file: '//trim(ncname)//' for the ', nrec, 'th record ......' 
 
   ndim1 = size(var, 1)
   ndim2 = size(var, 2)
@@ -266,7 +324,7 @@ subroutine write_r2d_rec(var_info, var, nrec) !{{{1
   stt  = (/1, 1, 1/)
   cnt  = (/ndim1, ndim2, 1/)
 
-  call create_r2d(var_info, nrec)
+  call create_r2d_nrec(var_info, nrec)
 
   call check (nf90_open(trim(ncname), nf90_write, ncid)  )
 
@@ -284,6 +342,38 @@ subroutine write_r2d_rec(var_info, var, nrec) !{{{1
   call check (nf90_close(ncid) )
 
 end subroutine write_r2d_rec
+
+subroutine write_r2d(var_info, var) !{{{1
+
+  type (type_var_info), intent(in) :: var_info
+  real (kind=wp), intent(in) :: var(:,:)
+
+  integer :: stt(3), cnt(3)
+  character (len = 80) :: ncname
+
+  ncname = trim(nm%od)//trim(var_info%name)//'.nc'
+
+  write(*,'(a)') '*** Output '//trim(var_info%name)//&
+    ' to file: '//trim(ncname)
+
+  ndim1 = size(var, 1)
+  ndim2 = size(var, 2)
+
+  stt  = (/1, 1, 1/)
+  cnt  = (/ndim1, ndim2, 1/)
+
+  call create_r2d(var_info)
+
+  call check (nf90_open(trim(ncname), nf90_write, ncid)  )
+
+  call check (nf90_inq_varid(ncid, trim(var_info%name), varid) )
+
+  call check (nf90_put_var(ncid, varid, var, &
+    start = stt, count = cnt) )
+
+  call check (nf90_close(ncid) )
+
+end subroutine write_r2d
 
 subroutine write_r1d(ncname, varname, var) !{{{1
 
@@ -307,7 +397,7 @@ subroutine write_i3d(ncname, varname, var) !{{{1
 
   integer :: stt(3), cnt(3)
 
-  write(*,'(a,i3,a)') '*** Output '//varname//' to file: '//ncname
+  write(*,'(a)') '*** Output '//varname//' to file: '//ncname
 
   ndim1 = size(var, 1)
   ndim2 = size(var, 2)
@@ -334,7 +424,7 @@ subroutine write_i2d(ncname, varname, var) !{{{1
 
   integer :: stt(2), cnt(2)
 
-  write(*,'(a,i3,a)') '*** Output '//varname//' to file: '//ncname
+  write(*,'(a)') '*** Output '//varname//' to file: '//ncname
 
   ndim1 = size(var, 1)
   ndim2 = size(var, 2)

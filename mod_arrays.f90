@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-26 15:40:39 BJT
-! Last Change: 2017-09-13 13:59:32 BJT
+! Last Change: 2017-10-24 10:19:41 BJT
 
 module mod_arrays
 
@@ -64,7 +64,7 @@ module mod_arrays
     acw   ! m/s, vertical velocity, bottom is assume to be zero, so it is nk layers, not nkp layers
   type (type_accu_gr2d) :: &
     acssh, & ! m, sea surface height
-    acph     ! Pa, sea bottom pressure
+    acch     !  , normalized sea bottom pressure
 
   ! grid variables !{{{1
   type (type_gvar_m3d) :: &
@@ -251,8 +251,8 @@ subroutine arrays_allocate () !{{{1
   call arrays_init( acssh%var, ni,nj, zero, g1j )
   acssh%n = 0; acssh%nrec = 0
 
-  call arrays_init( acph%var, ni,nj, zero, g1j )
-  acph%n = 0; acph%nrec = 0
+  call arrays_init( acch%var, ni,nj, zero, g1j )
+  acch%n = 0; acch%nrec = 0
 
   call arrays_init(ts(tc), ni,nj,nk, zero, g12)
   call arrays_init(ts(tp), ni,nj,nk, zero, g12)
