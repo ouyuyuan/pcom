@@ -3,13 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2017-09-13 16:44:45 BJT
+! Last Change: 2017-11-26 09:23:17 BJT
 
 module mod_den
 
   use mod_arrays, only: &
     gi2, git, &
-    ts, ch
+    eqts, ch
 
   use mod_con, only: deltat, deltas
 
@@ -17,7 +17,7 @@ module mod_den
 
   use mod_param, only: ni, nj, nk, tc
 
-  use mod_type, only: type_mat, type_gvar_m3d
+  use mod_type, only: type_mat
 
   implicit none
   private
@@ -29,12 +29,11 @@ module mod_den
     
 contains !{{{1
 
-subroutine den_alpha (alpha, ts, ch, mask)!{{{1
+subroutine den_alpha (alpha, t, s, ch, mask)!{{{1
   ! dianose specific volume from (T, S) and 
   !   normalized bottom pressure ch
 
-  type (type_gvar_m3d) :: ts
-  real (kind=wp), dimension(ni,nj,nk) :: alpha
+  real (kind=wp), dimension(ni,nj,nk) :: alpha, t, s
   real (kind=wp), dimension(ni,nj), intent(in) :: ch
   integer, dimension(ni,nj,nk), intent(in) :: mask
 
@@ -45,8 +44,8 @@ subroutine den_alpha (alpha, ts, ch, mask)!{{{1
   do i = 1, ni
     if ( mask(i,j,k) == 1 ) &
       alpha(i,j,k) = 1.0 /   &
-        den_rho( ts%x(1)%v(i,j,k), &
-                 ts%x(2)%v(i,j,k), &
+        den_rho( t(i,j,k), &
+                 s(i,j,k), &
                  ch(i,j) * git%pr(k) )
   end do
   end do
@@ -133,9 +132,9 @@ subroutine den_prho( prho ) !{{{1
   do k = 1, nk
   do j = 1, nj
   do i = 1, ni
-  if ( ts(tc)%x(1)%g%msk(i,j,k) > 0 ) then
-    t = ts(tc)%x(1)%v(i,j,k)
-    s = ts(tc)%x(2)%v(i,j,k)
+  if ( eqts%g%msk(i,j,k) > 0 ) then
+    t = eqts%tc(i,j,k)
+    s = eqts%sc(i,j,k)
     p = ch%tc(i,j) * gi2%pr(k)
 
     rhoa = den_rho( t + deltat, s, p )

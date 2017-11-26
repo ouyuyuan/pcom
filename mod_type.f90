@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-10-24 10:21:57 BJT
+! Last Change: 2017-11-26 10:39:58 BJT
 
 module mod_type
 
@@ -14,6 +14,7 @@ module mod_type
 
   public & !{{{1
     type_var_info, &
+    type_rst_info, &
     type_vars_info, &
     type_mat, &
     type_time, &
@@ -24,13 +25,14 @@ module mod_type
     type_gij, &
     type_gvar_r2d, &
     type_gvar_r3d, &
-    type_gvar_m2d, &
-    type_gvar_m3d, &
+    type_gvar_r4d, &
+    type_eq_ts, &
+    type_eq_uv, &
+    type_eq_uvb, &
     type_frc, &
     type_bnd, &
     type_bintgu, &
     type_ch, &
-    type_accu_gm3d, &
     type_accu_gr3d, &
     type_accu_gr2d, &
     operator(+), &
@@ -40,11 +42,12 @@ module mod_type
     type_days_year, &
     type_str2sec, &
     type_str2time, &
+    type_time2str, &
     type_check_date
 
   ! netcdf variable infomation
   type type_var_info
-    character (len=80) :: name, units, longname
+    character (len=80) :: name, units, longname, vartype
   end type type_var_info
 
   type type_vars_info
@@ -52,6 +55,12 @@ module mod_type
       pt, sa, u, v, w, rho, &
       ssh, ch, prh
   end type type_vars_info
+
+  ! restart file infomation
+  type type_rst_info
+    character (len=80) :: fname, cdate, pdate
+    type (type_var_info) :: ch, pt, sa
+  end type type_rst_info
 
   ! matrix structure !{{{1
   ! for horizontal (u,v) and tracer (theta,s)
@@ -127,28 +136,60 @@ module mod_type
     type (type_gij), pointer :: g
   end type type_gvar_r3d
 
-  type type_gvar_m2d
-    type (type_gvar_r2d) :: x(2)
-  end type type_gvar_m2d
+  type type_gvar_r4d
+    real (kind=wp), allocatable :: v(:,:,:,:) ! data values
+    type (type_gij), pointer :: g
+  end type type_gvar_r4d
 
-  type type_gvar_m3d
-    type (type_gvar_r3d) :: x(2)
-  end type type_gvar_m3d
+  ! equation variables  !{{{1
+
+  type type_eq_ts
+    real (kind=wp), dimension(:,:,:), pointer :: & ! temperature, salinity
+      tc, sc, & ! current time step
+      tp, sp, & ! previous time step
+      act, acs, acr  ! accumulated temp., salinity, density
+    type (type_gij), pointer :: g
+    integer :: n ! how many records in act and acs
+  end type type_eq_ts
+
+  type type_eq_uv
+    real (kind=wp), dimension(:,:,:), pointer :: & 
+      uc, vc, & ! current time of zonal currents, pressure weighted, P.15 (2.39)
+      up, vp, & ! previous time step ...
+      acu, acv, &  ! unweighted accumulated values, for time mean
+      auc, aup, aupp, & ! current/previous/pre-previous time step of advection of u
+      avc, avp, avpp, & ! current/previous/pre-previous time step of advection of v
+      fx, fy ! N, friction forces in momentum equation
+    real (kind=wp), dimension(:,:), pointer :: & 
+      pax, pay ! Pa/m, gradient forces of overloading atmospheric pressure
+    type (type_gij), pointer :: g
+    integer :: n ! how many records in accumulated values
+  end type type_eq_uv
+
+  type type_eq_uvb
+    ! barotropic momentum equation
+    real (kind=wp), dimension(:,:), pointer :: & 
+      uc, vc, up, vp, & ! current/previous timestep of barotropic velocities
+      ut, vt ! tendency of barotropic velocity
+    type (type_gi), pointer :: hg
+  end type type_eq_uvb
 
   ! compound variables !{{{1
 
   ! forcing
   type :: type_frc
-    type (type_gvar_m3d) :: tau ! wind stress (taux, tauy)
-    type (type_gvar_m3d) :: ts  ! climatic mean surface (temp., salinity)
+    type (type_gvar_r3d) :: taux ! wind stress (taux, tauy)
+    type (type_gvar_r3d) :: tauy ! 
+    type (type_gvar_r3d) :: t   ! climatic mean surface temp.
+    type (type_gvar_r3d) :: s  ! climatic mean surface salinity
     type (type_gvar_r3d) :: pa  ! sea level atmospheric pressure
     type (type_gvar_r3d) :: fw  ! fresh water flux (evaporation - precp.)
   end type type_frc
 
   ! surface boundary
   type :: type_bnd
-    type (type_gvar_m2d) :: tau
-    type (type_gvar_m2d) :: ts
+    type (type_gvar_r2d) :: taux, tauy
+    type (type_gvar_r2d) :: t, s
     type (type_gvar_r2d) :: pa
     type (type_gvar_r2d) :: fw
   end type type_bnd
@@ -174,19 +215,14 @@ module mod_type
 
   ! accumulated variables !{{{1
   ! for time-average output
-  type :: type_accu_gm3d
-    type (type_gvar_m3d) :: var
-    integer :: n, nrec
-  end type type_accu_gm3d
-
   type :: type_accu_gr3d
     type (type_gvar_r3d) :: var
-    integer :: n, nrec
+    integer :: n
   end type type_accu_gr3d
 
   type :: type_accu_gr2d
     type (type_gvar_r2d) :: var
-    integer :: n, nrec
+    integer :: n
   end type type_accu_gr2d
 
   !interface !{{{1
@@ -529,6 +565,17 @@ function type_str2time (str) !{{{1
     stop 'second should be between 0-59 in the input string in function type_str2time '
 
 end function type_str2time
+
+function type_time2str (time) !{{{1
+  ! type_time plus an integer (in seconds)
+  type (type_time), intent(in) :: time
+  character (len=80) :: type_time2str
+
+  write(type_time2str,'(i0.4,a,i0.2,a,i0.2, a,i0.2,a,i0.2,a,i0.2)') &
+    time%y,'-',time%m, '-',time%d,' ',&
+    time%h,':',time%mi,':',time%s
+
+end function type_time2str
 
 function time_plus_integer (t, dt) !{{{1
   ! type_time plus an integer (in seconds)

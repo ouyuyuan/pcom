@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-09-20 18:00:04 BJT
+! Last Change: 2017-11-07 10:11:32 BJT
 
 program main
 
@@ -14,7 +14,7 @@ program main
     cv1, cv2, &
     g1j, g2j, g3j, g4j, gtj, guj, &
     gi1, gi2, git, giw, g12, g32, gt, gu, &
-    acts, acuv, acw, acrho, acssh, acph, & 
+    acts, acuv, acw, acrho, acssh, acch, & 
     am, arrays_allocate, &
     bnd, bphi, bgraphi, &
     badv, &
@@ -37,11 +37,9 @@ program main
 
   use mod_int, only: int_trop, int_bnd, &
     int_pgra, int_readyc, int_clin, int_ts, &
-    int_ssh, int_ph
+    int_ssh
 
-  use mod_io, only: io_create, &
-    io_get_dim_len, io_read, &
-    io_quick_output
+  use mod_io, only: io_get_dim_len, io_read, io_create_rst
 
   use mod_kind, only: wp, zero, lint
 
@@ -49,16 +47,15 @@ program main
 
   use mod_mympi, only: &
     mympi_div, mympi_divx, mympi_divy, &
-    mympi_output, mympi_swpbnd, mympi_bcast, &
-    mympi_quick_output
+    mympi_output, mympi_swpbnd, mympi_bcast
 
   use mod_op, only: op_ter, op_gra
 
   use mod_param, only: &
     nm, my, missing_float, &
     glo_ni, glo_nj, &
-    ni, nj, nk, nim, njm, nkp, nc_vars, &
-    myid, npro, mid, names, &
+    ni, nj, nk, nim, njm, nkp, vars_info, &
+    myid, npro, mid, &
     param_set_my, param_set_nm, param_set_nc_vars, &
     print_my, &
     tc, tp
@@ -116,6 +113,9 @@ program main
   call set_vgrid (gi1, gi2, git, giw)
   call set_grid  (g12, g32, gt, gu)
 
+  ! output sea bottom pressure of reference state
+  call mympi_output (vars_info%prh, gt%prh, gt%msk(:,:,1))
+  
   ! calc. grid variables
   call calc_cf( cv1, cv2 )
 
@@ -124,12 +124,6 @@ program main
 
   ! prepare initial state of the ocean
   call inistat(ts, frc, graphih)
-
-  ! create output file
-  if ( myid == mid ) then
-    call io_create (nm%od)
-    write(fid_dia, '(a)') 'created output files in '//nm%od
-  end if
 
   ! integration cycle !{{{1
 
@@ -161,14 +155,9 @@ program main
 
     ! prepare for baroclinic integration
     call int_readyc (grapa, badv, adv, fri, wm)
-!    call mympi_quick_output('output/test.nc', 'var', &
-!      badv%x(1)%v, glo_lon, glo_lat) !DEBUG
 
     ! integrate series time steps per baroclinic time step
-    call int_trop (ch, upb)
-
-    ! calc. sea bottom pressure
-    call int_ph (acph)
+    call int_trop (ch, upb, acch)
 
     ! prediction of baroclinic mode
     call int_clin (up, acuv, am%v)
@@ -182,7 +171,13 @@ program main
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
 
-    call check_output (acts, acuv, acw, acrho, acssh, acph)
+    ! output at proper time
+    if ( ((tctr%ct%h/=tctr%pt%h).and.(nm%out_per.eq.'hour'))  .or. &
+         ((tctr%ct%d/=tctr%pt%d).and.(nm%out_per.eq.'day'))   .or. &
+         ((tctr%ct%m/=tctr%pt%m).and.(nm%out_per.eq.'month')) .or. &
+         ((tctr%ct%y/=tctr%pt%y).and.(nm%out_per.eq.'year')) ) then
+      call output (acts, acuv, acw, acrho, acssh, acch)
+    end if
   end do
 
   ! finish integration !{{{1
@@ -190,7 +185,7 @@ program main
     write (*, *) ''
     write (*, '(a)') 'Done model run.'
     write (*, '(a, i9, a)') &
-      'Integrated for ', tctr%nt, ' baroclinic time steps.'
+      'Integrated for total ', tctr%nt, ' baroclinic time step(s).'
   end if
 
   call mpi_finalize (err)
@@ -200,11 +195,6 @@ contains  !{{{1
 subroutine init () !{{{1
   ! initialize model environment
   
-  ! set nc_variable infomations !{{{2
-  if ( myid == mid ) then
-    call param_set_nc_vars ( )
-  end if
-
   ! get namelist !{{{2
 
   ! although we can read in namelist in all processors, 
@@ -212,8 +202,18 @@ subroutine init () !{{{1
   ! muliple-opening (happened once)
   if ( myid == mid ) then
     call param_set_nm (nm)
+    ! reset begin date for restart run
+    if (nm%rst == 1) then
+      print *, "I'm going for a restart-run from "//trim(nm%od)//"restart.nc"
+      call io_read (trim(nm%od)//'restart.nc', 'model_time', nm%bd)
+    end if
     call type_check_date(nm%bd)
     call type_check_date(nm%ed)
+  end if
+
+  ! set nc_variable infomations !{{{2
+  if ( myid == mid ) then
+    call param_set_nc_vars ( )
   end if
 
   call mympi_bcast (nm%px)
@@ -229,7 +229,9 @@ subroutine init () !{{{1
   call mympi_bcast (nm%ff)
   call mympi_bcast (nm%od)
 
-  call mympi_bcast (nm%per)
+  call mympi_bcast (nm%out_per)
+  call mympi_bcast (nm%rst_per)
+  call mympi_bcast (nm%rst)
 
   ! determine dimensions !{{{2
 
@@ -734,68 +736,70 @@ subroutine write_dim_info (fid) !{{{1
 
 end subroutine write_dim_info
 
-subroutine check_output (acts, acuv, acw, acrho, acssh, acph) !{{{1
+subroutine output (acts, acuv, acw, acrho, acssh, acch) !{{{1
+  ! time averaged model output
   type (type_accu_gm3d) :: acts, acuv
   type (type_accu_gr3d) :: acrho, acw
-  type (type_accu_gr2d) :: acssh, acph
+  type (type_accu_gr2d) :: acssh, acch
 
-  ! the print elapsed time infos if neccessary
-  if ( nm%per.eq.'hour' ) then 
+  integer, save :: nrec = 0
+
+  ! print elapsed time infos if neccessary
+  if ( nm%out_per.eq.'hour' ) then 
     if ( tctr%ct%h /= tctr%pt%h ) call print_time_per_hour (tctr) 
   else 
     if ( tctr%ct%d /= tctr%pt%d ) call print_time_per_day (tctr)
   end if
 
-  ! output if time is proper
-  if ( ((tctr%ct%h/=tctr%pt%h).and.(nm%per.eq.'hour'))  .or. &
-       ((tctr%ct%d/=tctr%pt%d).and.(nm%per.eq.'day'))   .or. &
-       ((tctr%ct%m/=tctr%pt%m).and.(nm%per.eq.'month')) .or. &
-       ((tctr%ct%y/=tctr%pt%y).and.(nm%per.eq.'year')) ) then
+  call mympi_output (vars_info%u, vars_info%v, acuv, gu%msk)
+  call mympi_output (vars_info%w, acw, gu%msk)
 
-    call mympi_output (nc_vars%pt, nc_vars%sa, acts)
+  call mympi_output (vars_info%pt, vars_info%sa, acts)
 
-    call mympi_output (nc_vars%rho, acrho, gt%msk)
+  call mympi_output (vars_info%rho, acrho, gt%msk)
 
-    call mympi_output (nc_vars%u, nc_vars%v, acuv, gu%msk)
-    call mympi_output (nc_vars%w, acw, gu%msk)
+  call mympi_output (vars_info%ch, acch, gt%msk(:,:,1))
 
-    call mympi_output (nc_vars%ph, acph, gt%msk(:,:,1))
+  ! calc. fluctuation of ssh, minus global mean
+  call mympi_output (vars_info%ssh, &
+    acssh, acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
 
-    ! calc. fluctuation of ssh, minus global mean
-    call mympi_output (nc_vars%ssh, &
-      acssh, acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
-
+  nrec = nrec + 1
+  ! output restart file
+  if ( mod(nrec, nm%rst_per) == 0 ) then
+    if ( myid == mid ) call io_create_rst ( )
+    call mympi_output ( vars_info%rst_ch, ch%tc )
   end if
 
-end subroutine check_output
+end subroutine output
 
-subroutine print_time_per_hour (tctr)
+subroutine print_time_per_hour (tctr) !{{{1
     type (type_tctr):: tctr
 
     tctr%t2 = mpi_wtime ()
 
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
-      'integrate for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ' ', tctr%ct%h, ':00:00 use ', tctr%t2 - tctr%t1, &
+      'integrated for ', tctr%pt%y, '-', tctr%pt%m, &
+      '-', tctr%pt%d, ' ', tctr%ct%h, ':00:00,  used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2
-end subroutine 
+end subroutine print_time_per_hour
 
-subroutine print_time_per_day (tctr)
+subroutine print_time_per_day (tctr) !{{{1
     type (type_tctr):: tctr
 
     tctr%t2 = mpi_wtime ()
 
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
-      'integrate for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ' used ', tctr%t2 - tctr%t1, &
+      'integrated for ', tctr%pt%y, '-', tctr%pt%m, &
+      '-', tctr%pt%d, ', used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2
-end subroutine 
+end subroutine print_time_per_day
 
 subroutine chk( ista ) !{{{1
   ! check state of allocate array 

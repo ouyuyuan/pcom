@@ -9,13 +9,12 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-09-20 18:09:43 BJT
+! Last Change: 2017-11-06 08:56:55 BJT
 
 module mod_mympi
 
   ! imported variables !{{{1
-  use mod_io, only: &
-    io_write, io_quick_output
+  use mod_io, only: io_write
 
   use mod_kind, only: wp
 
@@ -27,8 +26,10 @@ module mod_mympi
 
   use mod_type, only: &
     type_mat, type_accu_gm3d, type_accu_gr3d, &
-    type_accu_gr2d, type_nc_var, &
+    type_accu_gr2d, type_var_info, &
     type_gvar_m3d, type_gvar_r3d
+
+  use mod_arrays, only: ch
     
   implicit none
   private
@@ -39,7 +40,6 @@ module mod_mympi
     mympi_divx, &
     mympi_divy, &
     mympi_swpbnd, &
-    mympi_quick_output, &
     mympi_bcast, &
     mympi_merge, &
     mympi_output
@@ -48,14 +48,6 @@ module mod_mympi
     module procedure bcast_r1d
     module procedure bcast_i
     module procedure bcast_string
-  end interface
-
-  interface mympi_quick_output
-    module procedure quick_output_r3d
-    module procedure quick_output_r2d
-    module procedure quick_output_r1d
-    module procedure quick_output_i3d
-    module procedure quick_output_i2d
   end interface
 
   interface mympi_div
@@ -89,8 +81,9 @@ module mod_mympi
     module procedure merge_out_accu_gr2d_mask
     module procedure merge_out_accu_gr2d_weight
     module procedure merge_out_r3d
-    module procedure merge_out_r2d
     module procedure merge_out_i3d
+    module procedure merge_out_r2d_mask
+    module procedure merge_out_r2d
     module procedure merge_out_i2d
   end interface
 
@@ -126,28 +119,27 @@ subroutine bcast_string (var)!{{{1
   call mpi_bcast(var, len(var), mpi_byte, mid, mpi_comm_world, err)
 end subroutine bcast_string
 
-subroutine merge_out_accu_gm3d (nc_var1, nc_var2, var) ! {{{1
+subroutine merge_out_accu_gm3d (var1_info, var2_info, var) ! {{{1
   ! merge 3d array from other domains to mid
-  type (type_nc_var), intent(in) :: nc_var1, nc_var2
+  type (type_var_info), intent(in) :: var1_info, var2_info
   type (type_accu_gm3d) :: var
 
   var%var%x(1)%v = var%var%x(1)%v / var%n
   var%var%x(2)%v = var%var%x(2)%v / var%n
 
-  call merge_out_r3d (nc_var1, var%var%x(1)%v, var%nrec + 1)
-  call merge_out_r3d (nc_var2, var%var%x(2)%v, var%nrec + 1)
+  call merge_out_r3d (var1_info, var%var%x(1)%v)
+  call merge_out_r3d (var2_info, var%var%x(2)%v)
 
   var%var%x(1)%v = 0.0 ! reset accumulated value
   var%var%x(2)%v = 0.0
   var%n    = 0 ! reset counter
-  var%nrec = var%nrec + 1 ! nc record have been increased
 
 end subroutine merge_out_accu_gm3d
 
-subroutine merge_out_accu_gm3d_mask (nc_var1, nc_var2, var, mask) !{{{1
+subroutine merge_out_accu_gm3d_mask (var1_info, var2_info, var, mask) !{{{1
   ! merge 3d array from other domains to mid
   ! mask out the land points
-  type (type_nc_var), intent(in) :: nc_var1, nc_var2
+  type (type_var_info), intent(in) :: var1_info, var2_info
   type (type_accu_gm3d) :: var
   integer, dimension(:,:,:), intent(in) :: mask
 
@@ -159,35 +151,33 @@ subroutine merge_out_accu_gm3d_mask (nc_var1, nc_var2, var, mask) !{{{1
     var%var%x(2)%v = missing_float
   end where
 
-  call merge_out_r3d (nc_var1, var%var%x(1)%v, var%nrec + 1)
-  call merge_out_r3d (nc_var2, var%var%x(2)%v, var%nrec + 1)
+  call merge_out_r3d (var1_info, var%var%x(1)%v)
+  call merge_out_r3d (var2_info, var%var%x(2)%v)
 
   var%var%x(1)%v = 0.0 ! reset accumulated value
   var%var%x(2)%v = 0.0
   var%n    = 0 ! reset counter
-  var%nrec = var%nrec + 1 ! nc record have been increased
 
 end subroutine merge_out_accu_gm3d_mask
 
-subroutine merge_out_accu_gr3d (nc_var, var) !{{{1
+subroutine merge_out_accu_gr3d (var_info, var) !{{{1
   ! merge 3d array from other domains to mid
-  type (type_nc_var), intent(in) :: nc_var
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr3d) :: var
 
   var%var%v = var%var%v / var%n
 
-  call merge_out_r3d (nc_var, var%var%v, var%nrec + 1)
+  call merge_out_r3d (var_info, var%var%v)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
-  var%nrec  = var%nrec + 1 ! nc record have been increased
 
 end subroutine merge_out_accu_gr3d
 
-subroutine merge_out_accu_gr3d_mask (nc_var, var, mask) !{{{1
+subroutine merge_out_accu_gr3d_mask (var_info, var, mask) !{{{1
   ! merge 3d array from other domains to mid
   ! mask out the land points
-  type (type_nc_var), intent(in) :: nc_var
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr3d) :: var
   integer, dimension(:,:,:), intent(in) :: mask
 
@@ -196,18 +186,17 @@ subroutine merge_out_accu_gr3d_mask (nc_var, var, mask) !{{{1
     var%var%v = missing_float
   end where
 
-  call merge_out_r3d (nc_var, var%var%v, var%nrec + 1)
+  call merge_out_r3d (var_info, var%var%v)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
-  var%nrec  = var%nrec + 1 ! nc record have been increased
 
 end subroutine merge_out_accu_gr3d_mask
 
-subroutine merge_out_accu_gr2d_mask (vname, unitname, longname, var, mask) !{{{1
+subroutine merge_out_accu_gr2d_mask (var_info, var, mask) !{{{1
   ! merge 2d array from other domains to mid
   ! mask out the land points
-  character (len=*) :: vname, unitname, longname
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr2d) :: var
   integer, dimension(:,:), intent(in) :: mask
 
@@ -216,18 +205,17 @@ subroutine merge_out_accu_gr2d_mask (vname, unitname, longname, var, mask) !{{{1
     var%var%v = missing_float
   end where
 
-  call merge_out_r2d_rec (vname, unitname, longname, var%var%v, var%nrec + 1)
+  call merge_out_r2d (var_info, var%var%v)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
-  var%nrec  = var%nrec + 1 ! nc record have been increased
 
 end subroutine merge_out_accu_gr2d_mask
 
-subroutine merge_out_accu_gr2d_weight (vname, unitname, longname, var, wg, mask) !{{{1
+subroutine merge_out_accu_gr2d_weight (var_info, var, wg, mask) !{{{1
   ! merge 2d array from other domains to mid
   ! mask out the land points, remove global mean
-  character (len=*) :: fname, vname
+  type (type_var_info), intent(in) :: var_info
   type (type_accu_gr2d) :: var
   real (kind=wp), dimension(:,:), intent(in) :: wg
   integer, dimension(:,:), intent(in) :: mask
@@ -237,19 +225,17 @@ subroutine merge_out_accu_gr2d_weight (vname, unitname, longname, var, wg, mask)
     var%var%v = missing_float
   end where
 
-  call merge_out_r2d_weight (fname, vname, var%var%v, wg, var%nrec + 1)
+  call merge_out_r2d_weight (var_info, var%var%v, wg)
 
   var%var%v = 0.0 ! reset accumulated value
   var%n     = 0 ! reset counter
-  var%nrec  = var%nrec + 1 ! nc record have been increased
 
 end subroutine merge_out_accu_gr2d_weight
 
-subroutine merge_out_r3d (varname, unitname, longname, var, nrec) !{{{1
+subroutine merge_out_r3d (var_info, var) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*), intent(in) :: varname, unitname, longname
+  type (type_var_info), intent(in) :: var_info
   real (kind=wp), dimension(ni,nj,nk), intent(in) :: var
-  integer, intent(in) :: nrec
 
   real (kind=wp), allocatable, dimension(:,:,:) :: glo_var
 
@@ -274,7 +260,7 @@ subroutine merge_out_r3d (varname, unitname, longname, var, nrec) !{{{1
       end if
     end do
 
-    call io_write (trim(varname), unitname, longname, glo_var, nrec)
+    call io_write (var_info, glo_var)
 
     deallocate(glo_var)
 
@@ -286,12 +272,11 @@ subroutine merge_out_r3d (varname, unitname, longname, var, nrec) !{{{1
 
 end subroutine merge_out_r3d
 
-subroutine merge_out_r2d_weight (fname, varname, var, wg, nrec) !{{{1
+subroutine merge_out_r2d_weight (var_info, var, wg) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*), intent(in) :: fname, varname
+  type (type_var_info), intent(in) :: var_info
   real (kind=wp), dimension(ni,nj), intent(in) :: var
   real (kind=wp), dimension(ni,nj), intent(in) :: wg
-  integer, intent(in) :: nrec
 
   real (kind=wp), allocatable, dimension(:,:) :: glo_var
   real (kind=wp), allocatable, dimension(:,:) :: glo_wg
@@ -310,7 +295,7 @@ subroutine merge_out_r2d_weight (fname, varname, var, wg, nrec) !{{{1
     mean = sum(glo_var*glo_wg)/sum(glo_wg)
     where (glo_var /= missing_float) glo_var = glo_var - mean
 
-    call io_write (trim(fname), trim(varname), glo_var, nrec)
+    call io_write (var_info, glo_var)
 
     deallocate(glo_var)
     deallocate(glo_wg)
@@ -324,49 +309,9 @@ subroutine merge_out_r2d_weight (fname, varname, var, wg, nrec) !{{{1
 
 end subroutine merge_out_r2d_weight
 
-subroutine merge_out_r2d_rec (fname, varname, var, nrec) !{{{1
+subroutine merge_out_r2d (var_info, var) !{{{1
   ! merge 3d array from other domains to mid
-  character (len=*), intent(in) :: fname, varname
-  real (kind=wp), dimension(ni,nj), intent(in) :: var
-  integer, intent(in) :: nrec
-
-  real (kind=wp), allocatable, dimension(:,:) :: glo_var
-
-  integer, parameter :: tag = 30
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-
-    allocate( glo_var(glo_ni, glo_nj), stat=is)
-    call chk(is); glo_var = 0.0
-
-    do n = 1, npro
-      d = our(n)
-      leng  = (d%ge-d%gw+1) * (d%gn-d%gs+1)
-      if ( d%id == mid ) then
-        glo_var(d%gw:d%ge, d%gs:d%gn) = &
-          var(2:d%ni-1, 2:d%nj-1)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn), &
-          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-
-    call io_write (trim(fname), trim(varname), glo_var, nrec)
-    deallocate(glo_var)
-
-  else
-    leng  = (my%ge-my%gw+1) * (my%gn-my%gs+1)
-    call mpi_ssend (var(2:my%ni-1,2:my%nj-1), leng, &
-      mpi_real8, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine merge_out_r2d_rec
-
-subroutine merge_out_r2d (varname, unitname, longname, var) !{{{1
-  ! merge 2d array from other domains to mid
-  character (len=*), intent(in) :: varname, unitname, longname
+  type (type_var_info), intent(in) :: var_info
   real (kind=wp), dimension(ni,nj), intent(in) :: var
 
   real (kind=wp), allocatable, dimension(:,:) :: glo_var
@@ -392,7 +337,7 @@ subroutine merge_out_r2d (varname, unitname, longname, var) !{{{1
       end if
     end do
 
-    call io_write (trim(varname), unitname, longname, glo_var)
+    call io_write (var_info, glo_var)
     deallocate(glo_var)
 
   else
@@ -402,6 +347,51 @@ subroutine merge_out_r2d (varname, unitname, longname, var) !{{{1
   end if
 
 end subroutine merge_out_r2d
+
+subroutine merge_out_r2d_mask(var_info, var, mask) !{{{1
+  ! merge 3d array from other domains to mid
+  type (type_var_info), intent(in) :: var_info
+  real (kind=wp), dimension(ni,nj) :: var
+  integer, dimension(:,:), intent(in) :: mask
+
+  real (kind=wp), allocatable, dimension(:,:) :: glo_var
+
+  integer, parameter :: tag = 30
+  type (type_my) :: d
+  integer :: n, leng
+
+  where (mask == 0)
+    var = missing_float
+  end where
+
+  if (myid == mid) then
+
+    allocate( glo_var(glo_ni, glo_nj), stat=is)
+    call chk(is); glo_var = 0.0
+
+    do n = 1, npro
+      d = our(n)
+      leng  = (d%ge-d%gw+1) * (d%gn-d%gs+1)
+      if ( d%id == mid ) then
+        glo_var(d%gw:d%ge, d%gs:d%gn) = &
+          var(2:d%ni-1, 2:d%nj-1)
+      else
+        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn), &
+          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
+      end if
+    end do
+
+    call io_write (var_info, glo_var)
+    deallocate(glo_var)
+
+  else
+    leng  = (my%ge-my%gw+1) * (my%gn-my%gs+1)
+    call mpi_ssend (var(2:my%ni-1,2:my%nj-1), leng, &
+      mpi_real8, mid, tag, mpi_comm_world, err)
+  end if
+
+end subroutine merge_out_r2d_mask
+
 
 subroutine merge_out_i3d (fname, varname, var) !{{{1
   ! merge 3d array from other domains to mid
@@ -511,250 +501,6 @@ subroutine merge_r2d (glo_var, var) !{{{1
   end if
 
 end subroutine merge_r2d
-
-subroutine quick_output_r3d (fname, varname, var, lon, lat, z) !{{{1
-  ! merge 2d array from other domains to mid and output
-  character (len=*) :: fname, varname
-  real (kind=wp), intent(in) :: var(:,:,:)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat, z
-
-  real (kind=wp), allocatable :: glo_var(:,:,:)
-
-  integer, parameter :: tag = 50
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-
-    allocate( glo_var(glo_ni, glo_nj, nk), stat=is)
-    call chk(is); glo_var = 0
-
-    do n = 1, npro
-      d = our(n)
-      leng = (d%ge-d%gw+1) * (d%gn-d%gs+1) * nk
-      if ( d%id == mid ) then
-        glo_var(d%gw:d%ge, d%gs:d%gn, :) = var(2:my%ni-1, 2:my%nj-1, :)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn,:), &
-          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-
-    call io_quick_output (trim(fname), trim(varname), glo_var, lon, lat, z)
-    deallocate(glo_var)
-
-  else
-    leng = (my%ge-my%gw+1) * (my%gn-my%gs+1) * nk
-    call mpi_ssend (var(2:my%ni-1,2:my%nj-1,:), leng, &
-      mpi_real8, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine quick_output_r3d
-
-subroutine quick_output_r2d (fname, varname, var, lon, lat) !{{{1
-  ! merge 2d array from other domains to mid and output
-  character (len=*) :: fname, varname
-  real (kind=wp), intent(in) :: var(ni,nj)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat
-
-  real (kind=wp), allocatable, dimension(:,:) :: glo_var
-
-  integer, parameter :: tag = 30
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-
-    allocate( glo_var(glo_ni, glo_nj), stat=is)
-    call chk(is); glo_var = 0.0
-
-    do n = 1, npro
-      d = our(n)
-      leng = (d%ge-d%gw+1) * (d%gn-d%gs+1)
-      if ( d%id == myid ) then
-        glo_var(d%gw:d%ge, d%gs:d%gn) = var(2:d%ni-1, 2:d%nj-1)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn), &
-          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-
-    call io_quick_output (trim(fname), trim(varname), glo_var, lon, lat)
-    deallocate(glo_var)
-
-  else
-    leng = (my%ge-my%gw+1) * (my%gn-my%gs+1)
-    call mpi_ssend (var(2:my%ni-1,2:my%nj-1), leng, &
-      mpi_real8, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine quick_output_r2d
-
-subroutine quick_output_r1d (fname, varname, var, c, coor) !{{{1
-  ! merge 2d array from other domains to mid and output
-  character (len=*), intent(in) :: fname, varname
-  character (len=1), intent(in) :: c
-  real (kind=wp), intent(in) :: var(:), coor(:)
-
-  if ( c.eq.'y' ) then
-    call output_r1d_y (fname, varname, var, coor)
-  else if ( c.eq.'x' ) then
-    call output_r1d_x (fname, varname, var, coor)
-  else
-    stop 'unhandled character in quick_output_r1d in mod_mympi'
-  end if
-
-end subroutine quick_output_r1d
-
-subroutine output_r1d_y (fname, varname, var, coor) !{{{1
-  ! merge 1d array from other domains to mid and output
-  character (len=*), intent(in) :: fname, varname
-  real (kind=wp), intent(in) :: var(nj), coor(glo_nj)
-
-  real (kind=wp), allocatable, dimension(:) :: glo_var
-
-  integer, parameter :: tag = 140
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-    allocate( glo_var(glo_nj), stat=is)
-    call chk(is); glo_var = 0.0
-
-    do n = 1, npro
-      d = our(n)
-      leng = d%nj - 2
-      if ( d%id == myid ) then
-        glo_var(d%gs:d%gn) = var(2:d%nj-1)
-      else
-        call mpi_recv (glo_var(d%gs:d%gn), &
-          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-    call io_quick_output (trim(fname), trim(varname), glo_var, coor)
-    deallocate(glo_var)
-
-  else
-    leng = my%nj - 2
-    call mpi_ssend (var(2:my%nj-1), leng, &
-      mpi_real8, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine output_r1d_y
-
-subroutine output_r1d_x (fname, varname, var, coor) !{{{1
-  ! merge 1d array from other domains to mid and output
-  character (len=*), intent(in) :: fname, varname
-  real (kind=wp), intent(in) :: var(ni), coor(glo_ni)
-
-  real (kind=wp), allocatable, dimension(:) :: glo_var
-
-  integer, parameter :: tag = 150
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-    allocate( glo_var(glo_ni), stat=is)
-    call chk(is); glo_var = 0.0
-
-    do n = 1, npro
-      d = our(n)
-      leng = d%ni - 2
-      if ( d%id == myid ) then
-        glo_var(d%gw:d%ge) = var(2:d%ni-1)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge), &
-          leng, mpi_real8, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-    call io_quick_output (trim(fname), trim(varname), glo_var, coor)
-    deallocate(glo_var)
-
-  else
-    leng = my%ni - 2
-    call mpi_ssend (var(2:my%ni-1), leng, &
-      mpi_real8, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine output_r1d_x
-
-subroutine quick_output_i3d (fname, varname, var, lon, lat, z) !{{{1
-  ! merge 2d array from other domains to mid and output
-  character (len=*) :: fname, varname
-  integer, intent(in) :: var(ni,nj,nk)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat, z
-
-  integer, allocatable :: glo_var(:,:,:)
-
-  integer, parameter :: tag = 50
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-
-    allocate( glo_var(glo_ni, glo_nj, nk), stat=is)
-    call chk(is); glo_var = 0
-
-    do n = 1, npro
-      d = our(n)
-      leng = (d%ge-d%gw+1) * (d%gn-d%gs+1) * nk
-      if ( d%id == myid ) then
-        glo_var(d%gw:d%ge, d%gs:d%gn, :) = var(2:my%ni-1, 2:my%nj-1, :)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn,:), &
-          leng, mpi_integer, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-
-    call io_quick_output (trim(fname), trim(varname), glo_var, lon, lat, z)
-    deallocate(glo_var)
-
-  else
-    leng = (my%ge-my%gw+1) * (my%gn-my%gs+1) * nk
-    call mpi_ssend (var(2:my%ni-1,2:my%nj-1,:), leng, &
-      mpi_integer, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine quick_output_i3d
-
-subroutine quick_output_i2d (fname, varname, var, lon, lat) !{{{1
-  ! merge 2d array from other domains to mid and output
-  character (len=*) :: fname, varname
-  integer, intent(in) :: var(ni,nj)
-  real (kind=wp), intent(in) :: lon(glo_ni), lat(glo_nj)
-
-  integer, allocatable :: glo_var(:,:)
-
-  integer, parameter :: tag = 50
-  type (type_my) :: d
-  integer :: n, leng
-
-  if (myid == mid) then
-
-    allocate( glo_var(glo_ni, glo_nj), stat=is)
-    call chk(is); glo_var = 0
-
-    do n = 1, npro
-      d = our(n)
-      leng = (d%ge-d%gw+1) * (d%gn-d%gs+1)
-      if ( d%id == myid ) then
-        glo_var(d%gw:d%ge, d%gs:d%gn) = var(2:my%ni-1, 2:my%nj-1)
-      else
-        call mpi_recv (glo_var(d%gw:d%ge,d%gs:d%gn), &
-          leng, mpi_integer, d%id, tag, mpi_comm_world, msta, err)
-      end if
-    end do
-
-    call io_quick_output (trim(fname), trim(varname), glo_var, lon, lat)
-    deallocate(glo_var)
-
-  else
-    leng = (my%ge-my%gw+1) * (my%gn-my%gs+1)
-    call mpi_ssend (var(2:my%ni-1,2:my%nj-1), leng, &
-      mpi_integer, mid, tag, mpi_comm_world, err)
-  end if
-
-end subroutine quick_output_i2d
 
 subroutine swpbnd_r3d (var) !{{{1
   ! horizontally swap the boundary of subdomain for 3d array

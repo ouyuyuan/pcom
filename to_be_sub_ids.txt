@@ -1,6 +1,1 @@
-type_nc_var: type_var_info
-type_nc_vars: type_vars_info
-nc_var: var_info
-nc_vars: vars_info
-nc_var1: var1_info
-nc_var2: var2_info
+param_set_nc_vars: param_set_io

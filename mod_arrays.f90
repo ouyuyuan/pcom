@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-26 15:40:39 BJT
-! Last Change: 2017-10-24 10:19:41 BJT
+! Last Change: 2017-11-26 10:38:39 BJT
 
 module mod_arrays
 
@@ -18,11 +18,12 @@ module mod_arrays
   use mod_con, only: am_c, km_c
 
   use mod_type, only: &
-    type_mat, type_accu_gm3d, &
+    type_mat, &
     type_accu_gr3d, type_accu_gr2d, &
     type_bnd, type_frc, type_bintgu, &
-    type_gvar_m3d, type_gvar_m2d, type_gvar_r2d, type_gvar_r3d, &
-    type_gi, type_gj, type_gij, type_ch
+    type_gvar_r4d, type_gvar_r2d, type_gvar_r3d, &
+    type_gi, type_gj, type_gij, type_ch, &
+    type_eq_ts, type_eq_uv, type_eq_uvb
 
   implicit none
   public
@@ -44,10 +45,13 @@ module mod_arrays
 
   ! 'vector' variables !{{{1
   type (type_mat), allocatable, dimension(:,:,:) :: &
-    prho, & ! (p rho)/(p t/s), partial derivative of density
-    hpos ! rad, (lon, lat) position for g1j, g2j, g3j and g4j
+    prho ! (p rho)/(p t/s), partial derivative of density
 
   ! coordinates !{{{1
+
+  ! rad, (lon, lat) position for g1j, g2j, g3j and g4j
+  real (kind=wp), allocatable, dimension(:,:,:) :: hposx, hposy
+
   real (kind=wp), allocatable, dimension(:) :: &
     glo_lon, & ! degree, guj grid, global longitude
     lon,     & !              ... local ...
@@ -56,40 +60,49 @@ module mod_arrays
     z      ! m, gi2 grid, global depths of each layer
 
   ! accumulated variables, for time-average output !{{{1
-  type (type_accu_gm3d) :: &
-    acts, & ! accumulated (T, S)
-    acuv ! ... unweighted horizontal velocity
-  type (type_accu_gr3d) :: &
+  real (kind=wp), allocatable, dimension(:,:,:), target :: &
+    act, acs, & ! accumulated (T, S)
     acrho, & ! kg/m^3, density of sea water
+    acu, acv    ! m/s, unweighted horizontal velocity
+  type (type_accu_gr3d) :: &
     acw   ! m/s, vertical velocity, bottom is assume to be zero, so it is nk layers, not nkp layers
   type (type_accu_gr2d) :: &
     acssh, & ! m, sea surface height
     acch     !  , normalized sea bottom pressure
 
   ! grid variables !{{{1
-  type (type_gvar_m3d) :: &
-    adv(3), & ! baroclinic advection terms
-    up(2), & ! prognostic pressure weighted velocity
-    ts(2), & ! potential temperature and salinity
-    fri ! N, friction forces in momentum equation
-  type (type_gvar_m2d) :: &
-    graphih, & ! Pa/m, GRAdient of sea Bottom Pressure
-    grapa, & ! Pa/m, gradient of overloading atmospheric pressure
-    badv, & ! tendency of barotropic velocity
-    upb(2) ! barotropic velocity
-    ! grapa%x(2)%v = ( pay*10/rrho_0 ) in pcom 1.0
-  type (type_gvar_r3d) :: &
+
+  type (type_gvar_r4d), target :: &
+    temp,  & ! potential temperature
+    salt,  & ! salinity
+    upres, & ! prognostic pressure weighted zonal velocity
+    vpres, & ! prognostic pressure weighted longitinal velocity
+    adu, adv  ! baroclinic advection terms (advection of u,v)
+
+  type (type_gvar_r3d), target :: &
     alpha, & ! m^3/kg, specific volume
     adp, & ! m^3/kg * Pa, indefinite integration of alpha from p to prh
     am,   & ! m^2/s, horizontal momentum viscosity coefficient
     km,   & ! m^2/s, vertical momentum viscosity coefficient
     kh,   & ! m^2/s, vertical diffusion coefficient for tracers
-    wm      ! N m/s, vertical mass advection
-  type (type_gvar_r2d) :: &
+    wm,   & ! N m/s, vertical mass advection
+    frix, friy ! N, friction forces in momentum equation
+  type (type_gvar_r2d), target :: &
+    ubtc, vbtc, ubtp, vbtp, & ! current/previous timestep of barotropic velocities
+    badvx, badvy, & ! tendency of barotropic velocity
+    graphihx, & ! Pa/m, x-component of GRAdient of sea Bottom Pressure
+    graphihy, & ! Pa/m, y-component of GRAdient of sea Bottom Pressure
+    grapax, grapay, & ! Pa/m, gradient of overloading atmospheric pressure
     cor ! N, Coriolis force
+        ! grapay = ( pay*10/rrho_0 ) in pcom 1.0
   type (type_frc) :: frc
   type (type_bnd) :: bnd
   type (type_ch) :: ch ! bottom pressure, normalized by initial values
+
+  ! equation variables !{{{1
+  type (type_eq_ts) :: eqts
+  type (type_eq_uv) :: equv
+  type (type_eq_uvb) :: equvb
 
   ! other !{{{1
 
@@ -105,9 +118,9 @@ module mod_arrays
   ! interfaces !{{{1
   interface arrays_init
     module procedure init_gvar_r2d
-    module procedure init_gvar_m2d
     module procedure init_gvar_r3d
-    module procedure init_gvar_m3d
+    module procedure init_gvar_r4d
+    module procedure init_r3d
     module procedure init_r2d
   end interface arrays_init
 
@@ -235,46 +248,49 @@ subroutine arrays_allocate () !{{{1
   allocate( bgraphi%ye(ni,nj), stat=is ); call chk(is)
   allocate( bgraphi%yw(ni,nj), stat=is ); call chk(is)
 
-  call arrays_init( acts%var, ni,nj,nk, zero, g12 )
-  acts%n = 0; acts%nrec = 0
+  call arrays_init( act, ni,nj,nk, zero )
+  call arrays_init( acs, ni,nj,nk, zero )
 
-  call arrays_init( acuv%var, ni,nj,nk, zero, g32 )
-  acuv%n = 0; acuv%nrec = 0
+  call arrays_init( acu, ni,nj,nk, zero )
+  call arrays_init( acv, ni,nj,nk, zero )
 
   ! acw lies on g32 just for output, this is ad hoc
   call arrays_init( acw%var, ni,nj,nk, zero, g32 )
-  acw%n = 0; acw%nrec = 0
+  acw%n = 0
 
-  call arrays_init( acrho%var, ni,nj,nk, zero, g12 )
-  acrho%n = 0; acrho%nrec = 0
+  call arrays_init( acrho, ni,nj,nk, zero )
 
   call arrays_init( acssh%var, ni,nj, zero, g1j )
-  acssh%n = 0; acssh%nrec = 0
+  acssh%n = 0
 
   call arrays_init( acch%var, ni,nj, zero, g1j )
-  acch%n = 0; acch%nrec = 0
+  acch%n = 0
 
-  call arrays_init(ts(tc), ni,nj,nk, zero, g12)
-  call arrays_init(ts(tp), ni,nj,nk, zero, g12)
+  call arrays_init(temp, ni,nj,nk,2, zero, g12)
+  call arrays_init(salt, ni,nj,nk,2, zero, g12)
 
-  call arrays_init(adv(tc), ni,nj,nk, zero, g32)
-  call arrays_init(adv(tp), ni,nj,nk, zero, g32)
-  call arrays_init(adv(tpp), ni,nj,nk, zero, g32)
+  call arrays_init(adu, ni,nj,nk,3, zero, g32)
+  call arrays_init(adv, ni,nj,nk,3, zero, g32)
 
-  call arrays_init(up(tc), ni,nj,nk, zero, g32)
-  call arrays_init(up(tp), ni,nj,nk, zero, g32)
+  call arrays_init(upres, ni,nj,nk,2, zero, g32)
+  call arrays_init(vpres, ni,nj,nk,2, zero, g32)
 
-  call arrays_init(fri, ni,nj,nk, zero, g32)
+  call arrays_init(frix, ni,nj,nk, zero, g32)
+  call arrays_init(friy, ni,nj,nk, zero, g32)
 
-  call arrays_init(frc%tau, ni,nj,12, zero, sg3)
-  call arrays_init(frc%ts,  ni,nj,12, zero, sg1)
+  call arrays_init(frc%taux, ni,nj,12, zero, sg3)
+  call arrays_init(frc%tauy, ni,nj,12, zero, sg3)
+  call arrays_init(frc%t,  ni,nj,12, zero, sg1)
+  call arrays_init(frc%s,  ni,nj,12, zero, sg1)
   call arrays_init(frc%pa,  ni,nj,12, zero, sg1)
   call arrays_init(frc%fw,  ni,nj,12, zero, sg1)
 
-  call arrays_init(bnd%tau, ni,nj, zero, g1j)
-  call arrays_init(bnd%ts,  ni,nj, zero, g1j)
-  call arrays_init(bnd%pa,  ni,nj, zero, g1j)
-  call arrays_init(bnd%fw,  ni,nj, zero, g1j)
+  call arrays_init(bnd%taux, ni,nj, zero, g1j)
+  call arrays_init(bnd%tauy, ni,nj, zero, g1j)
+  call arrays_init(bnd%t,    ni,nj, zero, g1j)
+  call arrays_init(bnd%s,    ni,nj, zero, g1j)
+  call arrays_init(bnd%pa,   ni,nj, zero, g1j)
+  call arrays_init(bnd%fw,   ni,nj, zero, g1j)
 
   ! initiate as fresh water
   call arrays_init(alpha, ni,nj,nk, 1/1000.0*one, g12) 
@@ -286,9 +302,11 @@ subroutine arrays_allocate () !{{{1
   call arrays_init(km, ni,nj,nkp, km_c, g32%ud)
   call arrays_init(kh, ni,nj,nkp, zero,  g12%ud)
 
-  call arrays_init(graphih, ni,nj, zero, g3j)
+  call arrays_init(graphihx, ni,nj, zero, g3j)
+  call arrays_init(graphihy, ni,nj, zero, g3j)
 
-  call arrays_init(grapa, ni,nj, zero, g3j)
+  call arrays_init(grapax, ni,nj, zero, g3j)
+  call arrays_init(grapay, ni,nj, zero, g3j)
 
   ch%hg => g1j
   call arrays_init(ch%tc, ni,nj, one)
@@ -298,18 +316,22 @@ subroutine arrays_allocate () !{{{1
 
   call arrays_init(cor, ni,nj, zero, g3j)
 
-  call arrays_init(upb(tc), ni,nj, zero, g3j)
-  call arrays_init(upb(tp), ni,nj, zero, g3j)
+  call arrays_init(ubtc, ni,nj, zero, g3j)
+  call arrays_init(vbtc, ni,nj, zero, g3j)
+  call arrays_init(ubtp, ni,nj, zero, g3j)
+  call arrays_init(vbtp, ni,nj, zero, g3j)
 
-  call arrays_init(badv, ni,nj, zero, g3j)
+  call arrays_init(badvx, ni,nj, zero, g3j)
+  call arrays_init(badvy, ni,nj, zero, g3j)
 
   allocate(prho(ni,nj,nk), stat=is); call chk(is) 
   prho%x(1) = 0.0
   prho%x(2) = 0.0
 
-  allocate(hpos(ni,nj,4), stat=is); call chk(is) 
-  hpos%x(1) = 0.0
-  hpos%x(2) = 0.0
+  allocate(hposx(ni,nj,4), stat=is); call chk(is) 
+  allocate(hposy(ni,nj,4), stat=is); call chk(is) 
+  hposx = 0.0
+  hposy = 0.0
 
   allocate(cv1(ni,nj), stat=is); call chk(is); cv1 = 0.0
   allocate(cv2(ni,nj), stat=is); call chk(is); cv2 = 0.0
@@ -319,7 +341,95 @@ subroutine arrays_allocate () !{{{1
   allocate(lon(ni), stat=is); call chk(is); lon = 0.0
 
   allocate(z  (nk), stat=is); call chk(is); z  = 0.0
+
+  call init_eqts ()
+
+  call init_equv ()
+
+  call init_equvb ()
 end subroutine arrays_allocate
+
+subroutine init_eqts ()!{{{1
+  ! initialize temperature eqution
+
+  eqts%tc => temp%v(:,:,:,tc)
+  eqts%sc => salt%v(:,:,:,tc)
+  eqts%tp => temp%v(:,:,:,tp)
+  eqts%sp => salt%v(:,:,:,tp)
+
+  eqts%act => act
+  eqts%acs => acs
+  eqts%acr => acrho
+
+  eqts%g => temp%g
+
+  eqts%n = 0
+
+end subroutine init_eqts
+
+subroutine init_equv ()!{{{1
+  ! initialize horizontal momentum eqution
+
+  equv%uc => upres%v(:,:,:,tc)
+  equv%vc => vpres%v(:,:,:,tc)
+
+  equv%up => upres%v(:,:,:,tp)
+  equv%vp => vpres%v(:,:,:,tp)
+
+  equv%acu => acu
+  equv%acv => acv
+
+  equv%auc  => adu%v(:,:,:,tc)
+  equv%aup  => adu%v(:,:,:,tp)
+  equv%aupp => adu%v(:,:,:,tpp)
+
+  equv%avc  => adv%v(:,:,:,tc)
+  equv%avp  => adv%v(:,:,:,tp)
+  equv%avpp => adv%v(:,:,:,tpp)
+
+  equv%fx   => frix%v
+  equv%fy   => friy%v
+
+  equv%pax  => grapax%v
+  equv%pay  => grapay%v
+
+  equv%g => upres%g
+
+  equv%n = 0
+
+end subroutine init_equv
+
+subroutine init_equvb ()!{{{1
+  ! initialize barotropic momentum eqution
+
+  equvb%uc  => ubtc%v
+  equvb%vc  => vbtc%v
+  equvb%up  => ubtp%v
+  equvb%vp  => vbtp%v
+
+  equvb%ut => badvx%v
+  equvb%vt => badvy%v
+
+  equvb%hg => g3j
+
+end subroutine init_equvb
+
+subroutine init_gvar_r4d (var, d1, d2, d3, d4, ini, g)!{{{1
+  ! initialize grid variables
+  type (type_gvar_r4d) :: var
+  integer, intent(in) :: d1, d2, d3, d4
+  real (kind=wp) :: ini
+  type (type_gij), target :: g
+
+  integer :: is
+
+  allocate(var%v(d1,d2,d3,d4), stat = is)
+  call chk(is)
+
+  var%v = ini
+  var%g => g
+
+end subroutine init_gvar_r4d
 
 subroutine init_gvar_r3d (var, d1, d2, d3, ini, g)!{{{1
   ! initialize grid variables
@@ -338,16 +448,6 @@ subroutine init_gvar_r3d (var, d1, d2, d3, ini, g)!{{{1
 
 end subroutine init_gvar_r3d
 
-subroutine init_gvar_m3d (var, d1, d2, d3, ini, g) !{{{1
-  ! initialize grid variable
-  type (type_gvar_m3d) :: var
-  integer, intent(in) :: d1, d2, d3
-  real (kind=wp) :: ini
-  type (type_gij), target :: g
-  call init_gvar_r3d (var%x(1), d1, d2, d3, ini, g)
-  call init_gvar_r3d (var%x(2), d1, d2, d3, ini, g)
-end subroutine init_gvar_m3d
-
 subroutine init_gvar_r2d (var, d1, d2, ini, hg)!{{{1
   ! initialize grid variables
   type (type_gvar_r2d) :: var
@@ -364,17 +464,19 @@ subroutine init_gvar_r2d (var, d1, d2, ini, hg)!{{{1
 
 end subroutine init_gvar_r2d
 
-subroutine init_gvar_m2d (var, d1, d2, ini, hg) !{{{1
-  ! initialize grid variable
-  type (type_gvar_m2d) :: var
-  integer, intent(in) :: d1, d2
+subroutine init_r3d (var, d1, d2, d3, ini)!{{{1
+  ! initialize 3d real variables
+  real (kind=wp), dimension(:,:,:), allocatable :: var
+  integer, intent(in) :: d1, d2, d3
   real (kind=wp) :: ini
-  type (type_gi), target :: hg
 
-  call init_gvar_r2d( var%x(1), d1, d2, ini, hg )
-  call init_gvar_r2d( var%x(2), d1, d2, ini, hg )
+  integer :: is
 
-end subroutine init_gvar_m2d
+  allocate(var(d1,d2,d3), stat = is)
+  call chk(is)
+  var = ini
+
+end subroutine init_r3d
 
 subroutine init_r2d (var, d1, d2, ini)!{{{1
   ! initialize grid variables

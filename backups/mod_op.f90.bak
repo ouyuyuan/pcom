@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-11 15:23:38 BJT
-! Last Change: 2017-07-05 21:25:41 BJT
+! Last Change: 2017-10-30 07:47:38 BJT
 
 module mod_op
 
@@ -20,7 +20,7 @@ module mod_op
 
   use mod_kind, only: wp, one
 
-  use mod_mympi, only: mympi_swpbnd, mympi_quick_output
+  use mod_mympi, only: mympi_swpbnd
 
   use mod_param, only: &
     ni, nj, nk, nkp, &

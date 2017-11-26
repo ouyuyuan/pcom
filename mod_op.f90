@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-11 15:23:38 BJT
-! Last Change: 2017-07-05 21:25:41 BJT
+! Last Change: 2017-11-26 09:41:26 BJT
 
 module mod_op
 
@@ -11,16 +11,17 @@ module mod_op
   use mod_arrays, only: &
     g32, gi1, gi2, &
     gt, gu, gtj, guj, git, giw, &
-    am, km, kh, up, wm, ch, &
+    am, km, kh, wm, ch, &
     cv1, cv2, &
-    glo_lat, glo_lon, z
+    glo_lat, glo_lon, z, &
+    equv
 
   use mod_con, only: &
     a, g, rho0, cdbot, ah_c
 
   use mod_kind, only: wp, one
 
-  use mod_mympi, only: mympi_swpbnd, mympi_quick_output
+  use mod_mympi, only: mympi_swpbnd
 
   use mod_param, only: &
     ni, nj, nk, nkp, &
@@ -28,7 +29,7 @@ module mod_op
 
   use mod_type, only: type_mat, &
     tctr, type_gi, type_gj, type_gij, &
-    type_gvar_m3d, type_gvar_m2d, type_gvar_r2d, type_gvar_r3d
+    type_gvar_r2d, type_gvar_r3d
 
   implicit none
   private
@@ -62,8 +63,7 @@ module mod_op
     module procedure gra_r2d
     module procedure gra_r2d_b
     module procedure gra_r3d
-    module procedure gra_gr2d
-    module procedure gra_gr3d
+    module procedure gra_r3d_b
   end interface
 
   interface op_px1
@@ -81,16 +81,10 @@ module mod_op
     module procedure p3_r3d_ter
   end interface
 
-  interface op_lap
-    module procedure lap_r2d
-    module procedure lap_gm2d
-  end interface
-
   interface op_ter
     module procedure vter_r3d
     module procedure ter_r3d
     module procedure ter_r2d
-    module procedure ter_gm2d
     module procedure ter_i3d
     module procedure ter_i2d
   end interface
@@ -170,22 +164,20 @@ subroutine fri_r3d (ans, sch, v, vp, vc, tau) !{{{1
 
 end subroutine fri_r3d
 
-subroutine op_fri(fri, sch, up, tau) !{{{1
+subroutine op_fri(fx, fy, sch, taux, tauy) !{{{1
   ! horizontal frictional force
-  ! output is on the same grid as up
-  type (type_gvar_m3d) :: fri
-  real (kind=wp), dimension(:,:), intent(in) :: sch
-  type (type_gvar_m3d), intent(in) :: up
-  type (type_gvar_m2d), intent(in) :: tau
+  ! output is on the same grid as equv
+  real (kind=wp), dimension(:,:,:), intent(in) :: fx, fy
+  real (kind=wp), dimension(:,:), intent(in) :: sch, taux, tauy
 
   real (kind=wp), dimension(ni,nj,nk) :: u, v, sch3d
 
   sch3d = spread( sch, 3, nk )
-  u = up%x(1)%v / sch3d
-  v = up%x(2)%v / sch3d
+  u = equv%uc / sch3d
+  v = equv%vc / sch3d
 
-  call fri_r3d( fri%x(1)%v, sch, u, up%x(1)%v, -v, tau%x(1)%v )
-  call fri_r3d( fri%x(2)%v, sch, v, up%x(2)%v,  u, tau%x(2)%v )
+  call fri_r3d( fx, sch, u, equv%uc, -v, taux )
+  call fri_r3d( fy, sch, v, equv%vc,  u, tauy )
 
 end subroutine op_fri
 
@@ -241,11 +233,11 @@ subroutine op_adv (ans, var, sch) !{{{1
 
   ! unaveraged velocity, interpolate to proper grid
   sch3d = spread( sch, 3, nk )
-  wka = up(tc)%x(1)%v / sch3d
+  wka = equv%uc / sch3d
   call ter_r3d( u, wka, guj, guj%ew )
 
   cos3d = spread(guj%rh,3,nk)
-  wka = up(tc)%x(2)%v / sch3d
+  wka = equv%vc / sch3d
   call ter_r3d( v, wka*cos3d, guj, guj%ns )
 
   wkap = wm%v / spread(ch%tc,3,nkp)
@@ -301,8 +293,8 @@ subroutine op_adv_ts (ans, var, wm) !{{{1
   sch = sqrt(sch)
 
   do k = 1, nk
-    um(:,:,k)%x(1) = up(tc)%x(1)%v(:,:,k) * sch
-    um(:,:,k)%x(2) = up(tc)%x(2)%v(:,:,k) * sch * guj%rh
+    um(:,:,k)%x(1) = equv%uc(:,:,k) * sch
+    um(:,:,k)%x(2) = equv%vc(:,:,k) * sch * guj%rh
   end do
 
   ! horizontal advection
@@ -431,16 +423,6 @@ subroutine ter_r2d(ans, var, hga, hgb, dft) !{{{1
   call mympi_swpbnd (ans)
 
 end subroutine ter_r2d
-
-subroutine ter_gm2d (ans, var) !{{{1
-  ! interpolate var to ans's grid
-  type (type_gvar_m2d) :: ans
-  type (type_gvar_m2d), intent(in) :: var
-
-  call ter_r2d( ans%x(1)%v, var%x(1)%v, var%x(1)%hg, ans%x(1)%hg )
-  call ter_r2d( ans%x(2)%v, var%x(2)%v, var%x(2)%hg, ans%x(2)%hg )
-
-end subroutine ter_gm2d
 
 subroutine ter_i3d(ans, var, hga, hgb, dft) !{{{1
   ! interpolate from grid hga to grid hgb
@@ -877,21 +859,32 @@ subroutine gra_r2d (ans, var, hga, hgb, hgc) !{{{1
 
 end subroutine gra_r2d
 
-subroutine gra_r2d_b (ans, var, hga, hgb, hgc) !{{{1
+subroutine gra_r2d_b (var, hg, grax, gray) !{{{1
   ! horizontal gradient operator
-  ! var on grid hga, output on (hgb, hgc)
-  type (type_gvar_m2d) :: ans
-  real (kind=wp),  dimension(ni,nj), intent(in) :: var
-  type (type_gi), target :: hga, hgb, hgc
+  ! var on grid hg, output on (hg%ew, hg%ns)
+  real (kind=wp), dimension(ni,nj), intent(in) :: var
+  type (type_gi), target :: hg
+  real (kind=wp), dimension(ni,nj) :: grax, gray
 
-  ans%x(1)%hg => hgb; ans%x(2)%hg => hgc
-
-  call p1_r2d( ans%x(1)%v, var, hga, hgb )
-  ans%x(1)%v = ans%x(1)%v / ( a * hgb%rh )
-  call p2_r2d( ans%x(2)%v, var, hga, hgc )
-  ans%x(2)%v = ans%x(2)%v / a
+  call p1_r2d( grax, var, hg, hg%ew )
+  grax = grax / ( a * hg%ew%rh )
+  call p2_r2d( gray, var, hg, hg%ns )
+  gray = gray / a
 
 end subroutine gra_r2d_b
+
+subroutine gra_r3d_b (ansx, ansy, var, ga, gb, gc) !{{{1
+  ! horizontal gradient operator for 3d scalar
+  ! var on grid ga, output on (gb, gc)
+  real (kind=wp),  dimension(:,:,:) :: ansx, ansy
+  real (kind=wp),  dimension(:,:,:), intent(in) :: var
+  type (type_gi) :: ga, gb, gc
+
+  call p1_r3d( ansx, var, ga, gb)
+  ansx = ansx / ( a * spread(gb%rh,3,size(var,3)) )
+  call p2_r3d( ansy, var, ga, gc)
+  ansy = ansy / a
+end subroutine gra_r3d_b
 
 subroutine gra_r3d (ans, var, ga, gb, gc) !{{{1
   ! horizontal gradient operator for 3d scalar
@@ -906,40 +899,7 @@ subroutine gra_r3d (ans, var, ga, gb, gc) !{{{1
   ans%x(2) = ans%x(2) / a
 end subroutine gra_r3d
 
-subroutine gra_gr2d (ans, var) !{{{1
-  ! gradient of var
-  type (type_gvar_m2d) :: ans
-  type (type_gvar_r2d), intent(in) :: var
-
-  ans%x(1)%hg => var%hg%ew
-  call p1_r2d( ans%x(1)%v, var%v, var%hg, ans%x(1)%hg )
-  ans%x(1)%v = ans%x(1)%v / ( a * ans%x(1)%hg%rh )
-
-  ans%x(2)%hg => var%hg%ns
-  call p2_r2d( ans%x(2)%v, var%v, var%hg, ans%x(2)%hg )
-  ans%x(2)%v = ans%x(2)%v / a
-
-end subroutine gra_gr2d
-
-subroutine gra_gr3d (ans, var) !{{{1
-  ! gradient of var
-  type (type_gvar_m3d) :: ans
-  type (type_gvar_r3d), intent(in) :: var
-
-  integer :: d3
-
-  d3 = size(var%v, 3)
-
-  ans%x(1)%g => var%g%ew
-  call p1_r3d( ans%x(1)%v, var%v, var%g%hg, ans%x(1)%g%hg )
-  ans%x(1)%v = ans%x(1)%v / ( a * spread(ans%x(1)%g%hg%rh, 3, d3) )
-
-  ans%x(2)%g => var%g%ns
-  call p2_r3d( ans%x(2)%v, var%v, var%g%hg, ans%x(2)%g%hg )
-  ans%x(2)%v = ans%x(2)%v / a
-
-end subroutine gra_gr3d
-subroutine lap_r2d (ans, var, ga, gb) !{{{1
+subroutine op_lap (ans, var, ga, gb) !{{{1
   ! horizontal Laplacian operator
   ! var on grid ga, output on grid gb
   real (kind=wp), dimension(ni,nj) :: ans
@@ -960,19 +920,7 @@ subroutine lap_r2d (ans, var, ga, gb) !{{{1
 
   ans = ans / ( a*a*gb%rh )
 
-end subroutine lap_r2d
-
-subroutine lap_gm2d (ans, var) !{{{1
-  ! Laplacian operator
-  type (type_gvar_m2d) :: ans
-  type (type_gvar_m2d), intent(in) :: var
-
-  ans%x(1)%hg => var%x(1)%hg
-  call lap_r2d( ans%x(1)%v, var%x(1)%v, var%x(1)%hg, ans%x(1)%hg )
-
-  ans%x(2)%hg => var%x(2)%hg
-  call lap_r2d( ans%x(2)%v, var%x(2)%v, var%x(2)%hg, ans%x(2)%hg )
-end subroutine lap_gm2d
+end subroutine op_lap
 
 subroutine int_tobot (ans, var, grd)!{{{1
   ! indefinite integration from current depth to the sea bottom

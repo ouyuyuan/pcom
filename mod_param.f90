@@ -3,13 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-10-24 10:23:37 BJT
+! Last Change: 2017-11-10 09:54:51 BJT
 
 module mod_param
 
   use mpi
   use mod_kind, only: sglp, wp
-  use mod_type, only: type_vars_info
+  use mod_type, only: type_vars_info, type_rst_info, type_var_info
 
   implicit none
   public
@@ -29,7 +29,10 @@ module mod_param
 
   ! output variable informations
   type (type_vars_info) :: vars_info
-  
+
+  ! restart file
+  type (type_rst_info) :: rst_info
+
   ! namelist parameters
   ! if you change this type definition, remember also change the following:
   !   1. read_namelist () in main.f90
@@ -42,13 +45,16 @@ module mod_param
     ! Begin/End Date for integration, in the form of yyyy-mm-dd hh:mm:ss
     character (len=80) :: bd, ed
     ! BaroTropic/BaroClinic time step
-    integer :: bt, bc 
+    integer :: bt, bc
+
+    ! output one restart file after output every 'rst_per' records
+    integer :: rst_per, rst
 
     ! Filename of Initial/Forcing file
     ! directory name of output files
     character (len=80) :: fi, ff, od
     ! output PER month or PER year 
-    character (len=80) :: per
+    character (len=80) :: out_per
   end type type_nm
   type (type_nm) :: nm
 
@@ -78,46 +84,55 @@ module mod_param
 
 contains !{{{1
 
-subroutine param_set_nc_vars ( ) !{{{1
+subroutine param_set_io ( ) !{{{1
   ! set output infomations
 
-  vars_info%pt%name = 'pt'
-  vars_info%pt%longname = 'potential temperature'
-  vars_info%pt%units = 'degrees Celcius'
+  call set_var_info (vars_info%pt, 'pt', &
+    'potential temperature', 'degrees Celcius', 'mean')
+  call set_var_info (vars_info%sa, 'sa', &
+    'salinity', 'psu', 'mean')
+  call set_var_info (vars_info%u, 'u', &
+    'zonal velocity', 'm/s', 'mean')
+  call set_var_info (vars_info%v, 'v', &
+    'meridional velocity', 'm/s', 'mean')
+  call set_var_info (vars_info%w, 'w', &
+    'vertical velocity', 'm/s', 'mean')
+  call set_var_info (vars_info%rho, 'rho', &
+    'sea water density', 'kg/m^3', 'mean')
+  call set_var_info (vars_info%ssh, 'ssh', &
+    'sea surface height', 'm', 'mean')
+  call set_var_info (vars_info%ch, 'ch', &
+    'normalized sea bottom pressure', '', 'mean')
+  call set_var_info (vars_info%prh, 'prh', &
+    'reference state: sea bottom pressure (T-grid)', 'Pa', 'mean')
 
-  vars_info%sa%name = 'sa'
-  vars_info%sa%longname = 'salinity'
-  vars_info%sa%units = 'psu'
+  ! set restart infomations
+  if (nm%rst == 1) rst_info%fname = trim(nm%od)//'restart.nc'
+  if (myid == mid) &
+    print *, "I'm going for a restart-run from "//trim(rst_info%fname)
 
-  vars_info%u%name = 'u'
-  vars_info%u%longname = 'zonal velocity'
-  vars_info%u%units = 'm/s'
+  call set_var_info (rst_info%ch, vars_info%ch%name, &
+    vars_info%ch%longname, vars_info%ch%units, 'restart')
 
-  vars_info%v%name = 'v'
-  vars_info%v%longname = 'meridional velocity'
-  vars_info%v%units = 'm/s'
+  call set_var_info (rst_info%pt, vars_info%pt%name, &
+    vars_info%pt%longname, vars_info%pt%units, 'restart')
 
-  vars_info%w%name = 'w'
-  vars_info%w%longname = 'vertical velocity'
-  vars_info%w%units = 'm/s'
-
-  vars_info%rho%name = 'rho'
-  vars_info%rho%longname = 'sea water density'
-  vars_info%rho%units = 'kg/m^3'
-
-  vars_info%ssh%name = 'ssh'
-  vars_info%ssh%longname = 'sea surface height'
-  vars_info%ssh%units = 'm'
-
-  vars_info%ch%name = 'ch'
-  vars_info%ch%longname = 'normalized sea bottom pressure'
-  vars_info%ch%units = ''
+  call set_var_info (rst_info%sa, vars_info%sa%name, &
+    vars_info%sa%longname, vars_info%sa%units, 'restart')
   
-  vars_info%prh%name = 'prh'
-  vars_info%prh%longname = 'reference state: sea bottom pressure (T-grid)'
-  vars_info%prh%units = 'Pa'
-  
-end subroutine param_set_nc_vars
+end subroutine param_set_io
+
+subroutine set_var_info ( var_info, varname, longname, units, vartype ) !{{{1
+  ! set variable infomation
+  type (type_var_info) :: var_info
+  character (len=*), intent(in) :: varname, longname, units, vartype
+
+  var_info%name     = varname
+  var_info%longname = longname
+  var_info%units    = units
+  var_info%vartype  = vartype
+
+end subroutine set_var_info
 
 subroutine print_my (one) !{{{1
   ! print one define in mod_param
@@ -143,7 +158,7 @@ subroutine param_set_nm ( nm ) !{{{1
   integer :: npy, npx
 
   character (len=80) :: bdate, edate
-  integer :: dtbt, dtbc
+  integer :: dtbt, dtbc, restart_per, restart_run
 
   character (len=80) :: fname_ini, fname_frc, out_dir, out_per
 
@@ -152,7 +167,8 @@ subroutine param_set_nm ( nm ) !{{{1
 
   namelist /mpi_ctrl/ npy, npx
   namelist /time_ctrl/ bdate, edate, dtbt, dtbc
-  namelist /io_ctrl/ fname_ini, fname_frc, out_dir, out_per
+  namelist /io_ctrl/ fname_ini, fname_frc, out_dir, out_per, &
+           restart_per, restart_run
 
   open(fid_nam, file='namelist')
   read(fid_nam, mpi_ctrl)
@@ -179,10 +195,12 @@ subroutine param_set_nm ( nm ) !{{{1
   nm%bt = dtbt
   nm%bc = dtbc
 
-  nm%fi = fname_ini
-  nm%ff = fname_frc
-  nm%od = out_dir
-  nm%per= out_per
+  nm%fi  = fname_ini
+  nm%ff  = fname_frc
+  nm%od  = out_dir
+  nm%out_per = out_per
+  nm%rst_per = restart_per
+  nm%rst     = restart_run
 
 end subroutine param_set_nm
 

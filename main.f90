@@ -3,30 +3,28 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-10-24 10:24:40 BJT
+! Last Change: 2017-11-26 10:27:05 BJT
 
 program main
 
   ! imported variables !{{{1
   !-------------------------------------------------------=-
   use mod_arrays, only: &
-    adv, arrays_init, &
+    arrays_init, &
     cv1, cv2, &
     g1j, g2j, g3j, g4j, gtj, guj, &
     gi1, gi2, git, giw, g12, g32, gt, gu, &
-    acts, acuv, acw, acrho, acssh, acch, & 
+    acw, acssh, acch, & 
     am, arrays_allocate, &
     bnd, bphi, bgraphi, &
-    badv, &
-    frc, cor, fri, &
-    glo_lat, glo_lon, graphih, grapa, &
-    hpos, &
+    frc, cor, &
+    glo_lat, glo_lon, graphihx, graphihy, &
+    hposx, hposy, &
     km, kh, &
     lon, lat, &
     alpha, adp, &
     ch, prho, &
-    ts, &
-    up, upb, &
+    eqts, equv, equvb, &
     wm, &
     z
     
@@ -39,8 +37,7 @@ program main
     int_pgra, int_readyc, int_clin, int_ts, &
     int_ssh
 
-  use mod_io, only: io_get_dim_len, io_read, &
-    io_quick_output
+  use mod_io, only: io_get_dim_len, io_read, io_create_rst
 
   use mod_kind, only: wp, zero, lint
 
@@ -48,8 +45,7 @@ program main
 
   use mod_mympi, only: &
     mympi_div, mympi_divx, mympi_divy, &
-    mympi_output, mympi_swpbnd, mympi_bcast, &
-    mympi_quick_output
+    mympi_output, mympi_swpbnd, mympi_bcast
 
   use mod_op, only: op_ter, op_gra
 
@@ -58,20 +54,20 @@ program main
     glo_ni, glo_nj, &
     ni, nj, nk, nim, njm, nkp, vars_info, &
     myid, npro, mid, &
-    param_set_my, param_set_nm, param_set_nc_vars, &
+    param_set_my, param_set_nm, param_set_io, &
     print_my, &
+    rst_info, &
     tc, tp
 
   use mod_type, only: &
-    type_accu_gm3d, type_accu_gr3d, type_accu_gr2d, &
+    type_accu_gr3d, type_accu_gr2d, &
     type_gi, type_gj, type_gij, &
-    type_str2time, &
-    type_str2sec, type_mat, &
+    type_str2time, type_time2str, type_str2sec, &
     type_frc, tctr, type_tctr, &
-    type_gvar_m2d, type_gvar_m3d, &
     type_gvar_r2d, type_gvar_r3d, &
     type_bintgu, &
     type_check_date, &
+    type_eq_ts, &
     operator (+), operator (<)
 
   ! local variables !{{{1
@@ -108,7 +104,7 @@ program main
   call set_cf( km%v, kh%v )
 
 !   calc. variables depend on grid position
-  call calc_hpos (hpos)
+  call calc_hpos ()
 
   ! setting stagger grids
   call set_hgrid (g1j, g2j, g3j, g4j, gtj, guj) 
@@ -122,17 +118,15 @@ program main
   call calc_cf( cv1, cv2 )
 
   ! Coriolis force
-  cor%v = 2.0*omega*sin(hpos(:,:,cor%hg%n)%x(2))
+  cor%v = 2.0*omega*sin(hposy(:,:,cor%hg%n))
 
   ! prepare initial state of the ocean
-  call inistat(ts, frc, graphih)
+  call inistat(eqts, frc, graphihx, graphihy)
 
   ! integration cycle !{{{1
 
   ! time prepare !{{{2
-  tctr%ct = type_str2time (nm%bd)
-  tctr%pt = tctr%ct
-  tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(nm%bd) ) / nm%bc
+  call init_tctr ()
 
   ! baroclinic integrate !{{{2
 
@@ -150,32 +144,36 @@ program main
     end if
 
     ! calc. the specific volume, reciprocal of density
-    call den_alpha (alpha%v, ts(tc), ch%tc, gt%msk)
+    call den_alpha (alpha%v, eqts%tc, eqts%sc, ch%tc, gt%msk)
 
     ! calc. pressure gradient forces
     call int_pgra (adp, bphi, bgraphi)
 
     ! prepare for baroclinic integration
-    call int_readyc (grapa, badv, adv, fri, wm)
-!    call mympi_quick_output('output/test.nc', 'var', &
-!      badv%x(1)%v, glo_lon, glo_lat) !DEBUG
+    call int_readyc (equv, equvb, wm)
 
     ! integrate series time steps per baroclinic time step
-    call int_trop (ch, upb, acch)
+    call int_trop (ch, equvb, acch)
 
     ! prediction of baroclinic mode
-    call int_clin (up, acuv, am%v)
+    call int_clin (equv, am%v)
 
     ! calc. sea surface height
     call int_ssh (acssh, alpha%v)
 
     ! prediction of temperature and salinity
-    call int_ts (ts, acts, acrho, acw, wm)
+    call int_ts (eqts, acw, wm)
 
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
 
-    call check_output (acts, acuv, acw, acrho, acssh, acch)
+    ! output at proper time
+    if ( ((tctr%ct%h/=tctr%pt%h).and.(nm%out_per.eq.'hour'))  .or. &
+         ((tctr%ct%d/=tctr%pt%d).and.(nm%out_per.eq.'day'))   .or. &
+         ((tctr%ct%m/=tctr%pt%m).and.(nm%out_per.eq.'month')) .or. &
+         ((tctr%ct%y/=tctr%pt%y).and.(nm%out_per.eq.'year')) ) then
+      call output (acw, acssh, acch)
+    end if
   end do
 
   ! finish integration !{{{1
@@ -183,7 +181,7 @@ program main
     write (*, *) ''
     write (*, '(a)') 'Done model run.'
     write (*, '(a, i9, a)') &
-      'Integrated for ', tctr%nt, ' baroclinic time steps.'
+      'Integrated for total ', tctr%nt, ' baroclinic time step(s).'
   end if
 
   call mpi_finalize (err)
@@ -193,11 +191,6 @@ contains  !{{{1
 subroutine init () !{{{1
   ! initialize model environment
   
-  ! set nc_variable infomations !{{{2
-  if ( myid == mid ) then
-    call param_set_nc_vars ( )
-  end if
-
   ! get namelist !{{{2
 
   ! although we can read in namelist in all processors, 
@@ -208,21 +201,10 @@ subroutine init () !{{{1
     call type_check_date(nm%bd)
     call type_check_date(nm%ed)
   end if
+  call broadcast_nm ()
 
-  call mympi_bcast (nm%px)
-  call mympi_bcast (nm%py)
-
-  call mympi_bcast (nm%bd)
-  call mympi_bcast (nm%ed)
-
-  call mympi_bcast (nm%bt)
-  call mympi_bcast (nm%bc)
-
-  call mympi_bcast (nm%fi)
-  call mympi_bcast (nm%ff)
-  call mympi_bcast (nm%od)
-
-  call mympi_bcast (nm%per)
+  ! set nc_variable infomations
+  call param_set_io ()
 
   ! determine dimensions !{{{2
 
@@ -310,15 +292,12 @@ subroutine set_cf (km, kh) !{{{2
 
 end subroutine set_cf
 
-subroutine calc_hpos (hpos) !{{{1
-  ! calc. horizontal position on grid 1/2/3/4
+subroutine calc_hpos () !{{{1
+  ! calc. horizontal position (hposx, hposy) on grid 1/2/3/4
   ! (lon, lat) in I/O file is on grid 4
 
-  type (type_mat), dimension(ni,nj,4) :: hpos
-
+  real (kind=wp) :: px, py, loni, latj
   integer :: i, j
-  type (type_mat) :: p
-  real (kind=wp) :: loni, latj
 
   ! inner area !{{{2
   do j = 2, njm
@@ -326,49 +305,50 @@ subroutine calc_hpos (hpos) !{{{1
     !westest/eastest longitude wrap up
     loni = lon(i)
     latj = (lat(j) + lat(j-1)) * 0.5
-    p%x(1) = loni
-    p%x(2) = latj
-    hpos(i,j,1)%x(1) = p%x(1) * torad
-    hpos(i,j,1)%x(2) = p%x(2) * torad
+    px = loni
+    py = latj
+    hposx(i,j,1) = px * torad
+    hposy(i,j,1) = py * torad
 
     loni = (lon(i) + lon(i+1)) * 0.5
     ! the 'eastest' point will be 360.0 degree, for keeping
     !   monotonous, we donot change it to 0 degree
     if ( lon(i+1) < lon(i) ) loni = (lon(i) + lon(i+1)+360) * 0.5
     latj = (lat(j) + lat(j-1)) * 0.5
-    p%x(1) = loni
-    p%x(2) = latj
-    hpos(i,j,2)%x(1) = p%x(1) * torad
-    hpos(i,j,2)%x(2) = p%x(2) * torad
+    px = loni
+    py = latj
+    hposx(i,j,2) = px * torad
+    hposy(i,j,2) = py * torad
 
     loni = (lon(i) + lon(i+1)) * 0.5
     if ( lon(i+1) < lon(i) ) loni = (lon(i) + lon(i+1)+360) * 0.5
     latj = lat(j)
-    p%x(1) = loni
-    p%x(2) = latj
-    hpos(i,j,3)%x(1) = p%x(1) * torad
-    hpos(i,j,3)%x(2) = p%x(2) * torad
+    px = loni
+    py = latj
+    hposx(i,j,3) = px * torad
+    hposy(i,j,3) = py * torad
 
     loni = lon(i)
     latj = lat(j)
-    p%x(1) = loni
-    p%x(2) = latj
-    hpos(i,j,4)%x(1) = p%x(1) * torad
-    hpos(i,j,4)%x(2) = p%x(2) * torad
+    px = loni
+    py = latj
+    hposx(i,j,4) = px * torad
+    hposy(i,j,4) = py * torad
   end do
   end do
-  call mympi_swpbnd (hpos)
+  call mympi_swpbnd (hposx)
+  call mympi_swpbnd (hposy)
 
   ! extropolate  !{{{2
 
   if (my%gs == 1) then
-    hpos(:,1,:)%x(1) = 2*hpos(:,2,:)%x(1) - hpos(:,3,:)%x(1)
-    hpos(:,1,:)%x(2) = 2*hpos(:,2,:)%x(2) - hpos(:,3,:)%x(2)
+    hposx(:,1,:) = 2*hposx(:,2,:) - hposx(:,3,:)
+    hposy(:,1,:) = 2*hposy(:,2,:) - hposy(:,3,:)
   end if
 
   if (my%gn == glo_nj) then
-    hpos(:,nj,:)%x(1) = 2*hpos(:,nj-1,:)%x(1) - hpos(:,nj-2,:)%x(1)
-    hpos(:,nj,:)%x(2) = 2*hpos(:,nj-1,:)%x(2) - hpos(:,nj-2,:)%x(2)
+    hposx(:,nj,:) = 2*hposx(:,nj-1,:) - hposx(:,nj-2,:)
+    hposy(:,nj,:) = 2*hposy(:,nj-1,:) - hposy(:,nj-2,:)
   end if
 
 end subroutine calc_hpos
@@ -384,27 +364,27 @@ subroutine set_hgrid (g1j, g2j, g3j, g4j, gtj, guj) !{{{1
   do j = 2, njm
   do i = 2, nim
     !westest/eastest longitude wrap up
-    dx1 = hpos(i,j,2)%x(1) - hpos(i-1,j,2)%x(1)
+    dx1 = hposx(i,j,2) - hposx(i-1,j,2)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
-    dx2 = hpos(i,j,4)%x(2) - hpos(i,j-1,4)%x(2)
+    dx2 = hposy(i,j,4) - hposy(i,j-1,4)
     g1j%dx(i,j)%x(1) = dx1
     g1j%dx(i,j)%x(2) = dx2
 
-    dx1 = hpos(i+1,j,1)%x(1) - hpos(i,j,1)%x(1)
+    dx1 = hposx(i+1,j,1) - hposx(i,j,1)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
-    dx2 = hpos(i,j,3)%x(2) - hpos(i,j-1,3)%x(2)
+    dx2 = hposy(i,j,3) - hposy(i,j-1,3)
     g2j%dx(i,j)%x(1) = dx1
     g2j%dx(i,j)%x(2) = dx2
 
-    dx1 = hpos(i+1,j,4)%x(1) - hpos(i,j,4)%x(1)
+    dx1 = hposx(i+1,j,4) - hposx(i,j,4)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
-    dx2 = hpos(i,j+1,2)%x(2) - hpos(i,j,2)%x(2)
+    dx2 = hposy(i,j+1,2) - hposy(i,j,2)
     g3j%dx(i,j)%x(1) = dx1
     g3j%dx(i,j)%x(2) = dx2
 
-    dx1 = hpos(i,j,3)%x(1) - hpos(i-1,j,3)%x(1)
+    dx1 = hposx(i,j,3) - hposx(i-1,j,3)
     if ( dx1 < 0 ) dx1 = dx1 + 360.0*torad
-    dx2 = hpos(i,j+1,1)%x(2) - hpos(i,j,1)%x(2)
+    dx2 = hposy(i,j+1,1) - hposy(i,j,1)
     g4j%dx(i,j)%x(1) = dx1
     g4j%dx(i,j)%x(2) = dx2
   end do
@@ -448,15 +428,15 @@ subroutine set_hgrid (g1j, g2j, g3j, g4j, gtj, guj) !{{{1
 
   do j = 1, nj
   do i = 1, ni
-    g1j%rh(i,j) = cos( hpos(i,j,1)%x(2) )
-    g2j%rh(i,j) = cos( hpos(i,j,2)%x(2) )
-    g3j%rh(i,j) = cos( hpos(i,j,3)%x(2) )
-    g4j%rh(i,j) = cos( hpos(i,j,4)%x(2) )
+    g1j%rh(i,j) = cos( hposy(i,j,1) )
+    g2j%rh(i,j) = cos( hposy(i,j,2) )
+    g3j%rh(i,j) = cos( hposy(i,j,3) )
+    g4j%rh(i,j) = cos( hposy(i,j,4) )
 
-    g1j%tn(i,j) = tan( hpos(i,j,1)%x(2) )
-    g2j%tn(i,j) = tan( hpos(i,j,2)%x(2) )
-    g3j%tn(i,j) = tan( hpos(i,j,3)%x(2) )
-    g4j%tn(i,j) = tan( hpos(i,j,4)%x(2) )
+    g1j%tn(i,j) = tan( hposy(i,j,1) )
+    g2j%tn(i,j) = tan( hposy(i,j,2) )
+    g3j%tn(i,j) = tan( hposy(i,j,3) )
+    g4j%tn(i,j) = tan( hposy(i,j,4) )
   end do
   end do
 
@@ -633,79 +613,153 @@ subroutine calc_cf (cv1, cv2) !{{{1
 
   ! pcom 1.0 use this inderct method instead of directly use tan function
   ! these two ways differ a little bit
-!  temp = tan( hpos(:,:,3)%x(2) )
-  temp = sqrt(1-cos(hpos(:,:,3)%x(2))**2) / cos(hpos(:,:,3)%x(2))
+!  temp = tan( hposy(:,:,3) )
+  temp = sqrt(1-cos(hposy(:,:,3))**2) / cos(hposy(:,:,3))
   cv1 = (1 - temp*temp) / a**2
   cv2 = 2*temp / a
 
 end subroutine calc_cf
 
-subroutine inistat (ts, frc, graphih) !{{{1
-  ! prepare the initial state of the ocean
-  type (type_gvar_m3d) :: ts(2)
-  type (type_frc) :: frc
-  type (type_gvar_m2d) :: graphih
+subroutine init_tctr () !{{{1
+! initialize time control variable
 
-  type (type_mat), dimension(ni,nj) :: wk
-  real (kind=wp), allocatable, dimension(:,:,:) :: glo_pt, glo_sa
-  type (type_frc) :: glo_frc
-  integer :: is
+  if (nm%rst == 1) then
+    if (myid == mid) then
+      call io_read (trim(rst_info%fname), 'cdate', rst_info%cdate)
+      call io_read (trim(rst_info%fname), 'pdate', rst_info%pdate)
+    end if
+    call mympi_bcast (rst_info%cdate)
+    call mympi_bcast (rst_info%pdate)
 
-  if ( myid == mid ) then
-    ! 12 months forcing
-    call arrays_init(glo_frc%tau%x(1), glo_ni,glo_nj,12, zero, frc%tau%x(1)%g)
-    call arrays_init(glo_frc%tau%x(2), glo_ni,glo_nj,12, zero, frc%tau%x(2)%g)
-    call arrays_init(glo_frc%ts%x(1),  glo_ni,glo_nj,12, zero, frc%ts%x(1)%g)
-    call arrays_init(glo_frc%ts%x(2),  glo_ni,glo_nj,12, zero, frc%ts%x(2)%g)
-    call arrays_init(glo_frc%pa,       glo_ni,glo_nj,12, zero, frc%pa%g)
-    call arrays_init(glo_frc%fw,       glo_ni,glo_nj,12, zero, frc%fw%g)
+    tctr%ct = type_str2time (rst_info%cdate)
+    tctr%pt = type_str2time (rst_info%pdate)
+    tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(rst_info%cdate) ) / nm%bc
 
-    allocate(glo_pt(glo_ni, glo_nj, nk), stat=is); call chk(is)
-    glo_pt = 0.0
-    allocate(glo_sa(glo_ni, glo_nj, nk), stat=is); call chk(is)
-    glo_sa = 0.0
-
-    call io_read (nm%fi, 'pt',  glo_pt)
-    call io_read (nm%fi, 'sa',  glo_sa)
-
-    call io_read (nm%ff, 'taux', glo_frc%tau%x(1)%v) 
-    call io_read (nm%ff, 'tauy', glo_frc%tau%x(2)%v) 
-
-    call io_read (nm%ff, 'bct', glo_frc%ts%x(1)%v) 
-    call io_read (nm%ff, 'bcs', glo_frc%ts%x(2)%v) 
-
-    call io_read (nm%ff, 'pa', glo_frc%pa%v) 
-
-    call io_read (nm%ff, 'fw', glo_frc%fw%v) 
+  else 
+    tctr%ct = type_str2time (nm%bd)
+    tctr%pt = tctr%ct
+    tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(nm%bd) ) / nm%bc
   end if
 
-  call mympi_div (glo_frc%tau, frc%tau)
-  call mympi_div (glo_frc%ts, frc%ts)
+end subroutine init_tctr
+
+subroutine inistat (eqts, frc, graphihx, graphihy) !{{{1
+  ! prepare the initial state of the ocean
+  type (type_eq_ts) :: eqts
+  type (type_frc) :: frc
+  type (type_gvar_r2d) :: graphihx, graphihy
+
+  real (kind=wp), dimension(ni,nj) :: wkx, wky
+  real (kind=wp), allocatable, dimension(:,:,:) :: glo_pt, glo_sa
+  type (type_frc) :: glo_frc
+
+  ! initial info for restart run
+  if (nm%rst == 1)  then
+    if (myid == mid) then
+      rst_info%fname = trim(nm%od)//'restart.nc'
+      print *, "I'm going for a restart-run from "//trim(rst_info%fname)
+      call io_read (trim(rst_info%fname), 'cdate', rst_info%cdate)
+      call io_read (trim(rst_info%fname), 'pdate', rst_info%pdate)
+    end if
+
+    call mympi_bcast (rst_info%cdate)
+    call mympi_bcast (rst_info%pdate)
+  end if
+
+  if ( myid == mid ) call get_init_frc (glo_pt, glo_sa, glo_frc)
+
+  call mympi_div (glo_frc%taux, frc%taux)
+  call mympi_div (glo_frc%tauy, frc%tauy)
+  call mympi_div (glo_frc%t, frc%t)
+  call mympi_div (glo_frc%s, frc%s)
   call mympi_div (glo_frc%pa, frc%pa)
   call mympi_div (glo_frc%fw, frc%fw)
 
   ! forcing on land set to zero (no forcing)
   !!! potential bug, missing is not all at land of input file
 !  where (spread(g12%lev, 3, 12) == 0)
-  where (frc%tau%x(1)%v == missing_float)
-    frc%tau%x(1)%v = 0.0 
-    frc%tau%x(2)%v = 0.0 
-    frc%ts%x(1)%v = 0.0 
-    frc%ts%x(2)%v = 0.0 
+  where (frc%taux%v == missing_float)
+    frc%taux%v = 0.0 
+    frc%tauy%v = 0.0 
+    frc%t%v = 0.0 
+    frc%s%v = 0.0 
     frc%pa%v = 0.0 
     frc%fw%v = 0.0 
   end where
 
   ! initial (T, S)
-  call mympi_div (glo_pt, ts(tc)%x(1))
-  call mympi_div (glo_sa, ts(tc)%x(2))
-  ts(tp) = ts(tc)
+  call mympi_div (glo_pt, eqts%tc)
+  call mympi_div (glo_sa, eqts%sc)
+  eqts%tp = eqts%tc
+  eqts%sp = eqts%sc
 
   !! why not average before differentiate?
-  call op_gra( wk, gt%phih, gtj, gtj%ew, gtj%ns)
-  call op_ter( graphih%x(1)%v, wk%x(1), gtj%ew, graphih%x(1)%hg )
-  call op_ter( graphih%x(2)%v, wk%x(2), gtj%ns, graphih%x(2)%hg )
+  call op_gra( gt%phih, gtj, wkx, wky)
+  call op_ter( graphihx%v, wkx, gtj%ew, graphihx%hg )
+  call op_ter( graphihy%v, wky, gtj%ns, graphihy%hg )
+
 end subroutine inistat
+
+subroutine get_init_frc (glo_pt, glo_sa, glo_frc) !{{{1
+! get initial and forcing field from external file in mid
+  real (kind=wp), allocatable, dimension(:,:,:) :: glo_pt, glo_sa
+  type (type_frc) :: glo_frc
+  integer :: is
+  character (len=80) :: ncname
+
+  ! 12 months forcing
+  call arrays_init(glo_frc%taux, glo_ni,glo_nj,12, zero, frc%taux%g)
+  call arrays_init(glo_frc%tauy, glo_ni,glo_nj,12, zero, frc%tauy%g)
+  call arrays_init(glo_frc%t,  glo_ni,glo_nj,12, zero, frc%t%g)
+  call arrays_init(glo_frc%s,  glo_ni,glo_nj,12, zero, frc%s%g)
+  call arrays_init(glo_frc%pa,       glo_ni,glo_nj,12, zero, frc%pa%g)
+  call arrays_init(glo_frc%fw,       glo_ni,glo_nj,12, zero, frc%fw%g)
+
+  allocate(glo_pt(glo_ni, glo_nj, nk), stat=is); call chk(is)
+  glo_pt = 0.0
+  allocate(glo_sa(glo_ni, glo_nj, nk), stat=is); call chk(is)
+  glo_sa = 0.0
+
+  ncname = nm%fi
+  if (nm%rst == 1) ncname = rst_info%fname
+
+  call io_read (ncname, 'pt',  glo_pt)
+  call io_read (ncname, 'sa',  glo_sa)
+
+  ncname = nm%ff
+
+  call io_read (ncname, 'taux', glo_frc%taux%v) 
+  call io_read (ncname, 'tauy', glo_frc%tauy%v) 
+
+  call io_read (ncname, 'bct', glo_frc%t%v) 
+  call io_read (ncname, 'bcs', glo_frc%s%v) 
+
+  call io_read (ncname, 'pa', glo_frc%pa%v) 
+
+  call io_read (ncname, 'fw', glo_frc%fw%v) 
+
+end subroutine get_init_frc
+
+subroutine broadcast_nm () !{{{1
+! broad cast namelist from mid to all ids
+  call mympi_bcast (nm%px)
+  call mympi_bcast (nm%py)
+
+  call mympi_bcast (nm%bd)
+  call mympi_bcast (nm%ed)
+
+  call mympi_bcast (nm%bt)
+  call mympi_bcast (nm%bc)
+
+  call mympi_bcast (nm%fi)
+  call mympi_bcast (nm%ff)
+  call mympi_bcast (nm%od)
+
+  call mympi_bcast (nm%out_per)
+  call mympi_bcast (nm%rst_per)
+  call mympi_bcast (nm%rst)
+
+end subroutine broadcast_nm
 
 subroutine write_dim_info (fid) !{{{1
 
@@ -727,68 +781,69 @@ subroutine write_dim_info (fid) !{{{1
 
 end subroutine write_dim_info
 
-subroutine check_output (acts, acuv, acw, acrho, acssh, acch) !{{{1
-  type (type_accu_gm3d) :: acts, acuv
-  type (type_accu_gr3d) :: acrho, acw
+subroutine output (acw, acssh, acch) !{{{1
+  ! time averaged model output
+  type (type_accu_gr3d) :: acw
   type (type_accu_gr2d) :: acssh, acch
 
-  ! the print elapsed time infos if neccessary
-  if ( nm%per.eq.'hour' ) then 
+  integer, save :: nrec = 0
+
+  ! print elapsed time infos if neccessary
+  if ( nm%out_per.eq.'hour' ) then 
     if ( tctr%ct%h /= tctr%pt%h ) call print_time_per_hour (tctr) 
   else 
     if ( tctr%ct%d /= tctr%pt%d ) call print_time_per_day (tctr)
   end if
 
-  ! output if time is proper
-  if ( ((tctr%ct%h/=tctr%pt%h).and.(nm%per.eq.'hour'))  .or. &
-       ((tctr%ct%d/=tctr%pt%d).and.(nm%per.eq.'day'))   .or. &
-       ((tctr%ct%m/=tctr%pt%m).and.(nm%per.eq.'month')) .or. &
-       ((tctr%ct%y/=tctr%pt%y).and.(nm%per.eq.'year')) ) then
+  call mympi_output (equv)
+  call mympi_output (vars_info%w, acw, gu%msk)
 
-    call mympi_output (vars_info%pt, vars_info%sa, acts)
+  call mympi_output (eqts)
 
-    call mympi_output (vars_info%rho, acrho, gt%msk)
+  call mympi_output (vars_info%ch, acch, gt%msk(:,:,1))
 
-    call mympi_output (vars_info%u, vars_info%v, acuv, gu%msk)
-    call mympi_output (vars_info%w, acw, gu%msk)
+  ! calc. fluctuation of ssh, minus global mean
+  call mympi_output (vars_info%ssh, &
+    acssh, acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
 
-    call mympi_output (vars_info%ch, acch, gt%msk(:,:,1))
-
-    ! calc. fluctuation of ssh, minus global mean
-    call mympi_output (vars_info%ssh, &
-      acssh, acssh%var%hg%rh*gt%msk(:,:,1), gt%msk(:,:,1))
-
+  nrec = nrec + 1
+  ! output restart file
+  if ( mod(nrec, nm%rst_per) == 0 ) then
+    if ( myid == mid ) call io_create_rst ( rst_info )
+    call mympi_output ( rst_info%ch, ch%tc )
+    call mympi_output ( rst_info%pt, eqts%tc )
+    call mympi_output ( rst_info%sa, eqts%sc )
   end if
 
-end subroutine check_output
+end subroutine output
 
-subroutine print_time_per_hour (tctr)
+subroutine print_time_per_hour (tctr) !{{{1
     type (type_tctr):: tctr
 
     tctr%t2 = mpi_wtime ()
 
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
-      'integrate for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ' ', tctr%ct%h, ':00:00 use ', tctr%t2 - tctr%t1, &
+      'integrated for ', tctr%pt%y, '-', tctr%pt%m, &
+      '-', tctr%pt%d, ' ', tctr%ct%h, ':00:00,  used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2
-end subroutine 
+end subroutine print_time_per_hour
 
-subroutine print_time_per_day (tctr)
+subroutine print_time_per_day (tctr) !{{{1
     type (type_tctr):: tctr
 
     tctr%t2 = mpi_wtime ()
 
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
-      'integrate for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ' used ', tctr%t2 - tctr%t1, &
+      'integrated for ', tctr%pt%y, '-', tctr%pt%m, &
+      '-', tctr%pt%d, ', used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2
-end subroutine 
+end subroutine print_time_per_day
 
 subroutine chk( ista ) !{{{1
   ! check state of allocate array 

@@ -3,13 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-20 17:55:29 BJT
+! Last Change: 2017-11-07 10:12:25 BJT
 
 module mod_param
 
   use mpi
   use mod_kind, only: sglp, wp
-  use mod_type, only: type_nc_vars
+  use mod_type, only: type_vars_info, type_rst_info
 
   implicit none
   public
@@ -28,46 +28,10 @@ module mod_param
   type (type_my), allocatable :: our(:)
 
   ! output variable informations
-  type (type_nc_vars) :: nc_vars
-  
-  ! output variable names
-  type :: type_names
-    character (len=2) :: pt = 'pt'
-    character (len=2) :: sa = 'sa'
-    character (len=1) :: u = 'u'
-    character (len=1) :: v = 'v'
-    character (len=1) :: w = 'w'
-    character (len=len('rho')) :: rho = 'rho'
-    character (len=len('ssh')) :: ssh = 'ssh'
-    character (len=len('ph')) :: ph = 'ph'
-  end type type_names
-  type (type_names) :: names 
+  type (type_vars_info) :: vars_info
 
-  ! long name of variables
-  type :: type_longnames
-    character (len=len('potential temperature')) :: pt = 'potential temperature'
-    character (len=len('salinity')) :: sa = 'salinity'
-    character (len=len('zonal velocity')) :: u = 'zonal velocity'
-    character (len=len('meridional velocity')) :: v = 'meridional velocity'
-    character (len=len('vertical velocity')) :: w = 'vertical velocity'
-    character (len=len('sea water density')) :: rho = 'sea water density'
-    character (len=len('sea surface height')) :: ssh = 'sea surface height'
-    character (len=len('sea bottom pressure')) :: ph = 'sea bottom pressure'
-  end type type_longnames
-  type (type_longnames) :: longnames 
-
-  ! units of variables
-  type :: type_units
-    character( len=len('degrees Celcius') ) :: pt = 'degrees Celcius'
-    character( len=len('psu') ) :: sa = 'psu'
-    character( len=len('m/s') ) :: u = 'm/s'
-    character( len=len('m/s') ) :: v = 'm/s'
-    character( len=len('m/s') ) :: w = 'm/s'
-    character( len=len('kg/m^3') ) :: rho = 'kg/m^3'
-    character( len=len('m') ) :: ssh = 'm'
-    character( len=len('Pa') ) :: ph = 'Pa'
-  end type type_units
-  type (type_units) :: units
+  ! restart file
+  type (type_rst_info) :: rst_info
 
   ! namelist parameters
   ! if you change this type definition, remember also change the following:
@@ -81,13 +45,16 @@ module mod_param
     ! Begin/End Date for integration, in the form of yyyy-mm-dd hh:mm:ss
     character (len=80) :: bd, ed
     ! BaroTropic/BaroClinic time step
-    integer :: bt, bc 
+    integer :: bt, bc
+
+    ! output one restart file after output every 'rst_per' records
+    integer :: rst_per, rst
 
     ! Filename of Initial/Forcing file
     ! directory name of output files
     character (len=80) :: fi, ff, od
     ! output PER month or PER year 
-    character (len=80) :: per
+    character (len=80) :: out_per
   end type type_nm
   type (type_nm) :: nm
 
@@ -120,37 +87,49 @@ contains !{{{1
 subroutine param_set_nc_vars ( ) !{{{1
   ! set output infomations
 
-  nc_vars%pt%name = 'pt'
-  nc_vars%pt%longname = 'potential temperature'
-  nc_vars%pt%unit = 'degrees Celcius'
+  vars_info%pt%name = 'pt'
+  vars_info%pt%longname = 'potential temperature'
+  vars_info%pt%units = 'degrees Celcius'
 
-  nc_vars%sa%name = 'sa'
-  nc_vars%sa%longname = 'salinity'
-  nc_vars%sa%unit = 'psu'
+  vars_info%sa%name = 'sa'
+  vars_info%sa%longname = 'salinity'
+  vars_info%sa%units = 'psu'
 
-  nc_vars%u%name = 'u'
-  nc_vars%u%longname = 'zonal velocity'
-  nc_vars%u%unit = 'm/s'
+  vars_info%u%name = 'u'
+  vars_info%u%longname = 'zonal velocity'
+  vars_info%u%units = 'm/s'
 
-  nc_vars%v%name = 'v'
-  nc_vars%v%longname = 'meridional velocity'
-  nc_vars%v%unit = 'm/s'
+  vars_info%v%name = 'v'
+  vars_info%v%longname = 'meridional velocity'
+  vars_info%v%units = 'm/s'
 
-  nc_vars%w%name = 'w'
-  nc_vars%w%longname = 'vertical velocity'
-  nc_vars%w%unit = 'm/s'
+  vars_info%w%name = 'w'
+  vars_info%w%longname = 'vertical velocity'
+  vars_info%w%units = 'm/s'
 
-  nc_vars%rho%name = 'rho'
-  nc_vars%rho%longname = 'sea water density'
-  nc_vars%rho%unit = 'kg/m^3'
+  vars_info%rho%name = 'rho'
+  vars_info%rho%longname = 'sea water density'
+  vars_info%rho%units = 'kg/m^3'
 
-  nc_vars%ssh%name = 'ssh'
-  nc_vars%ssh%longname = 'sea surface height'
-  nc_vars%ssh%unit = 'm'
+  vars_info%ssh%name = 'ssh'
+  vars_info%ssh%longname = 'sea surface height'
+  vars_info%ssh%units = 'm'
 
-  nc_vars%ph%name = 'ph'
-  nc_vars%ph%longname = 'sea bottom pressure'
-  nc_vars%ph%unit = 'Pa'
+  vars_info%ch%name = 'ch'
+  vars_info%ch%longname = 'normalized sea bottom pressure'
+  vars_info%ch%units = ''
+  
+  vars_info%prh%name = 'prh'
+  vars_info%prh%longname = 'reference state: sea bottom pressure (T-grid)'
+  vars_info%prh%units = 'Pa'
+  
+  ! set restart infomations
+  vars_info%rst_ch%name = 'ch'
+  vars_info%rst_ch%longname = 'normalized sea bottom pressure'
+  vars_info%rst_ch%units = ''
+  vars_info%rst_ch%vartype = 'restart'
+  
+  rst_info%fname = bd
   
 end subroutine param_set_nc_vars
 
@@ -178,7 +157,7 @@ subroutine param_set_nm ( nm ) !{{{1
   integer :: npy, npx
 
   character (len=80) :: bdate, edate
-  integer :: dtbt, dtbc
+  integer :: dtbt, dtbc, restart_per, restart_run
 
   character (len=80) :: fname_ini, fname_frc, out_dir, out_per
 
@@ -187,7 +166,8 @@ subroutine param_set_nm ( nm ) !{{{1
 
   namelist /mpi_ctrl/ npy, npx
   namelist /time_ctrl/ bdate, edate, dtbt, dtbc
-  namelist /io_ctrl/ fname_ini, fname_frc, out_dir, out_per
+  namelist /io_ctrl/ fname_ini, fname_frc, out_dir, out_per, &
+           restart_per, restart_run
 
   open(fid_nam, file='namelist')
   read(fid_nam, mpi_ctrl)
@@ -214,10 +194,12 @@ subroutine param_set_nm ( nm ) !{{{1
   nm%bt = dtbt
   nm%bc = dtbc
 
-  nm%fi = fname_ini
-  nm%ff = fname_frc
-  nm%od = out_dir
-  nm%per= out_per
+  nm%fi  = fname_ini
+  nm%ff  = fname_frc
+  nm%od  = out_dir
+  nm%out_per = out_per
+  nm%rst_per = restart_per
+  nm%rst     = restart_run
 
 end subroutine param_set_nm
 

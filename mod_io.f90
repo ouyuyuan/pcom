@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-09-26 19:29:43 BJT
+! Last Change: 2017-11-10 10:04:38 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -11,9 +11,10 @@ module mod_io !{{{1
   use netcdf
   use mod_kind, only: wp
 
-  use mod_type, only: tctr, type_var_info
+  use mod_type, only: tctr, type_var_info, type_time2str, &
+    type_rst_info
   use mod_param, only: glo_ni, glo_nj, nk, &
-    missing_int, missing_float, nm
+    missing_int, missing_float, nm, vars_info, rst_info
 
   use mod_arrays, only: glo_lon, glo_lat, z
 
@@ -25,31 +26,19 @@ module mod_io !{{{1
   public &
     io_get_dim_len,   &
     io_write,         &
-    io_quick_output,  &
+    io_create_rst,    &
     io_read
 
 !internal variables-------------------------------------{{{1
 
-  integer :: ncid, varid, ndim1, ndim2, ndim3
+  integer :: ncid, varid, ndim1, ndim2, ndim3, &
+             id_lon, id_lat, id_z, id_time
 
 !interfaces---------------------------------------------{{{1
 !-----------------------------------------------------------
   interface io_write
-    module procedure write_scalar
     module procedure write_r3d
-    module procedure write_r2d_rec
     module procedure write_r2d
-    module procedure write_r1d
-    module procedure write_i3d
-    module procedure write_i2d
-  end interface
-
-  interface io_quick_output
-    module procedure quick_output_r3d
-    module procedure quick_output_r2d
-    module procedure quick_output_r1d
-    module procedure quick_output_i3d
-    module procedure quick_output_i2d
   end interface
 
   interface io_read
@@ -58,675 +47,113 @@ module mod_io !{{{1
     module procedure read_i3d
     module procedure read_i2d
     module procedure read_scalar
+    module procedure read_glo_att
   end interface
 
 contains !{{{1
 !-------------------------------------------------------{{{1
 
-subroutine create_r3d (var_info, nrec) !{{{1
-  ! create the output file for 3d variable
+subroutine io_create_rst ( rst_info ) !{{{1
+  ! create file for restart run
+  type (type_rst_info) :: rst_info
 
-  type (type_var_info), intent(in) :: var_info
-  integer, intent(in) :: nrec
+  integer :: idx
 
-  integer :: dimid1, dimid2, dimid3, dimid4
-  integer :: dimids(4)
-  character (len=80) :: ncname
+  rst_info%cdate = type_time2str(tctr%ct)
+  rst_info%pdate = type_time2str(tctr%pt)
 
-  write(ncname,'(a,i0.4,a)') &
-    trim(nm%od)//trim(var_info%name)//'_', nrec, '.nc'
+  rst_info%fname = trim(nm%od)//'restart_'//trim(rst_info%cdate)//'.nc'
+  idx = len(trim(nm%od)//'restart_0000-00-00') + 1
+  rst_info%fname(idx:idx) = '_'
 
-  call check ( nf90_create (trim(ncname), NF90_CLOBBER, ncid)  )
+  call create_nc (rst_info%fname, ncid)
 
-  !def dim. {{{2
-  call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
-  call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
-  call check ( nf90_def_dim (ncid, 'z',   nk, dimid3) )
-  call check ( nf90_def_dim (ncid, 'time', NF90_UNLIMITED, dimid4) )
+  call def_dim_3d (id_lon, id_lat, id_z, id_time)
 
-  !def global attr. {{{2
-  call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
-    'created', "by subroutine create_r3d in module mod_io") )
+  call put_glo_att ('created', "by subroutine io_create_rst in module mod_io")
+  call put_glo_att ('cdate', rst_info%cdate)
+  call put_glo_att ('pdate', rst_info%pdate)
 
-  ! def vars  !{{{2
-  call check ( nf90_def_var (ncid, "lon", nf90_float, &
-    dimid1, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'longitude') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'degree_east') )
+  ! def vars
+  call def_var_r2d (rst_info%ch)
+  call def_var_r3d (rst_info%pt)
+  call def_var_r3d (rst_info%sa)
 
-  call check ( nf90_def_var (ncid, "lat", nf90_float, &
-    dimid2, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'latitude') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'degree_north') )
-
-  call check ( nf90_def_var (ncid, "z", nf90_float, &
-    dimid3, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'depth') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'm') )
-
-  call check ( nf90_def_var (ncid, "time", nf90_float, &
-    dimid4, varid) )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'hours since 0001-01-01 00:00:00') )
-
-  dimids = (/dimid1, dimid2, dimid3, dimid4/)
-
-  call check ( nf90_def_var (ncid, trim(var_info%name), &
-    nf90_float, dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    var_info%longname) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', &
-    missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    var_info%units) )
-
-  !end def {{{2
   call check (nf90_enddef(ncid) )
+
+  call put_dim_3d ( )
 
   call check (nf90_close(ncid) )
 
-  ! write coordinates {{{2
-  call write_r1d (ncname, 'lon', glo_lon)
-  call write_r1d (ncname, 'lat', glo_lat)
-  call write_r1d (ncname, 'z', z)
+end subroutine io_create_rst
 
-end subroutine create_r3d
-
-subroutine create_r2d_nrec (var_info, nrec) !{{{1
-  ! create the output file for 2d variable
-
-  type (type_var_info), intent(in) :: var_info
-  integer, intent(in) :: nrec
-
-  integer :: dimid1, dimid2, dimid3
-  integer :: dimids(3)
-  character (len=80) :: ncname
-
-  write(ncname,'(a,i0.4,a)') &
-    trim(nm%od)//trim(var_info%name)//'_', nrec, '.nc'
-
-  call check ( nf90_create (trim(ncname), NF90_CLOBBER, ncid)  )
-
-  !def dim. {{{2
-  call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
-  call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
-  call check ( nf90_def_dim (ncid, 'time', NF90_UNLIMITED, dimid3) )
-
-  !def global attr. {{{2
-  call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
-    'created', "by subroutine create_r2d_nrec in module mod_io") )
-
-  ! def vars  !{{{2
-  call check ( nf90_def_var (ncid, "lon", nf90_float, &
-    dimid1, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'longitude') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'degree_east') )
-
-  call check ( nf90_def_var (ncid, "lat", nf90_float, &
-    dimid2, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'latitude') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'degree_north') )
-
-  call check ( nf90_def_var (ncid, "time", nf90_float, &
-    dimid3, varid) )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'hours since 0001-01-01 00:00:00') )
-
-  dimids = (/dimid1, dimid2, dimid3/)
-
-  call check ( nf90_def_var (ncid, trim(var_info%name), &
-    nf90_float, dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    var_info%longname) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', &
-    missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    var_info%units) )
-
-  !end def {{{2
-  call check (nf90_enddef(ncid) )
-
-  call check (nf90_close(ncid) )
-
-  ! write coordinates {{{2
-  call write_r1d (ncname, 'lon', glo_lon)
-  call write_r1d (ncname, 'lat', glo_lat)
-end subroutine create_r2d_nrec
-
-subroutine create_r2d(var_info) !{{{1
-  ! create the output file for 2d variable
-
-  type (type_var_info), intent(in) :: var_info
-
-  integer :: dimid1, dimid2
-  integer :: dimids(2)
-  character (len=80) :: ncname
-
-  ncname = trim(nm%od)//trim(var_info%name)//'.nc'
-
-  call check ( nf90_create (trim(ncname), NF90_CLOBBER, ncid)  )
-
-  !def dim. {{{2
-  call check ( nf90_def_dim (ncid, 'lon', glo_ni, dimid1) )
-  call check ( nf90_def_dim (ncid, 'lat', glo_nj, dimid2) )
-
-  !def global attr. {{{2
-  call check ( nf90_put_att (ncid, NF90_GLOBAL, & 
-    'created', "by subroutine create_r2d in module mod_io") )
-
-  ! def vars  !{{{2
-  call check ( nf90_def_var (ncid, "lon", nf90_float, &
-    dimid1, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'longitude') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'degree_east') )
-
-  call check ( nf90_def_var (ncid, "lat", nf90_float, &
-    dimid2, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    'latitude') )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    'degree_north') )
-
-  dimids = (/dimid1, dimid2/)
-
-  call check ( nf90_def_var (ncid, trim(var_info%name), &
-    nf90_float, dimids, varid) )
-  call check ( nf90_put_att (ncid, varid, 'long_name', &
-    var_info%longname) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', &
-    missing_float) )
-  call check ( nf90_put_att (ncid, varid, 'units', &
-    var_info%units) )
-
-  !end def {{{2
-  call check (nf90_enddef(ncid) )
-
-  call check (nf90_close(ncid) )
-
-  ! write coordinates {{{2
-  call write_r1d (ncname, 'lon', glo_lon)
-  call write_r1d (ncname, 'lat', glo_lat)
-end subroutine create_r2d
-
-subroutine write_r3d(var_info, var, nrec) !{{{1
+subroutine write_r3d(var_info, var) !{{{1
 
   type (type_var_info), intent(in) :: var_info
   real (kind=wp), intent(in) :: var(:,:,:)
-  integer, intent(in) :: nrec
 
   character (len = 80) :: ncname
-  integer :: stt(4), cnt(4)
-  real (kind=wp) :: hour
 
-  write(ncname,'(a,i0.4,a)') &
-    trim(nm%od)//trim(var_info%name)//'_', nrec, '.nc'
+  ! determine nc filename
+  if (trim(var_info%vartype) .eq. 'restart') then
+    ncname = rst_info%fname
+  else
+    call get_ncname (var_info%name, ncname)
+  end if
 
-  write(*,'(a,i6,a)') '*** Output '//trim(var_info%name)//' to file: '//&
-    trim(ncname)//' for the ', nrec, 'th record ......' 
+  ! create nc file for every output
+  if (trim(var_info%vartype) .ne. 'restart') then
+    call create_nc ( ncname, ncid )
+    call def_dim_3d ( id_lon, id_lat, id_z, id_time )
+    call put_glo_att ( 'created', "by subroutine write_r3d in module mod_io")
+    call def_var_r3d ( var_info )
+    call check (nf90_enddef(ncid) )
+    call put_dim_3d ( )
+  else
+    call check (nf90_open(trim(ncname), nf90_write, ncid)  )
+  end if
 
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-  ndim3 = size(var, 3)
+  call put_var_r3d (var_info%name, var)
 
-  stt  = (/1, 1, 1, 1/)
-  cnt  = (/ndim1, ndim2, ndim3, 1/)
-
-  call create_r3d(var_info, nrec)
-
-  call check (nf90_open (trim(ncname), nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, trim(var_info%name), varid) )
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! increase time record
-  hour = real(tctr%i) * real(nm%bc) / 3600.0
-  call check (nf90_inq_varid(ncid, 'time', varid) )
-  call check (nf90_put_var(ncid, varid, hour, &
-    start = (/1/) ) )
+  call increase_time ( )
 
   call check (nf90_close(ncid) )
 
 end subroutine write_r3d
-
-subroutine write_r2d_rec(var_info, var, nrec) !{{{1
-
-  type (type_var_info), intent(in) :: var_info
-  real (kind=wp), intent(in) :: var(:,:)
-  integer, intent(in) :: nrec
-
-  integer :: stt(3), cnt(3)
-  real (kind=wp) :: hour
-  character (len = 80) :: ncname
-
-  write(ncname,'(a,i0.4,a)') &
-    trim(nm%od)//trim(var_info%name)//'_', nrec, '.nc'
-
-  write(*,'(a,i6,a)') '*** Output '//trim(var_info%name)//&
-    ' to file: '//trim(ncname)//' for the ', nrec, 'th record ......' 
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-
-  stt  = (/1, 1, 1/)
-  cnt  = (/ndim1, ndim2, 1/)
-
-  call create_r2d_nrec(var_info, nrec)
-
-  call check (nf90_open(trim(ncname), nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, trim(var_info%name), varid) )
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! increase time record
-  hour = real(tctr%i) * real(nm%bc) / 3600.0
-  call check (nf90_inq_varid(ncid, 'time', varid) )
-  call check (nf90_put_var(ncid, varid, hour, &
-    start = (/1/)) )
-
-  call check (nf90_close(ncid) )
-
-end subroutine write_r2d_rec
 
 subroutine write_r2d(var_info, var) !{{{1
 
   type (type_var_info), intent(in) :: var_info
   real (kind=wp), intent(in) :: var(:,:)
 
-  integer :: stt(3), cnt(3)
   character (len = 80) :: ncname
 
-  ncname = trim(nm%od)//trim(var_info%name)//'.nc'
+  ! determine nc filename
+  if (trim(var_info%vartype) .eq. 'restart') then
+    ncname = rst_info%fname
+  else
+    call get_ncname (var_info%name, ncname)
+  end if
 
-  write(*,'(a)') '*** Output '//trim(var_info%name)//&
-    ' to file: '//trim(ncname)
+  ! create nc file for every output
+  if (trim(var_info%vartype) .ne. 'restart') then
+    call create_nc ( ncname, ncid )
+    call def_dim_2d ( id_lon, id_lat, id_time )
+    call put_glo_att ( 'created', "by subroutine write_r2d in module mod_io")
+    call def_var_r2d ( var_info )
+    call check (nf90_enddef(ncid) )
+    call put_dim_2d ( )
+  else
+    call check (nf90_open(trim(ncname), nf90_write, ncid)  )
+  end if
 
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
+  call put_var_r2d (var_info%name, var)
 
-  stt  = (/1, 1, 1/)
-  cnt  = (/ndim1, ndim2, 1/)
-
-  call create_r2d(var_info)
-
-  call check (nf90_open(trim(ncname), nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, trim(var_info%name), varid) )
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
+  call increase_time ( )
 
   call check (nf90_close(ncid) )
 
 end subroutine write_r2d
-
-subroutine write_r1d(ncname, varname, var) !{{{1
-
-  character (len = *), intent(in) :: ncname, varname
-  real (kind=wp), intent(in) :: var(:)
-
-  call check (nf90_open(ncname, nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, varname, varid) )
-
-  call check (nf90_put_var(ncid, varid, var) )
-
-  call check (nf90_close(ncid) )
-
-end subroutine write_r1d
-
-subroutine write_i3d(ncname, varname, var) !{{{1
-
-  character (len = *), intent(in) :: ncname, varname
-  integer, intent(in) :: var(:,:,:)
-
-  integer :: stt(3), cnt(3)
-
-  write(*,'(a)') '*** Output '//varname//' to file: '//ncname
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-  ndim3 = size(var, 3)
-
-  stt  = (/1, 1, 1/)
-  cnt  = (/ndim1, ndim2, ndim3/)
-
-  call check (nf90_open(ncname, nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, varname, varid) )
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  call check (nf90_close(ncid) )
-
-end subroutine write_i3d
-
-subroutine write_i2d(ncname, varname, var) !{{{1
-
-  character (len = *), intent(in) :: ncname, varname
-  integer, intent(in) :: var(:,:)
-
-  integer :: stt(2), cnt(2)
-
-  write(*,'(a)') '*** Output '//varname//' to file: '//ncname
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-
-  stt  = (/1, 1/)
-  cnt  = (/ndim1, ndim2/)
-
-  call check (nf90_open(ncname, nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, varname, varid) )
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  call check (nf90_close(ncid) )
-
-end subroutine write_i2d
-
-subroutine write_scalar(ncname, varname, var) !{{{1
-
-  character (len = *), intent(in) :: ncname, varname
-  real (kind=wp), intent(in) :: var
-
-  call check (nf90_open(ncname, nf90_write, ncid)  )
-
-  call check (nf90_inq_varid(ncid, varname, varid) )
-
-  call check (nf90_put_var(ncid, varid, var) )
-
-  call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
-
-end subroutine write_scalar
-
-subroutine quick_output_r3d ( ncname, varname, var, lon, lat, z ) !{{{1
-  ! creat a new file and output a 3d real variable
-
-  character (len = *), intent(in) :: ncname, varname
-  real (kind=wp),      intent(in) :: var(:,:,:)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat, z
-
-  integer :: dimids(4)
-  integer :: nrec, stt(4), cnt(4), &
-             dimid1, dimid2, dimid3, time_dimid, &
-             lonid, latid, zid
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-  ndim3 = size(var, 3)
-
-  nrec = 1
-  stt  = (/1, 1, 1, nrec/)
-  cnt  = (/ndim1, ndim2, ndim3, 1/)
-
-  call check (nf90_create(ncname, NF90_CLOBBER, ncid)  )
-
-  ! def dim. {{{2
-  call check (nf90_def_dim(ncid, 'lon', ndim1, dimid1) )
-  call check (nf90_def_dim(ncid, 'lat', ndim2, dimid2) )
-  call check (nf90_def_dim(ncid, 'z',   ndim3, dimid3) )
-  call check (nf90_def_dim(ncid, 'time', NF90_UNLIMITED, &
-    time_dimid) )
-
-  ! def vars !{{{2
-  call check (nf90_def_var(ncid, 'lon', nf90_float, dimid1, lonid) )
-  call check (nf90_def_var(ncid, 'lat', nf90_float, dimid2, latid) )
-  call check (nf90_def_var(ncid, 'z',   nf90_float, dimid3, zid) )
-
-  dimids =  (/ dimid1, dimid2, dimid3, time_dimid /)
-  call check (nf90_def_var(ncid, varname, nf90_float, dimids, &
-    varid) )
-  call check (nf90_put_att(ncid, varid, '_FillValue', &
-    missing_float) )
-
-  call check (nf90_enddef(ncid) )
-
-  ! write vars !{{{2
-  call check (nf90_put_var(ncid, lonid, lon))
-  call check (nf90_put_var(ncid, latid, lat))
-  call check (nf90_put_var(ncid, zid, z))
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! close file !{{{2
-  call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
-
-end subroutine quick_output_r3d
-
-subroutine quick_output_r2d ( ncname, varname, var, lon, lat ) !{{{1
-  ! creat a new file and output a 2d real variable
-
-  character (len = *), intent(in) :: ncname, varname
-  real (kind=wp),      intent(in) :: var(:,:)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat
-
-  integer :: dimids(3)
-  integer :: nrec, stt(3), cnt(3), &
-             dimid1, dimid2, time_dimid, &
-             lonid, latid
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-
-  nrec = 1
-  stt  = (/1, 1, nrec/)
-  cnt  = (/ndim1, ndim2, 1/)
-
-  call check (nf90_create(ncname, NF90_CLOBBER, ncid)  )
-
-  ! def dim. {{{2
-  call check (nf90_def_dim(ncid, 'lon', ndim1, dimid1) )
-  call check (nf90_def_dim(ncid, 'lat', ndim2, dimid2) )
-  call check (nf90_def_dim(ncid, 'time', NF90_UNLIMITED, &
-    time_dimid) )
-
-  ! def vars !{{{2
-  dimids =  (/ dimid1, dimid2, time_dimid /)
-  call check (nf90_def_var(ncid, 'lon', nf90_float, dimid1, lonid) )
-  call check (nf90_def_var(ncid, 'lat', nf90_float, dimid2, latid) )
-
-  call check (nf90_def_var(ncid, varname, nf90_float, dimids, &
-    varid) )
-  call check (nf90_put_att(ncid, varid, '_FillValue', &
-    missing_float) )
-
-  call check (nf90_enddef(ncid) )
-
-  ! write var !{{{2
-  call check (nf90_put_var(ncid, lonid, lon))
-  call check (nf90_put_var(ncid, latid, lat))
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! close file !{{{2
-  call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
-
-end subroutine quick_output_r2d
-
-subroutine quick_output_r1d ( ncname, varname, var, coor ) !{{{1
-  ! creat a new file and output a 1d real variable
-
-  character (len = *), intent(in) :: ncname, varname
-  real (kind=wp), dimension(:), intent(in) :: var, coor
-
-  integer :: dimid1, time_dimid, stt(2), cnt(2), &
-    coorid, dimids(2), nrec
-
-  ndim1 = size(var)
-
-  nrec = 1
-  stt  = (/1, nrec/)
-  cnt  = (/ndim1, 1/)
-
-  call check (nf90_create(ncname, NF90_CLOBBER, ncid)  )
-
-  ! def dim. {{{2
-  call check (nf90_def_dim(ncid, 'coor', ndim1, dimid1) )
-  call check (nf90_def_var(ncid, 'coor', nf90_float, dimid1, coorid))
-
-  call check (nf90_def_dim(ncid, 'time', NF90_UNLIMITED, &
-    time_dimid) )
-
-  ! def var !{{{2
-  dimids =  (/ dimid1, time_dimid /)
-  call check (nf90_def_var(ncid, varname, nf90_float, dimids, &
-    varid) )
-  call check (nf90_put_att(ncid, varid, '_FillValue', &
-    missing_float) )
-
-  call check (nf90_enddef(ncid) )
-
-  ! write vars !{{{2
-  call check (nf90_put_var(ncid, coorid, coor))
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! close file !{{{2
-  call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
-
-end subroutine quick_output_r1d
-
-subroutine quick_output_i3d ( ncname, varname, var, lon, lat, z ) !{{{1
-  ! creat a new file and output a 3d real variable
-
-  character (len = *), intent(in) :: ncname, varname
-  integer,             intent(in) :: var(:,:,:)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat, z
-
-  integer :: dimids(4)
-  integer :: nrec, stt(4), cnt(4), &
-             dimid1, dimid2, dimid3, time_dimid, &
-             lonid, latid, zid
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-  ndim3 = size(var, 3)
-
-  nrec = 1
-  stt  = (/1, 1, 1, nrec/)
-  cnt  = (/ndim1, ndim2, ndim3, 1/)
-
-  call check (nf90_create(ncname, NF90_CLOBBER, ncid)  )
-
-  ! def dim. {{{2
-  call check (nf90_def_dim(ncid, 'lon', ndim1, dimid1) )
-  call check (nf90_def_dim(ncid, 'lat', ndim2, dimid2) )
-  call check (nf90_def_dim(ncid, 'z',   ndim3, dimid3) )
-  call check (nf90_def_dim(ncid, 'time', NF90_UNLIMITED, &
-    time_dimid) )
-
-  ! def vars !{{{2
-  call check (nf90_def_var(ncid, 'lon', nf90_float, dimid1, lonid) )
-  call check (nf90_def_var(ncid, 'lat', nf90_float, dimid2, latid) )
-  call check (nf90_def_var(ncid, 'z',   nf90_float, dimid3, zid) )
-
-  dimids =  (/ dimid1, dimid2, dimid3, time_dimid /)
-  call check (nf90_def_var(ncid, varname, nf90_int, dimids, &
-    varid) )
-  call check (nf90_put_att(ncid, varid, '_FillValue', &
-    missing_int) )
-
-  call check (nf90_enddef(ncid) )
-
-  ! write vars !{{{2
-  call check (nf90_put_var(ncid, lonid, lon))
-  call check (nf90_put_var(ncid, latid, lat))
-  call check (nf90_put_var(ncid, zid, z))
-
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! close file !{{{2
-  call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
-
-end subroutine quick_output_i3d
-
-subroutine quick_output_i2d ( ncname, varname, var, lon, lat ) !{{{1
-  ! creat a new file and output a 2d real variable
-
-  character (len = *), intent(in) :: ncname, varname
-  integer,             intent(in) :: var(:,:)
-  real (kind=wp), dimension(:), intent(in) :: lon, lat
-
-  integer :: dimids(3)
-  integer :: nrec, stt(3), cnt(3), &
-             dimid1, dimid2, time_dimid, &
-             lonid, latid
-
-  ndim1 = size(var, 1)
-  ndim2 = size(var, 2)
-
-  nrec = 1
-  stt  = (/1, 1, nrec/)
-  cnt  = (/ndim1, ndim2, 1/)
-
-  call check (nf90_create(ncname, NF90_CLOBBER, ncid)  )
-
-  ! def dim. {{{2
-  call check (nf90_def_dim(ncid, 'lon', ndim1, dimid1) )
-  call check (nf90_def_dim(ncid, 'lat', ndim2, dimid2) )
-  call check (nf90_def_dim(ncid, 'time', NF90_UNLIMITED, &
-    time_dimid) )
-
-  ! def vars !{{{2
-  dimids =  (/ dimid1, dimid2, time_dimid /)
-  call check (nf90_def_var(ncid, 'lon', nf90_float, dimid1, lonid) )
-  call check (nf90_def_var(ncid, 'lat', nf90_float, dimid2, latid) )
-
-  call check (nf90_def_var(ncid, varname, nf90_int, dimids, &
-    varid) )
-  call check (nf90_put_att(ncid, varid, '_FillValue', &
-    missing_int) )
-
-  call check (nf90_enddef(ncid) )
-
-  ! write var !{{{2
-  call check (nf90_put_var(ncid, lonid, lon))
-  call check (nf90_put_var(ncid, latid, lat))
-
-  ! quit odd, it will print the first four elements in the first row 
-  ! of var to the screen when execute at BCM, maybe this is a bug of netcdf
-  call check (nf90_put_var(ncid, varid, var, &
-    start = stt, count = cnt) )
-
-  ! close file !{{{2
-  call check (nf90_close(ncid) )
-
-  write(*,*) '*** SUCCESS output '//varname//' to file: '//ncname
-
-end subroutine quick_output_i2d
 
 subroutine read_r3d(ncname, varname, var) !{{{1
   character (len=*), intent(in) :: ncname, varname
@@ -804,6 +231,18 @@ subroutine read_scalar(ncname, varname, var) !{{{1
   call check (nf90_close(ncid) )
 end subroutine read_scalar
 
+subroutine read_glo_att(ncname, att, var) !{{{1
+  ! read a global attribute
+  character (len=*), intent(in) :: ncname, att
+  character (len=*) :: var
+
+  call check (nf90_open(ncname, NF90_NOWRITE, ncid) )
+
+  call check (nf90_get_att(ncid, NF90_GLOBAL, att, var) )
+
+  call check (nf90_close(ncid) )
+end subroutine read_glo_att
+
 subroutine io_get_dim_len(ncname, dimname, var) !{{{1
 ! get the length of a dimension with 'dimname' from a 
 ! NetCDF file with 'ncname'
@@ -820,6 +259,193 @@ subroutine io_get_dim_len(ncname, dimname, var) !{{{1
   call check ( nf90_close(ncid) )
 
 end subroutine io_get_dim_len
+
+subroutine get_ncname (varname, ncname) !{{{1
+! create nc file name per output time
+  character (len=*), intent (in) :: varname
+  character (len=*) :: ncname
+
+  character (len = len('0000-00-00 00:00:00')) :: str
+  integer :: idx
+
+  str = trim(type_time2str(tctr%ct))
+
+  idx = len('0000-00-00') + 1
+  str (idx:idx) = '_'
+
+  idx = len('0000-00-00_00:00')
+  ncname = trim(nm%od)//trim(varname)//'_'//str(1:idx)//'.nc'
+
+end subroutine get_ncname
+
+subroutine def_dim_2d (id_lon, id_lat, id_time) !{{{1
+! dimension definition
+  integer :: id_lon, id_lat, id_time
+
+  call check ( nf90_def_dim (ncid, 'lon', glo_ni, id_lon) )
+  call check ( nf90_def_dim (ncid, 'lat', glo_nj, id_lat) )
+  call check ( nf90_def_dim (ncid, 'time', NF90_UNLIMITED, id_time) )
+
+  call check ( nf90_def_var (ncid, "lon", nf90_float, &
+    id_lon, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'longitude') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_east') )
+
+  call check ( nf90_def_var (ncid, "lat", nf90_float, &
+    id_lat, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'latitude') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'degree_north') )
+
+  call check ( nf90_def_var (ncid, "time", nf90_float, &
+    id_time, varid) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'hours since 0001-01-01 00:00:00') )
+
+end subroutine def_dim_2d
+
+subroutine def_dim_3d (id_lon, id_lat, id_z, id_time) !{{{1
+! dimension definition
+  integer :: id_lon, id_lat, id_z, id_time
+
+  call def_dim_2d (id_lon, id_lat, id_time)
+
+  call check ( nf90_def_dim (ncid, 'z',   nk, id_z) )
+
+  call check ( nf90_def_var (ncid, "z", nf90_float, &
+    id_z, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    'depth') )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    'm') )
+
+end subroutine def_dim_3d
+
+subroutine def_var_r2d (var_info) !{{{1
+  ! define a 2d variable
+  type (type_var_info), intent(in) :: var_info
+
+  integer :: dimids(3)
+
+  dimids = (/id_lon, id_lat, id_time/)
+
+  call check ( nf90_def_var (ncid, var_info%name, &
+    nf90_float, dimids, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    var_info%longname) )
+  call check ( nf90_put_att (ncid, varid, '_FillValue', &
+    missing_float) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    var_info%units) )
+
+end subroutine def_var_r2d
+
+subroutine def_var_r3d (var_info) !{{{1
+  ! define a 2d variable
+  type (type_var_info), intent(in) :: var_info
+
+  integer :: dimids(4)
+
+  dimids = (/id_lon, id_lat, id_z, id_time/)
+
+  call check ( nf90_def_var (ncid, var_info%name, &
+    nf90_float, dimids, varid) )
+  call check ( nf90_put_att (ncid, varid, 'long_name', &
+    var_info%longname) )
+  call check ( nf90_put_att (ncid, varid, '_FillValue', &
+    missing_float) )
+  call check ( nf90_put_att (ncid, varid, 'units', &
+    var_info%units) )
+
+end subroutine def_var_r3d
+
+subroutine put_var_r3d (varname, var) !{{{1
+  ! define a 2d variable
+  character (len=*), intent(in) :: varname
+  real (kind=wp), intent(in) :: var(:,:,:)
+
+  integer :: stt(4), cnt(4)
+
+  ndim1 = size(var, 1)
+  ndim2 = size(var, 2)
+  ndim3 = size(var, 3)
+
+  stt  = (/1, 1, 1, 1/)
+  cnt  = (/ndim1, ndim2, ndim3, 1/)
+
+  call check (nf90_inq_varid(ncid, trim(varname), varid) )
+  call check (nf90_put_var(ncid, varid, var, start=stt, count=cnt) )
+
+end subroutine put_var_r3d
+
+subroutine put_var_r2d (varname, var) !{{{1
+  ! define a 2d variable
+  character (len=*), intent(in) :: varname
+  real (kind=wp), intent(in) :: var(:,:)
+
+  integer :: stt(3), cnt(3)
+
+  ndim1 = size(var, 1)
+  ndim2 = size(var, 2)
+
+  stt  = (/1, 1, 1/)
+  cnt  = (/ndim1, ndim2, 1/)
+
+  call check (nf90_inq_varid(ncid, trim(varname), varid) )
+  call check (nf90_put_var(ncid, varid, var, start=stt, count=cnt) )
+
+end subroutine put_var_r2d
+
+subroutine increase_time () !{{{1
+  ! increase time value
+  real (kind=wp) :: hour
+
+  hour = real(tctr%i) * real(nm%bc) / 3600.0
+  call check (nf90_inq_varid(ncid, 'time', varid) )
+  call check (nf90_put_var(ncid, varid, hour, start=(/1/)) )
+
+end subroutine increase_time
+
+subroutine put_glo_att (attname, str) !{{{1
+! write global attribute of nc file
+  character (len=*), intent(in) :: attname, str
+
+  call check ( nf90_put_att (ncid, NF90_GLOBAL, attname, trim(str) ) )
+
+end subroutine put_glo_att
+
+subroutine create_nc (ncname, ncid) !{{{1
+  ! create nc file
+  character (len=*), intent(in) :: ncname
+  integer :: ncid
+
+  call check ( nf90_create (trim(ncname), NF90_CLOBBER, ncid)  )
+
+end subroutine create_nc
+
+subroutine put_dim_2d ( ) !{{{1
+  ! write dimension coordinate
+
+  call check (nf90_inq_varid(ncid, 'lon', varid) )
+  call check (nf90_put_var(ncid, varid, glo_lon) )
+
+  call check (nf90_inq_varid(ncid, 'lat', varid) )
+  call check (nf90_put_var(ncid, varid, glo_lat) )
+
+end subroutine put_dim_2d
+
+subroutine put_dim_3d ( ) !{{{1
+  ! write dimension coordinates
+
+  call put_dim_2d ( )
+
+  call check (nf90_inq_varid(ncid, 'z', varid) )
+  call check (nf90_put_var(ncid, varid, z) )
+
+end subroutine put_dim_3d
 
 subroutine check(status) !{{{1
 !-----------------------------------------------------------

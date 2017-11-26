@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-09-20 18:07:14 BJT
+! Last Change: 2017-11-07 10:09:30 BJT
 
 module mod_type
 
@@ -13,7 +13,9 @@ module mod_type
   private
 
   public & !{{{1
-    type_nc_vars, &
+    type_var_info, &
+    type_rst_info, &
+    type_vars_info, &
     type_mat, &
     type_time, &
     type_tctr, &
@@ -39,17 +41,25 @@ module mod_type
     type_days_year, &
     type_str2sec, &
     type_str2time, &
+    type_time2str, &
     type_check_date
 
   ! netcdf variable infomation
-  type type_nc_var
-    character (len=80) :: name, unit, longname
-  end type type_nc_var
+  type type_var_info
+    character (len=80) :: name, units, longname, vartype
+  end type type_var_info
 
-  type type_nc_vars
-    type (type_nc_var) :: &
-      pt, sa, u, v, w, rho, ssh, ph
-  end type type_nc_vars
+  type type_vars_info
+    type (type_var_info) :: &
+      pt, sa, u, v, w, rho, &
+      ssh, ch, prh, &
+      rst_ch
+  end type type_vars_info
+
+  ! restart file infomation
+  type type_rst_info
+    character (len=80) :: fname
+  end type type_rst_info
 
   ! matrix structure !{{{1
   ! for horizontal (u,v) and tracer (theta,s)
@@ -174,17 +184,17 @@ module mod_type
   ! for time-average output
   type :: type_accu_gm3d
     type (type_gvar_m3d) :: var
-    integer :: n, nrec
+    integer :: n
   end type type_accu_gm3d
 
   type :: type_accu_gr3d
     type (type_gvar_r3d) :: var
-    integer :: n, nrec
+    integer :: n
   end type type_accu_gr3d
 
   type :: type_accu_gr2d
     type (type_gvar_r2d) :: var
-    integer :: n, nrec
+    integer :: n
   end type type_accu_gr2d
 
   !interface !{{{1
@@ -527,6 +537,17 @@ function type_str2time (str) !{{{1
     stop 'second should be between 0-59 in the input string in function type_str2time '
 
 end function type_str2time
+
+function type_time2str (time) !{{{1
+  ! type_time plus an integer (in seconds)
+  type (type_time), intent(in) :: time
+  character (len=80) :: type_time2str
+
+  write(type_time2str,'(i0.4,a,i0.2,a,i0.2, a,i0.2,a,i0.2,a,i0.2)') &
+    time%y,'-',time%m, '-',time%d,' ',&
+    time%h,':',time%mi,':',time%s
+
+end function type_time2str
 
 function time_plus_integer (t, dt) !{{{1
   ! type_time plus an integer (in seconds)
