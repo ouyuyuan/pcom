@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-11-26 10:26:24 BJT
+! Last Change: 2017-12-02 10:34:20 BJT
 
 module mod_mympi
 
@@ -26,12 +26,11 @@ module mod_mympi
     vars_info
 
   use mod_type, only: &
-    type_mat, type_accu_gr3d, type_accu_gr2d, &
+    type_mat, type_accu_gr2d, &
     type_var_info, &
-    type_gvar_r3d, type_eq_ts, type_eq_uv
+    type_gvar_r3d, &
+    type_eq_ts, type_eq_uv, type_eq_w
 
-  use mod_arrays, only: ch
-    
   implicit none
   private
 
@@ -72,8 +71,7 @@ module mod_mympi
 
   interface mympi_output
     module procedure merge_out_eqts
-    module procedure merge_out_equv
-    module procedure merge_out_accu_gr3d_mask
+    module procedure merge_out_equvw
     module procedure merge_out_accu_gr2d_mask
     module procedure merge_out_accu_gr2d_weight
     module procedure merge_out_r3d
@@ -136,45 +134,33 @@ subroutine merge_out_eqts (eqts) ! {{{1
 
 end subroutine merge_out_eqts
 
-subroutine merge_out_equv (equv) ! {{{1
+subroutine merge_out_equvw (equv, eqw) ! {{{1
   ! output time-average variables of u,v eqation
   type (type_eq_uv) :: equv
+  type (type_eq_w) :: eqw
 
   equv%acu = equv%acu / equv%n
   equv%acv = equv%acv / equv%n
+  eqw%acw  = eqw%acw  / eqw%n
 
   where (equv%g%msk == 0)
     equv%acu = missing_float
     equv%acv = missing_float
+    eqw%acw  = missing_float
   end where
 
   call merge_out_r3d (vars_info%u, equv%acu)
   call merge_out_r3d (vars_info%v, equv%acv)
+  call merge_out_r3d (vars_info%w, eqw%acw)
 
   equv%acu = 0.0 ! reset accumulated value
   equv%acv = 0.0
+  eqw%acw  = 0.0
+
   equv%n   = 0   ! reset counter
+  eqw%n    = 0   
 
-end subroutine merge_out_equv
-
-subroutine merge_out_accu_gr3d_mask (var_info, var, mask) !{{{1
-  ! merge 3d array from other domains to mid
-  ! mask out the land points
-  type (type_var_info), intent(in) :: var_info
-  type (type_accu_gr3d) :: var
-  integer, dimension(:,:,:), intent(in) :: mask
-
-  var%var%v = var%var%v / var%n
-  where (mask == 0)
-    var%var%v = missing_float
-  end where
-
-  call merge_out_r3d (var_info, var%var%v)
-
-  var%var%v = 0.0 ! reset accumulated value
-  var%n     = 0 ! reset counter
-
-end subroutine merge_out_accu_gr3d_mask
+end subroutine merge_out_equvw
 
 subroutine merge_out_accu_gr2d_mask (var_info, var, mask) !{{{1
   ! merge 2d array from other domains to mid

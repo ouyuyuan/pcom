@@ -3,13 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-11-07 10:12:25 BJT
+! Last Change: 2017-12-02 09:49:23 BJT
 
 module mod_param
 
   use mpi
   use mod_kind, only: sglp, wp
-  use mod_type, only: type_vars_info, type_rst_info
+  use mod_type, only: type_vars_info, type_rst_info, type_var_info
 
   implicit none
   public
@@ -84,54 +84,58 @@ module mod_param
 
 contains !{{{1
 
-subroutine param_set_nc_vars ( ) !{{{1
+subroutine param_set_io ( ) !{{{1
   ! set output infomations
 
-  vars_info%pt%name = 'pt'
-  vars_info%pt%longname = 'potential temperature'
-  vars_info%pt%units = 'degrees Celcius'
+  call set_var_info (vars_info%pt, 'pt', &
+    'potential temperature', 'degrees Celcius', 'mean')
+  call set_var_info (vars_info%sa, 'sa', &
+    'salinity', 'psu', 'mean')
+  call set_var_info (vars_info%u, 'u', &
+    'zonal velocity', 'm/s', 'mean')
+  call set_var_info (vars_info%v, 'v', &
+    'meridional velocity', 'm/s', 'mean')
+  call set_var_info (vars_info%w, 'w', &
+    'vertical velocity', 'm/s', 'mean')
+  call set_var_info (vars_info%rho, 'rho', &
+    'sea water density', 'kg/m^3', 'mean')
+  call set_var_info (vars_info%ssh, 'ssh', &
+    'sea surface height', 'm', 'mean')
+  call set_var_info (vars_info%ch, 'ch', &
+    'normalized sea bottom pressure', '', 'mean')
+  call set_var_info (vars_info%prh, 'prh', &
+    'reference state: sea bottom pressure (T-grid)', 'Pa', 'mean')
 
-  vars_info%sa%name = 'sa'
-  vars_info%sa%longname = 'salinity'
-  vars_info%sa%units = 'psu'
-
-  vars_info%u%name = 'u'
-  vars_info%u%longname = 'zonal velocity'
-  vars_info%u%units = 'm/s'
-
-  vars_info%v%name = 'v'
-  vars_info%v%longname = 'meridional velocity'
-  vars_info%v%units = 'm/s'
-
-  vars_info%w%name = 'w'
-  vars_info%w%longname = 'vertical velocity'
-  vars_info%w%units = 'm/s'
-
-  vars_info%rho%name = 'rho'
-  vars_info%rho%longname = 'sea water density'
-  vars_info%rho%units = 'kg/m^3'
-
-  vars_info%ssh%name = 'ssh'
-  vars_info%ssh%longname = 'sea surface height'
-  vars_info%ssh%units = 'm'
-
-  vars_info%ch%name = 'ch'
-  vars_info%ch%longname = 'normalized sea bottom pressure'
-  vars_info%ch%units = ''
-  
-  vars_info%prh%name = 'prh'
-  vars_info%prh%longname = 'reference state: sea bottom pressure (T-grid)'
-  vars_info%prh%units = 'Pa'
-  
   ! set restart infomations
-  vars_info%rst_ch%name = 'ch'
-  vars_info%rst_ch%longname = 'normalized sea bottom pressure'
-  vars_info%rst_ch%units = ''
-  vars_info%rst_ch%vartype = 'restart'
+  if (nm%rst == 1) rst_info%fname = trim(nm%od)//'restart.nc'
+  if (myid == mid) &
+    print *, "I'm going for a restart-run from "//trim(rst_info%fname)
+
+  call set_var_info (rst_info%ch_tc, 'ch_tc', &
+    vars_info%ch%longname, vars_info%ch%units, 'restart')
+
+  call set_var_info (rst_info%ch_tp, 'ch_tp', &
+    vars_info%ch%longname, vars_info%ch%units, 'restart')
+
+  call set_var_info (rst_info%pt, vars_info%pt%name, &
+    vars_info%pt%longname, vars_info%pt%units, 'restart')
+
+  call set_var_info (rst_info%sa, vars_info%sa%name, &
+    vars_info%sa%longname, vars_info%sa%units, 'restart')
   
-  rst_info%fname = bd
-  
-end subroutine param_set_nc_vars
+end subroutine param_set_io
+
+subroutine set_var_info ( var_info, varname, longname, units, vartype ) !{{{1
+  ! set variable infomation
+  type (type_var_info) :: var_info
+  character (len=*), intent(in) :: varname, longname, units, vartype
+
+  var_info%name     = varname
+  var_info%longname = longname
+  var_info%units    = units
+  var_info%vartype  = vartype
+
+end subroutine set_var_info
 
 subroutine print_my (one) !{{{1
   ! print one define in mod_param

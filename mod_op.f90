@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-11 15:23:38 BJT
-! Last Change: 2017-11-26 09:41:26 BJT
+! Last Change: 2017-12-02 15:46:42 BJT
 
 module mod_op
 
@@ -11,10 +11,10 @@ module mod_op
   use mod_arrays, only: &
     g32, gi1, gi2, &
     gt, gu, gtj, guj, git, giw, &
-    am, km, kh, wm, ch, &
+    am, km, kh, wm, &
     cv1, cv2, &
     glo_lat, glo_lon, z, &
-    equv
+    equv, eqch
 
   use mod_con, only: &
     a, g, rho0, cdbot, ah_c
@@ -123,9 +123,9 @@ subroutine fri_r3d (ans, sch, v, vp, vc, tau) !{{{1
 
   ! div(ch*gra(v))
   call op_gra( wkmat, v, guj, guj%ew, guj%ns )
-  call op_ter( wkr2d, ch%tc, ch%hg, guj%ew )
+  call op_ter( wkr2d, eqch%chc, eqch%hg, guj%ew )
   ch3da = spread( wkr2d, 3, nk )
-  call op_ter( wkr2d, ch%tc, ch%hg, guj%ns )
+  call op_ter( wkr2d, eqch%chc, eqch%hg, guj%ns )
   ch3db = spread( wkr2d, 3, nk )
   call div_r3d( wka, ch3da*wkmat%x(1), ch3db*wkmat%x(2), &
                 guj%ew, guj%ns, guj )
@@ -240,7 +240,7 @@ subroutine op_adv (ans, var, sch) !{{{1
   wka = equv%vc / sch3d
   call ter_r3d( v, wka*cos3d, guj, guj%ns )
 
-  wkap = wm%v / spread(ch%tc,3,nkp)
+  wkap = wm%v / spread(eqch%chc,3,nkp)
   call ter_r3d( w, wkap, gtj, guj )
 
   ! var*u
@@ -289,7 +289,7 @@ subroutine op_adv_ts (ans, var, wm) !{{{1
   real (kind=wp),  dimension(ni,nj) :: sch
   integer :: k
 
-  call op_ter( sch, ch%tc, ch%hg, guj, one )
+  call op_ter( sch, eqch%chc, eqch%hg, guj, one )
   sch = sqrt(sch)
 
   do k = 1, nk

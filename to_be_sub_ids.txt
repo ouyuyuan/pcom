@@ -1,1 +1,2 @@
-param_set_nc_vars: param_set_io
+ch_tc: chc
+ch_tp: chp

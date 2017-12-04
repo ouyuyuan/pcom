@@ -4,7 +4,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-11-26 10:37:42 BJT
+! Last Change: 2017-12-02 20:14:37 BJT
 
 module mod_int
 
@@ -17,8 +17,8 @@ module mod_int
     am, bnd, eqts, &
     bphi, bgraphi, &
     frc, graphihx, graphihy, &
-    alpha, adp, ch, cor, &
-    equv, equvb, z, prho, &
+    alpha, adp, cor, &
+    equv, equvb, eqch, z, prho, &
     glo_lon, glo_lat
 
   use mod_con, only: &
@@ -37,12 +37,13 @@ module mod_int
     tp, tc, tpp, nm
 
   use mod_type, only: type_mat, &
-    type_accu_gr3d, type_accu_gr2d, &
+    type_accu_gr2d, &
     type_bnd, tctr, &
     type_gvar_r4d, type_gvar_r3d, type_gvar_r2d, &
-    type_bintgu, type_ch, &
+    type_bintgu, &
     type_days_month, &
-    type_eq_ts, type_eq_uv, type_eq_uvb
+    type_eq_ts, type_eq_uv, type_eq_uvb, type_eq_w, &
+    type_eq_ch
 
   implicit none
   private
@@ -101,7 +102,7 @@ subroutine int_readyc (equv, equvb, wm) !{{{1
 
   ! the optional parameter 1.0 for interpolation is ressonable 
   !   and is neccessary, otherwise NaN will be created when divide sch
-  call op_ter( sch, ch%tc, ch%hg, guj, one )
+  call op_ter( sch, eqch%chc, eqch%hg, guj, one )
   sch = sqrt( sch )
   where (gu%lev == 0) sch = 1.0
 
@@ -117,14 +118,16 @@ subroutine int_readyc (equv, equvb, wm) !{{{1
   call op_adv( equv%auc, equv%uc, sch )
   call op_adv( equv%avc, equv%vc, sch )
 
-  if ( tctr%i == 1 ) then
-    equv%aupp = equv%auc
-    equv%avpp = equv%avc
-    equv%aup  = equv%auc
-    equv%avp  = equv%avc
-  else if ( tctr%i == 2 ) then
-    equv%aupp = equv%aup
-    equv%avpp = equv%avp
+  if (nm%rst == 0) then
+    if ( tctr%i == 1 ) then
+      equv%aupp = equv%auc
+      equv%avpp = equv%avc
+      equv%aup  = equv%auc
+      equv%avp  = equv%avc
+    else if ( tctr%i == 2 ) then
+      equv%aupp = equv%aup
+      equv%avpp = equv%avp
+    end if
   end if
 
   call op_fri( equv%fx, equv%fy, sch, bnd%taux%v, bnd%tauy%v )
@@ -146,11 +149,10 @@ subroutine int_readyc (equv, equvb, wm) !{{{1
 
 end subroutine int_readyc
 
-subroutine int_trop (ch, equvb, acch) !{{{1
+subroutine int_trop (equvb, eqch) !{{{1
   ! barotropic integrations for 2 baroclinic steps
-  type (type_ch) :: ch
   type (type_eq_uvb) :: equvb
-  type (type_accu_gr2d) :: acch
+  type (type_eq_ch) :: eqch
 
   type (type_mat), dimension(ni,nj) :: &
     supb, & ! scale barotropic velocity
@@ -173,23 +175,23 @@ subroutine int_trop (ch, equvb, acch) !{{{1
   upbaccu%x(1) = equvb%uc
   upbaccu%x(2) = equvb%vc
 
-  ch%bc  = ch%tc
-  ch%bc2 = ch%tc
+  eqch%mch  = eqch%chc
+  eqch%mch2 = eqch%chc
   nstep   = nm%bc / nm%bt * 2
 
   do nt = 1, nstep
     sch = 1.0
-    call op_ter( wk, ch%tp, ch%hg, guj )
+    call op_ter( wk, eqch%chp, eqch%hg, guj )
     where ( gu%lev > 0 ) sch = sqrt(wk)
 
     ! calculate ch at predictor time step
     supb%x(1) = gu%prh*sch * equvb%up
     supb%x(2) = gu%prh*sch * equvb%vp
-    call op_div( wk, supb%x(1), supb%x(2), guj, guj, ch%hg)
-    wk = ch%tp - wk * nm%bt * gamma_b / gt%prh
-    where ( gt%lev > 0 ) ch%tc = wk
+    call op_div( wk, supb%x(1), supb%x(2), guj, guj, eqch%hg)
+    wk = eqch%chp - wk * nm%bt * gamma_b / gt%prh
+    where ( gt%lev > 0 ) eqch%chc = wk
 
-    call op_ter( wk, ch%tc, ch%hg, guj )
+    call op_ter( wk, eqch%chc, eqch%hg, guj )
     where ( gu%lev > 0 ) sch = sqrt(wk)
 
     call op_lap( wkmat%x(1), equvb%up, guj, guj )
@@ -205,7 +207,7 @@ subroutine int_trop (ch, equvb, acch) !{{{1
 
     ! pressure gradient due to the change of free surface
     ! special interpolation from g2j to g3j for pressure gradient force
-    call op_gra( grach, ch%tc, ch%hg, ch%hg%ew, ch%hg%ns )
+    call op_gra( grach, eqch%chc, eqch%hg, eqch%hg%ew, eqch%hg%ns )
     grachint(:,1:njm)%x(1) = 0.5 * ( &
        grach(:,1:njm)%x(1) * bphi%xn(:,1:njm) + &
        grach(:, 2:nj)%x(1) * bphi%xs(:, 2:nj) )
@@ -214,11 +216,11 @@ subroutine int_trop (ch, equvb, acch) !{{{1
        grach(2:ni, :)%x(2) * bphi%yw(2:ni, :) )
     call mympi_swpbnd( grachint )
 
-    call op_ter( wk, ch%tc, ch%hg, ch%hg%ew )
+    call op_ter( wk, eqch%chc, eqch%hg, eqch%hg%ew )
     chgraint(:,1:njm)%x(1) = 0.5 * ( &
        wk(:,1:njm) * bgraphi%xn(:,1:njm) + &
        wk(:, 2:nj) * bgraphi%xs(:, 2:nj) )
-    call op_ter( wk, ch%tc, ch%hg, ch%hg%ns )
+    call op_ter( wk, eqch%chc, eqch%hg, eqch%hg%ns )
     chgraint(1:nim,:)%x(2) = 0.5 * ( &
        wk(1:nim,:) * bgraphi%ye(1:nim,:) + &
        wk(2:ni, :) * bgraphi%yw(2:ni, :) )
@@ -260,14 +262,14 @@ subroutine int_trop (ch, equvb, acch) !{{{1
     ! calculate ch at corrector time step
     supb%x(1) = gu%prh*sch * equvb%uc
     supb%x(2) = gu%prh*sch * equvb%vc
-    call op_div( wk, supb%x(1), supb%x(2), guj, guj, ch%hg)
-    ch%tc = ch%tp - gt%msk(:,:,1)*wk*nm%bt/gt%prh
-    if ( nt <= nstep/2 ) ch%bc = ch%bc + ch%tc
-    ch%tp = ch%tc
+    call op_div( wk, supb%x(1), supb%x(2), guj, guj, eqch%hg)
+    eqch%chc = eqch%chp - gt%msk(:,:,1)*wk*nm%bt/gt%prh
+    if ( nt <= nstep/2 ) eqch%mch = eqch%mch + eqch%chc
+    eqch%chp = eqch%chc
 
     upbaccu%x(1) = upbaccu%x(1) + equvb%uc
     upbaccu%x(2) = upbaccu%x(2) + equvb%vc
-    ch%bc2 = ch%bc2 + ch%tc
+    eqch%mch2 = eqch%mch2 + eqch%chc
   end do
 
   equvb%uc = upbaccu%x(1) / ( nstep + 1 )
@@ -275,14 +277,14 @@ subroutine int_trop (ch, equvb, acch) !{{{1
   equvb%up = equvb%uc
   equvb%vp = equvb%vc
 
-  ch%bc  = ch%bc / ( nstep/2 + 1 )
-  ch%bc2 = ch%bc2 / ( nstep + 1 )
+  eqch%mch  = eqch%mch / ( nstep/2 + 1 )
+  eqch%mch2 = eqch%mch2 / ( nstep + 1 )
 
-  ch%tc = ch%bc2
-  ch%tp = ch%tc
+  eqch%chc = eqch%mch2
+  eqch%chp = eqch%chc
 
-  acch%var%v = acch%var%v + ch%tc
-  acch%n = acch%n + 1
+  eqch%acch = eqch%acch + eqch%chc
+  eqch%n = eqch%n + 1
 
   ! sea bottom pressure (include pa) can be calculated by
   ! ( modification of 2.44 of Ou2016_phd,
@@ -313,15 +315,15 @@ subroutine int_clin (equv, am) !{{{1
   c_tpp =   5.0/12
 
   sch  = 1.0
-  call op_ter( wk, ch%bc, ch%hg, gu%hg, one )
+  call op_ter( wk, eqch%mch, eqch%hg, gu%hg, one )
   where ( gu%lev > 0 ) sch = sqrt(wk)
 
   do k = 1, nk
     ! pressure gradient
-    wk = gt%phih + ch%bc * adp%v(:,:,k)
+    wk = gt%phih + eqch%mch * adp%v(:,:,k)
     call op_gra( pgra, wk, gtj, gtj%ew, gtj%ns )
 
-    wk = ch%bc
+    wk = eqch%mch
     call op_gra( wkmat, wk, gtj, gtj%ew, gtj%ns )
 
     call op_ter( wk, alpha%v(:,:,k), gtj, gtj%ew ) 
@@ -379,12 +381,12 @@ subroutine int_clin (equv, am) !{{{1
   equv%vp = equv%vc
 
   ! diagnose unweighted 3d currents
-  call op_ter( wk, ch%bc2, ch%hg, gu%hg, one )
+  call op_ter( wk, eqch%mch2, eqch%hg, gu%hg, one )
   sch = sqrt(wk) ! why not set land to 1.0, as previous does?
 
   do k = 1, nk
-    u(:,:,k)%x(1) = equv%uc(:,:,k) * sch / ch%bc2
-    u(:,:,k)%x(2) = equv%vc(:,:,k) * sch / ch%bc2
+    u(:,:,k)%x(1) = equv%uc(:,:,k) * sch / eqch%mch2
+    u(:,:,k)%x(2) = equv%vc(:,:,k) * sch / eqch%mch2
   end do
 
   ! accumulate ouput fields for time-average output
@@ -436,10 +438,10 @@ subroutine smag( am, u, v ) !{{{2
 
 end subroutine smag
 
-subroutine int_ts (eqts, acw, wm) !{{{1
+subroutine int_ts (eqts, eqw, wm) !{{{1
   ! prognose of temperature and salinity
   type (type_eq_ts) :: eqts
-  type (type_accu_gr3d) :: acw
+  type (type_eq_w) :: eqw
   type (type_gvar_r3d) :: wm
 
   type (type_mat), dimension(ni,nj,nk) :: &
@@ -453,18 +455,18 @@ subroutine int_ts (eqts, acw, wm) !{{{1
 
   ! diagnostic the vertical velocity in z-coordinate
   do k = 1, nk
-    acw%var%v(:,:,k) = acw%var%v(:,:,k) + &
-      wm%v(:,:,k)*alpha%v(:,:,k) / (g*ch%bc2)
+    eqw%acw(:,:,k) = eqw%acw(:,:,k) + &
+      wm%v(:,:,k)*alpha%v(:,:,k) / (g*eqch%mch2)
   end do
-  acw%n = acw%n + 1
+  eqw%n = eqw%n + 1
 
   call op_adv_ts( wkm%x(1), eqts%tc, wm%v )
   call op_adv_ts( wkm%x(2), eqts%sc, wm%v )
   pts%x(1) = - wkm%x(1)
   pts%x(2) = - wkm%x(2)
 
-  call op_dif( wkm%x(1), ch%bc, eqts%tp )
-  call op_dif( wkm%x(2), ch%bc, eqts%sp )
+  call op_dif( wkm%x(1), eqch%mch, eqts%tp )
+  call op_dif( wkm%x(2), eqch%mch, eqts%sp )
   pts%x(1) = pts%x(1) + wkm%x(1)
   pts%x(2) = pts%x(2) + wkm%x(2)
 
@@ -474,14 +476,14 @@ subroutine int_ts (eqts, acw, wm) !{{{1
   pts(:,:,1)%x(1) = pts(:,:,1)%x(1) + pbnd
 
   pbnd = gamma_s*( bnd%s%v - eqts%sc(:,:,1) ) &
-         * eqts%g%msk(:,:,1) * ch%bc
+         * eqts%g%msk(:,:,1) * eqch%mch
   pts(:,:,1)%x(2) = pts(:,:,1)%x(2) + pbnd
 
   ! compute T&S at next time level
   eqts%tc = eqts%tp + pts%x(1) * nm%bc * &
-                  eqts%g%msk / spread(ch%bc, 3, nk)
+                  eqts%g%msk / spread(eqch%mch, 3, nk)
   eqts%sc = eqts%sp + pts%x(2) * nm%bc * &
-                  eqts%g%msk / spread(ch%bc, 3, nk)
+                  eqts%g%msk / spread(eqch%mch, 3, nk)
 
   ! set T > -1.5 temporarily since no seaice model
   where ( eqts%g%msk > 0 .and. eqts%tc < tice ) &
@@ -497,7 +499,7 @@ subroutine int_ts (eqts, acw, wm) !{{{1
   eqts%act = eqts%act + eqts%tc
   eqts%acs = eqts%acs + eqts%sc
   ! calc. density 
-  call den_alpha (wk, eqts%tp, eqts%sp, ch%tc, gt%msk)
+  call den_alpha (wk, eqts%tp, eqts%sp, eqch%chc, gt%msk)
   eqts%acr = eqts%acr + 1.0/wk
   eqts%n = eqts%n + 1
 
@@ -606,11 +608,11 @@ subroutine int_ssh (acssh, alpha) !{{{1
   integer :: i, j
 
   ! calc. density with different ch and t, s
-  call den_alpha (alpha, eqts%tp, eqts%sp, ch%bc, gt%msk)
+  call den_alpha (alpha, eqts%tp, eqts%sp, eqch%mch, gt%msk)
 
   do j = 1, nj
   do i = 1, ni
-    ssh(i,j) = sum(alpha(i,j,:) * git%dpr*ch%bc(i,j) * gt%msk(i,j,:))/g
+    ssh(i,j) = sum(alpha(i,j,:) * git%dpr*eqch%mch(i,j) * gt%msk(i,j,:))/g
   end do
   end do
   ssh = gt%phih / g + ssh
@@ -630,7 +632,7 @@ subroutine upwelling( wm ) !{{{1
     wk2d
   integer :: k
 
-  call op_ter( sch, ch%tp, ch%hg, g32%hg )
+  call op_ter( sch, eqch%chp, eqch%hg, g32%hg )
   sch3d = spread( sqrt(sch), 3, nk )
   call op_div( wk3d, sch3d*equv%uc, sch3d*equv%vc, &
                 guj, guj, wm%g%hg )

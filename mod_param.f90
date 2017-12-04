@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-11-10 09:54:51 BJT
+! Last Change: 2017-12-04 12:44:06 BJT
 
 module mod_param
 
@@ -60,6 +60,7 @@ module mod_param
 
   integer, parameter :: missing_int = -999
   real (kind=sglp), parameter :: missing_float = -9.99999e30
+  real (kind=wp), parameter :: missing_double = -9.99999e30
 
   ! parallel
   integer, parameter :: mid = 0 ! Master ID
@@ -107,19 +108,47 @@ subroutine param_set_io ( ) !{{{1
     'reference state: sea bottom pressure (T-grid)', 'Pa', 'mean')
 
   ! set restart infomations
-  if (nm%rst == 1) rst_info%fname = trim(nm%od)//'restart.nc'
-  if (myid == mid) &
-    print *, "I'm going for a restart-run from "//trim(rst_info%fname)
+  if (nm%rst == 1) then 
+    rst_info%fname = trim(nm%od)//'restart.nc'
+    if (myid == mid) &
+      print *, "I'm going for a restart-run from "//trim(rst_info%fname)
+  end if
 
-  call set_var_info (rst_info%ch, vars_info%ch%name, &
+  call set_var_info (rst_info%chc, 'chc', &
+    vars_info%ch%longname, vars_info%ch%units, 'restart')
+  call set_var_info (rst_info%chp, 'chp', &
     vars_info%ch%longname, vars_info%ch%units, 'restart')
 
-  call set_var_info (rst_info%pt, vars_info%pt%name, &
+  call set_var_info (rst_info%tc, 'tc', &
     vars_info%pt%longname, vars_info%pt%units, 'restart')
-
-  call set_var_info (rst_info%sa, vars_info%sa%name, &
+  call set_var_info (rst_info%sc, 'sc', &
     vars_info%sa%longname, vars_info%sa%units, 'restart')
+  call set_var_info (rst_info%tp, 'tp', &
+    vars_info%pt%longname, vars_info%pt%units, 'restart')
+  call set_var_info (rst_info%sp, 'sp', &
+    vars_info%sa%longname, vars_info%sa%units, 'restart')
+
+  call set_var_info (rst_info%uc, 'uc', &
+    vars_info%u%longname, vars_info%u%units, 'restart')
+  call set_var_info (rst_info%vc, 'vc', &
+    vars_info%v%longname, vars_info%v%units, 'restart')
+  call set_var_info (rst_info%up, 'up', &
+    vars_info%u%longname, vars_info%u%units, 'restart')
+  call set_var_info (rst_info%vp, 'vp', &
+    vars_info%v%longname, vars_info%v%units, 'restart')
   
+  call set_var_info (rst_info%auc, 'auc', &
+    'advection of velocity', 'm/s^2', 'restart')
+  call set_var_info (rst_info%avc, 'avc', &
+    'advection of velocity', 'm/s^2', 'restart')
+  call set_var_info (rst_info%aup, 'aup', &
+    'advection of velocity', 'm/s^2', 'restart')
+  call set_var_info (rst_info%avp, 'avp', &
+    'advection of velocity', 'm/s^2', 'restart')
+  call set_var_info (rst_info%aupp, 'aupp', &
+    'advection of velocity', 'm/s^2', 'restart')
+  call set_var_info (rst_info%avpp, 'avpp', &
+    'advection of velocity', 'm/s^2', 'restart')
 end subroutine param_set_io
 
 subroutine set_var_info ( var_info, varname, longname, units, vartype ) !{{{1

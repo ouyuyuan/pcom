@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-11-26 10:39:58 BJT
+! Last Change: 2017-12-03 09:28:24 BJT
 
 module mod_type
 
@@ -29,11 +29,11 @@ module mod_type
     type_eq_ts, &
     type_eq_uv, &
     type_eq_uvb, &
+    type_eq_w, &
+    type_eq_ch, &
     type_frc, &
     type_bnd, &
     type_bintgu, &
-    type_ch, &
-    type_accu_gr3d, &
     type_accu_gr2d, &
     operator(+), &
     operator(<), &
@@ -59,7 +59,11 @@ module mod_type
   ! restart file infomation
   type type_rst_info
     character (len=80) :: fname, cdate, pdate
-    type (type_var_info) :: ch, pt, sa
+    type (type_var_info) :: &
+      chc, chp, & ! normalized sea-bottom pressure of current/previous time step
+      tc, sc, tp, sp, & ! temperature/salinity of current/previous time step
+      uc, vc, up, vp, & ! zonal/longitinal velocity
+      auc, avc, aup, avp, aupp, avpp ! advection of u/v
   end type type_rst_info
 
   ! matrix structure !{{{1
@@ -174,6 +178,27 @@ module mod_type
     type (type_gi), pointer :: hg
   end type type_eq_uvb
 
+  type type_eq_w
+    real (kind=wp), dimension(:,:,:), pointer :: & 
+      acw ! unweighted accumulated velocity, for time mean
+          ! m/s, bottom is assume to be zero, so it is nk layers, not nkp layers
+    type (type_gij), pointer :: g
+    integer :: n ! how many records in accumulated values
+  end type type_eq_w
+
+  type type_eq_ch
+    ! prognostic equation for pressure bottom, i.e., the mass-conservation equation in PCOM
+    real (kind=wp), dimension(:,:), pointer :: & 
+     ! normalized sea bottom pressure when using stagger time scheme
+     chc, & ! current  time step values of ch
+     chp, & ! previous time step values of ch
+     mch, & ! mean values in 1 baroclinic step ( = pbt_st(:,:,2) of v1.0 )
+     mch2,& ! mean values in 2 baroclinic step ( = pbt_st(:,:,3) of v1.0 )
+     acch     !  , accumulated normalized sea bottom pressure
+    type (type_gi), pointer :: hg
+    integer :: n ! how many records in accumulated values
+  end type type_eq_ch
+
   ! compound variables !{{{1
 
   ! forcing
@@ -202,24 +227,7 @@ module mod_type
     real (kind=wp), allocatable, dimension(:,:) :: ye, yw 
   end type type_bintgu
 
-  ! normalized sea bottom pressure when using stagger time scheme
-  type :: type_ch
-    real (kind=wp), allocatable :: tp(:,:) ! previous time step values
-    real (kind=wp), allocatable :: tc(:,:) ! current  time step values
-    ! mean values in 1 baroclinic step ( = pbt_st(:,:,2) of v1.0 )
-    real (kind=wp), allocatable :: bc(:,:) 
-    ! mean values in 2 baroclinic step ( = pbt_st(:,:,3) of v1.0 )
-    real (kind=wp), allocatable :: bc2(:,:)
-    type (type_gi), pointer :: hg
-  end type type_ch
-
   ! accumulated variables !{{{1
-  ! for time-average output
-  type :: type_accu_gr3d
-    type (type_gvar_r3d) :: var
-    integer :: n
-  end type type_accu_gr3d
-
   type :: type_accu_gr2d
     type (type_gvar_r2d) :: var
     integer :: n

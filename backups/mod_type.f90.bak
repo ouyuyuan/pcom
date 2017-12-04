@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-11-07 10:09:30 BJT
+! Last Change: 2017-12-02 16:30:16 BJT
 
 module mod_type
 
@@ -25,14 +25,15 @@ module mod_type
     type_gij, &
     type_gvar_r2d, &
     type_gvar_r3d, &
-    type_gvar_m2d, &
-    type_gvar_m3d, &
+    type_gvar_r4d, &
+    type_eq_ts, &
+    type_eq_uv, &
+    type_eq_uvb, &
+    type_eq_w, &
+    type_eq_ch, &
     type_frc, &
     type_bnd, &
     type_bintgu, &
-    type_ch, &
-    type_accu_gm3d, &
-    type_accu_gr3d, &
     type_accu_gr2d, &
     operator(+), &
     operator(<), &
@@ -52,13 +53,17 @@ module mod_type
   type type_vars_info
     type (type_var_info) :: &
       pt, sa, u, v, w, rho, &
-      ssh, ch, prh, &
-      rst_ch
+      ssh, ch, prh
   end type type_vars_info
 
   ! restart file infomation
   type type_rst_info
-    character (len=80) :: fname
+    character (len=80) :: fname, cdate, pdate
+    type (type_var_info) :: &
+      chc, chp, &
+      pt, sa, &
+      uc, vc, up, vp
+      
   end type type_rst_info
 
   ! matrix structure !{{{1
@@ -135,28 +140,81 @@ module mod_type
     type (type_gij), pointer :: g
   end type type_gvar_r3d
 
-  type type_gvar_m2d
-    type (type_gvar_r2d) :: x(2)
-  end type type_gvar_m2d
+  type type_gvar_r4d
+    real (kind=wp), allocatable :: v(:,:,:,:) ! data values
+    type (type_gij), pointer :: g
+  end type type_gvar_r4d
 
-  type type_gvar_m3d
-    type (type_gvar_r3d) :: x(2)
-  end type type_gvar_m3d
+  ! equation variables  !{{{1
+
+  type type_eq_ts
+    real (kind=wp), dimension(:,:,:), pointer :: & ! temperature, salinity
+      tc, sc, & ! current time step
+      tp, sp, & ! previous time step
+      act, acs, acr  ! accumulated temp., salinity, density
+    type (type_gij), pointer :: g
+    integer :: n ! how many records in act and acs
+  end type type_eq_ts
+
+  type type_eq_uv
+    real (kind=wp), dimension(:,:,:), pointer :: & 
+      uc, vc, & ! current time of zonal currents, pressure weighted, P.15 (2.39)
+      up, vp, & ! previous time step ...
+      acu, acv, &  ! unweighted accumulated values, for time mean
+      auc, aup, aupp, & ! current/previous/pre-previous time step of advection of u
+      avc, avp, avpp, & ! current/previous/pre-previous time step of advection of v
+      fx, fy ! N, friction forces in momentum equation
+    real (kind=wp), dimension(:,:), pointer :: & 
+      pax, pay ! Pa/m, gradient forces of overloading atmospheric pressure
+    type (type_gij), pointer :: g
+    integer :: n ! how many records in accumulated values
+  end type type_eq_uv
+
+  type type_eq_uvb
+    ! barotropic momentum equation
+    real (kind=wp), dimension(:,:), pointer :: & 
+      uc, vc, up, vp, & ! current/previous timestep of barotropic velocities
+      ut, vt ! tendency of barotropic velocity
+    type (type_gi), pointer :: hg
+  end type type_eq_uvb
+
+  type type_eq_w
+    real (kind=wp), dimension(:,:,:), pointer :: & 
+      acw ! unweighted accumulated velocity, for time mean
+          ! m/s, bottom is assume to be zero, so it is nk layers, not nkp layers
+    type (type_gij), pointer :: g
+    integer :: n ! how many records in accumulated values
+  end type type_eq_w
+
+  type type_eq_ch
+    ! prognostic equation for pressure bottom, i.e., the mass-conservation equation in PCOM
+    real (kind=wp), dimension(:,:), pointer :: & 
+     ! normalized sea bottom pressure when using stagger time scheme
+     chc, & ! current  time step values of ch
+     chp, & ! previous time step values of ch
+     mch, & ! mean values in 1 baroclinic step ( = pbt_st(:,:,2) of v1.0 )
+     mch2,& ! mean values in 2 baroclinic step ( = pbt_st(:,:,3) of v1.0 )
+     acch     !  , accumulated normalized sea bottom pressure
+    type (type_gi), pointer :: hg
+    integer :: n ! how many records in accumulated values
+  end type type_eq_ch
 
   ! compound variables !{{{1
 
   ! forcing
   type :: type_frc
-    type (type_gvar_m3d) :: tau ! wind stress (taux, tauy)
-    type (type_gvar_m3d) :: ts  ! climatic mean surface (temp., salinity)
+    type (type_gvar_r3d) :: taux ! wind stress (taux, tauy)
+    type (type_gvar_r3d) :: tauy ! 
+    type (type_gvar_r3d) :: t   ! climatic mean surface temp.
+    type (type_gvar_r3d) :: s  ! climatic mean surface salinity
     type (type_gvar_r3d) :: pa  ! sea level atmospheric pressure
     type (type_gvar_r3d) :: fw  ! fresh water flux (evaporation - precp.)
   end type type_frc
 
   ! surface boundary
   type :: type_bnd
-    type (type_gvar_m2d) :: tau
-    type (type_gvar_m2d) :: ts
+    type (type_gvar_r2d) :: taux, tauy
+    type (type_gvar_r2d) :: t, s
     type (type_gvar_r2d) :: pa
     type (type_gvar_r2d) :: fw
   end type type_bnd
@@ -169,29 +227,7 @@ module mod_type
     real (kind=wp), allocatable, dimension(:,:) :: ye, yw 
   end type type_bintgu
 
-  ! normalized sea bottom pressure when using stagger time scheme
-  type :: type_ch
-    real (kind=wp), allocatable :: tp(:,:) ! previous time step values
-    real (kind=wp), allocatable :: tc(:,:) ! current  time step values
-    ! mean values in 1 baroclinic step ( = pbt_st(:,:,2) of v1.0 )
-    real (kind=wp), allocatable :: bc(:,:) 
-    ! mean values in 2 baroclinic step ( = pbt_st(:,:,3) of v1.0 )
-    real (kind=wp), allocatable :: bc2(:,:)
-    type (type_gi), pointer :: hg
-  end type type_ch
-
   ! accumulated variables !{{{1
-  ! for time-average output
-  type :: type_accu_gm3d
-    type (type_gvar_m3d) :: var
-    integer :: n
-  end type type_accu_gm3d
-
-  type :: type_accu_gr3d
-    type (type_gvar_r3d) :: var
-    integer :: n
-  end type type_accu_gr3d
-
   type :: type_accu_gr2d
     type (type_gvar_r2d) :: var
     integer :: n

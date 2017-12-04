@@ -4,7 +4,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-11-06 10:09:15 BJT
+! Last Change: 2017-12-02 15:54:52 BJT
 
 module mod_int
 
@@ -14,12 +14,11 @@ module mod_int
     g1j, g2j, g3j, g4j, &
     gi2, g12, g32, &
     gt, gu, gtj, guj, git, giw, &
-    am, bnd, ts, &
+    am, bnd, eqts, &
     bphi, bgraphi, &
-    badv, &
-    frc, fri, graphih, grapa, &
-    alpha, adp, ch, cor, &
-    up, upb, z, adv, prho, &
+    frc, graphihx, graphihy, &
+    alpha, adp, cor, &
+    equv, equvb, eqch, z, prho, &
     glo_lon, glo_lat
 
   use mod_con, only: &
@@ -37,12 +36,14 @@ module mod_int
   use mod_param, only: ni, nj, nk, nim, njm, nkp, &
     tp, tc, tpp, nm
 
-  use mod_type, only: type_mat, type_accu_gm3d, &
-    type_accu_gr3d, type_accu_gr2d, &
+  use mod_type, only: type_mat, &
+    type_accu_gr2d, &
     type_bnd, tctr, &
-    type_gvar_r3d, type_gvar_r2d, type_gvar_m3d, &
-    type_gvar_m2d, type_bintgu, type_ch, &
-    type_days_month
+    type_gvar_r4d, type_gvar_r3d, type_gvar_r2d, &
+    type_bintgu, &
+    type_days_month, &
+    type_eq_ts, type_eq_uv, type_eq_uvb, type_eq_w, &
+    type_eq_ch
 
   implicit none
   private
@@ -62,8 +63,7 @@ subroutine int_pgra (adp, bphi, bgraphi) !{{{1
   ! calc. pressure gradient Force due to free surface eta
   type (type_gvar_r3d) :: adp 
   type (type_bintgu) :: bphi, bgraphi
-  type (type_mat), dimension(ni,nj,nk) :: wkmat
-  real (kind=wp),  dimension(ni,nj,nk) :: pr3d, wk, wkb, wkc
+  real (kind=wp), dimension(ni,nj,nk) :: pr3d, wk, wkb, wkc, wkx, wky
 
   ! indefinite integration from p to sea bottom
   call op_int_tobot( adp%v, alpha%v, alpha%g )
@@ -79,30 +79,30 @@ subroutine int_pgra (adp, bphi, bgraphi) !{{{1
   wk  = wkb + pr3d * wkc
   call op_vint_ew( wk, bphi%ye, bphi%yw )
 
-  call op_gra( wkmat, adp%v, gtj, gtj%ew, gtj%ns )
-  call op_vint_ns( wkmat%x(1), bgraphi%xn, bgraphi%xs)
-  call op_vint_ew( wkmat%x(2), bgraphi%ye, bgraphi%yw )
+  call op_gra( wkx, wky, adp%v, gtj, gtj%ew, gtj%ns )
+  call op_vint_ns( wkx, bgraphi%xn, bgraphi%xs )
+  call op_vint_ew( wky, bgraphi%ye, bgraphi%yw )
 
 end subroutine int_pgra
 
-subroutine int_readyc (grapa, badv, adv, fri, wm) !{{{1
+subroutine int_readyc (equv, equvb, wm) !{{{1
   ! prepare for baroclinic integration
-  type (type_gvar_m2d) :: grapa, badv 
-  type (type_gvar_m3d) :: adv(3), fri
+  type (type_eq_uv) :: equv
+  type (type_eq_uvb) :: equvb
   type (type_gvar_r3d) :: wm
 
-  type (type_mat), dimension(ni,nj) :: wkm2d
-  real (kind=wp), dimension(ni,nj) :: sch ! square root of ch
+  real (kind=wp), dimension(ni,nj) :: sch, & ! square root of ch
+    wkx, wky
   integer :: k
 
   ! atmospheric gradient
-  call op_gra( wkm2d, bnd%pa%v, bnd%pa%hg, bnd%pa%hg%ew, bnd%pa%hg%ns )
-  call op_ter( grapa%x(1)%v, wkm2d%x(1), bnd%pa%hg%ew, grapa%x(1)%hg )
-  call op_ter( grapa%x(2)%v, wkm2d%x(2), bnd%pa%hg%ns, grapa%x(2)%hg )
+  call op_gra( bnd%pa%v, bnd%pa%hg, wkx, wky )
+  call op_ter( equv%pax, wkx, bnd%pa%hg%ew, equv%g%hg )
+  call op_ter( equv%pay, wky, bnd%pa%hg%ns, equv%g%hg )
 
   ! the optional parameter 1.0 for interpolation is ressonable 
   !   and is neccessary, otherwise NaN will be created when divide sch
-  call op_ter( sch, ch%tc, ch%hg, guj, one )
+  call op_ter( sch, eqch%chc, eqch%hg, guj, one )
   sch = sqrt( sch )
   where (gu%lev == 0) sch = 1.0
 
@@ -110,48 +110,53 @@ subroutine int_readyc (grapa, badv, adv, fri, wm) !{{{1
   call upwelling( wm )
 
   ! advection of velocities, retain 3 time steps for time filter
-  adv(tpp) = adv(tp)
-  adv(tp)  = adv(tc)
-  call op_adv( adv(tc)%x(1)%v, up(tc)%x(1)%v, sch )
-  call op_adv( adv(tc)%x(2)%v, up(tc)%x(2)%v, sch )
+  equv%aupp = equv%aup
+  equv%avpp = equv%avp
+  equv%aup  = equv%auc
+  equv%avp  = equv%avc
+
+  call op_adv( equv%auc, equv%uc, sch )
+  call op_adv( equv%avc, equv%vc, sch )
 
   if ( tctr%i == 1 ) then
-    adv(tpp) = adv(tc)
-    adv(tp)  = adv(tc)
+    equv%aupp = equv%auc
+    equv%avpp = equv%avc
+    equv%aup  = equv%auc
+    equv%avp  = equv%avc
   else if ( tctr%i == 2 ) then
-    adv(tpp) = adv(tp)
+    equv%aupp = equv%aup
+    equv%avpp = equv%avp
   end if
 
-  call op_fri( fri, sch, up(tc), bnd%tau )
+  call op_fri( equv%fx, equv%fy, sch, bnd%taux%v, bnd%tauy%v )
 
   ! vertical integration of tendency of baroclinic velocity
-  badv%x(1)%v = 0.0
-  badv%x(2)%v = 0.0
+  equvb%ut = 0.0
+  equvb%vt = 0.0
   do k = 1, nk
-    wkm2d%x(1) = - adv(tc)%x(1)%v(:,:,k) - sch*a0*grapa%x(1)%v + &
-      fri%x(1)%v(:,:,k)
-    wkm2d%x(2) = - adv(tc)%x(2)%v(:,:,k) - sch*a0*grapa%x(2)%v + &
-      fri%x(2)%v(:,:,k)
-    badv%x(1)%v = badv%x(1)%v + wkm2d%x(1)*gu%vg%dpr(k)*gu%msk(:,:,k)
-    badv%x(2)%v = badv%x(2)%v + wkm2d%x(2)*gu%vg%dpr(k)*gu%msk(:,:,k)
+    wkx = - equv%auc(:,:,k) - sch*a0*equv%pax + &
+      equv%fx(:,:,k)
+    wky = - equv%avc(:,:,k) - sch*a0*equv%pay + &
+      equv%fy(:,:,k)
+    equvb%ut = equvb%ut + wkx*gu%vg%dpr(k)*gu%msk(:,:,k)
+    equvb%vt = equvb%vt + wky*gu%vg%dpr(k)*gu%msk(:,:,k)
   end do
 
-  badv%x(1)%v = badv%x(1)%v / gu%prh
-  badv%x(2)%v = badv%x(2)%v / gu%prh
+  equvb%ut = equvb%ut / gu%prh
+  equvb%vt = equvb%vt / gu%prh
 
 end subroutine int_readyc
 
-subroutine int_trop (ch, upb, acch) !{{{1
+subroutine int_trop (equvb, eqch) !{{{1
   ! barotropic integrations for 2 baroclinic steps
-  type (type_ch) :: ch
-  type (type_gvar_m2d) :: upb(2)
-  type (type_accu_gr2d) :: acch
+  type (type_eq_uvb) :: equvb
+  type (type_eq_ch) :: eqch
 
   type (type_mat), dimension(ni,nj) :: &
     supb, & ! scale barotropic velocity
     grach, & ! 1/m, bottom pressure gradient
-    upbaccu, & ! m/s, accumulate upb in the whole barotropic cycle
-    pupb, & ! m/s^2, tendency of upb, (p upb)/(p t)
+    upbaccu, & ! m/s, accumulate ub in the whole barotropic cycle
+    pupb, & ! m/s^2, tendency of ub, (p ub)/(p t)
     pgra, & ! N, pressure gradient force
     grachint, & ! N, bottom pressure gradient mul. geopotential int.
     chgraint, & ! N, bottom pressure mul. gradient of geopotential int.
@@ -165,30 +170,30 @@ subroutine int_trop (ch, upb, acch) !{{{1
   integer :: nt, nstep
 
   seau = gu%msk(:,:,1)
-  upbaccu%x(1) = upb(tc)%x(1)%v
-  upbaccu%x(2) = upb(tc)%x(2)%v
+  upbaccu%x(1) = equvb%uc
+  upbaccu%x(2) = equvb%vc
 
-  ch%bc  = ch%tc
-  ch%bc2 = ch%tc
+  eqch%mch  = eqch%chc
+  eqch%mch2 = eqch%chc
   nstep   = nm%bc / nm%bt * 2
 
   do nt = 1, nstep
     sch = 1.0
-    call op_ter( wk, ch%tp, ch%hg, guj )
+    call op_ter( wk, eqch%chp, eqch%hg, guj )
     where ( gu%lev > 0 ) sch = sqrt(wk)
 
     ! calculate ch at predictor time step
-    supb%x(1) = gu%prh*sch * upb(tp)%x(1)%v
-    supb%x(2) = gu%prh*sch * upb(tp)%x(2)%v
-    call op_div( wk, supb%x(1), supb%x(2), guj, guj, ch%hg)
-    wk = ch%tp - wk * nm%bt * gamma_b / gt%prh
-    where ( gt%lev > 0 ) ch%tc = wk
+    supb%x(1) = gu%prh*sch * equvb%up
+    supb%x(2) = gu%prh*sch * equvb%vp
+    call op_div( wk, supb%x(1), supb%x(2), guj, guj, eqch%hg)
+    wk = eqch%chp - wk * nm%bt * gamma_b / gt%prh
+    where ( gt%lev > 0 ) eqch%chc = wk
 
-    call op_ter( wk, ch%tc, ch%hg, guj )
+    call op_ter( wk, eqch%chc, eqch%hg, guj )
     where ( gu%lev > 0 ) sch = sqrt(wk)
 
-    call op_lap( wkmat%x(1), upb(tp)%x(1)%v, guj, guj )
-    call op_lap( wkmat%x(2), upb(tp)%x(2)%v, guj, guj )
+    call op_lap( wkmat%x(1), equvb%up, guj, guj )
+    call op_lap( wkmat%x(2), equvb%vp, guj, guj )
     vs%x(1) = seau*am%v(:,:,1)*wkmat%x(1)
     vs%x(2) = seau*am%v(:,:,1)*wkmat%x(2)
     ! vs is changed every nt step, it only minus the first nt
@@ -200,7 +205,7 @@ subroutine int_trop (ch, upb, acch) !{{{1
 
     ! pressure gradient due to the change of free surface
     ! special interpolation from g2j to g3j for pressure gradient force
-    call op_gra( grach, ch%tc, ch%hg, ch%hg%ew, ch%hg%ns )
+    call op_gra( grach, eqch%chc, eqch%hg, eqch%hg%ew, eqch%hg%ns )
     grachint(:,1:njm)%x(1) = 0.5 * ( &
        grach(:,1:njm)%x(1) * bphi%xn(:,1:njm) + &
        grach(:, 2:nj)%x(1) * bphi%xs(:, 2:nj) )
@@ -209,73 +214,75 @@ subroutine int_trop (ch, upb, acch) !{{{1
        grach(2:ni, :)%x(2) * bphi%yw(2:ni, :) )
     call mympi_swpbnd( grachint )
 
-    call op_ter( wk, ch%tc, ch%hg, ch%hg%ew )
+    call op_ter( wk, eqch%chc, eqch%hg, eqch%hg%ew )
     chgraint(:,1:njm)%x(1) = 0.5 * ( &
        wk(:,1:njm) * bgraphi%xn(:,1:njm) + &
        wk(:, 2:nj) * bgraphi%xs(:, 2:nj) )
-    call op_ter( wk, ch%tc, ch%hg, ch%hg%ns )
+    call op_ter( wk, eqch%chc, eqch%hg, eqch%hg%ns )
     chgraint(1:nim,:)%x(2) = 0.5 * ( &
        wk(1:nim,:) * bgraphi%ye(1:nim,:) + &
        wk(2:ni, :) * bgraphi%yw(2:ni, :) )
     call mympi_swpbnd( chgraint )
 
     pgra%x(1) = (grachint%x(1) + chgraint%x(1) + &
-      graphih%x(1)%v)*seau*sch
+      graphihx%v)*seau*sch
     pgra%x(2) = (grachint%x(2) + chgraint%x(2) + &
-      graphih%x(2)%v)*seau*sch
+      graphihy%v)*seau*sch
 
     ! advection + viscosiy + pressure gradient + coriolis
     ! forces in land set to zero
-    pupb%x(1) = seau*( vs%x(1)-vs1%x(1) + badv%x(1)%v - pgra%x(1) + &
-                       0.5*cor%v*upb(tp)%x(2)%v )
-    pupb%x(2) = seau*( vs%x(2)-vs1%x(2) + badv%x(2)%v - pgra%x(2) - &
-                       0.5*cor%v*upb(tp)%x(1)%v )
+    pupb%x(1) = seau*( vs%x(1)-vs1%x(1) + equvb%ut - pgra%x(1) + &
+                       0.5*cor%v*equvb%vp )
+    pupb%x(2) = seau*( vs%x(2)-vs1%x(2) + equvb%vt - pgra%x(2) - &
+                       0.5*cor%v*equvb%up )
 
     ! Coriolis adjustment
-    wkmat%x(1) = pupb%x(1) * nm%bt + upb(tp)%x(1)%v
-    wkmat%x(2) = pupb%x(2) * nm%bt + upb(tp)%x(2)%v
-    upb(tc)%x(1)%v = ( wkmat%x(1) + 0.5*cor%v*nm%bt*wkmat%x(2) ) / &
+    wkmat%x(1) = pupb%x(1) * nm%bt + equvb%up
+    wkmat%x(2) = pupb%x(2) * nm%bt + equvb%vp
+    equvb%uc = ( wkmat%x(1) + 0.5*cor%v*nm%bt*wkmat%x(2) ) / &
                      ( 1 + (0.5*cor%v*nm%bt)**2 )
-    upb(tc)%x(2)%v = ( wkmat%x(2) - 0.5*cor%v*nm%bt*wkmat%x(1) ) / &
+    equvb%vc = ( wkmat%x(2) - 0.5*cor%v*nm%bt*wkmat%x(1) ) / &
                      ( 1 + (0.5*cor%v*nm%bt)**2 )
 
-    upb(tc)%x(1)%v = 0.5 * (upb(tc)%x(1)%v + upb(tp)%x(1)%v)
-    upb(tc)%x(2)%v = 0.5 * (upb(tc)%x(2)%v + upb(tp)%x(2)%v)
+    equvb%uc = 0.5 * (equvb%uc + equvb%up)
+    equvb%vc = 0.5 * (equvb%vc + equvb%vp)
 
-    ! upb at next time step
-    pupb%x(1) = seau*( vs%x(1)-vs1%x(1) - pgra%x(1) + badv%x(1)%v + &
-                       cor%v*upb(tc)%x(2)%v )
-    pupb%x(2) = seau*( vs%x(2)-vs1%x(2) - pgra%x(2) + badv%x(2)%v - &
-                       cor%v*upb(tc)%x(1)%v )
-    upb(tc)%x(1)%v = pupb%x(1) * nm%bt + upb(tp)%x(1)%v
-    upb(tc)%x(2)%v = pupb%x(2) * nm%bt + upb(tp)%x(2)%v
-    upb(tp) = upb(tc)
+    ! ub at next time step
+    pupb%x(1) = seau*( vs%x(1)-vs1%x(1) - pgra%x(1) + equvb%ut + &
+                       cor%v*equvb%vc )
+    pupb%x(2) = seau*( vs%x(2)-vs1%x(2) - pgra%x(2) + equvb%vt - &
+                       cor%v*equvb%uc )
+    equvb%uc = pupb%x(1) * nm%bt + equvb%up
+    equvb%vc = pupb%x(2) * nm%bt + equvb%vp
+    equvb%up = equvb%uc
+    equvb%vp = equvb%vc
 
     ! calculate ch at corrector time step
-    supb%x(1) = gu%prh*sch * upb(tc)%x(1)%v
-    supb%x(2) = gu%prh*sch * upb(tc)%x(2)%v
-    call op_div( wk, supb%x(1), supb%x(2), guj, guj, ch%hg)
-    ch%tc = ch%tp - gt%msk(:,:,1)*wk*nm%bt/gt%prh
-    if ( nt <= nstep/2 ) ch%bc = ch%bc + ch%tc
-    ch%tp = ch%tc
+    supb%x(1) = gu%prh*sch * equvb%uc
+    supb%x(2) = gu%prh*sch * equvb%vc
+    call op_div( wk, supb%x(1), supb%x(2), guj, guj, eqch%hg)
+    eqch%chc = eqch%chp - gt%msk(:,:,1)*wk*nm%bt/gt%prh
+    if ( nt <= nstep/2 ) eqch%mch = eqch%mch + eqch%chc
+    eqch%chp = eqch%chc
 
-    upbaccu%x(1) = upbaccu%x(1) + upb(tc)%x(1)%v
-    upbaccu%x(2) = upbaccu%x(2) + upb(tc)%x(2)%v
-    ch%bc2 = ch%bc2 + ch%tc
+    upbaccu%x(1) = upbaccu%x(1) + equvb%uc
+    upbaccu%x(2) = upbaccu%x(2) + equvb%vc
+    eqch%mch2 = eqch%mch2 + eqch%chc
   end do
 
-  upb(tc)%x(1)%v = upbaccu%x(1) / ( nstep + 1 )
-  upb(tc)%x(2)%v = upbaccu%x(2) / ( nstep + 1 )
-  upb(tp) = upb(tc)
+  equvb%uc = upbaccu%x(1) / ( nstep + 1 )
+  equvb%vc = upbaccu%x(2) / ( nstep + 1 )
+  equvb%up = equvb%uc
+  equvb%vp = equvb%vc
 
-  ch%bc  = ch%bc / ( nstep/2 + 1 )
-  ch%bc2 = ch%bc2 / ( nstep + 1 )
+  eqch%mch  = eqch%mch / ( nstep/2 + 1 )
+  eqch%mch2 = eqch%mch2 / ( nstep + 1 )
 
-  ch%tc = ch%bc2
-  ch%tp = ch%tc
+  eqch%chc = eqch%mch2
+  eqch%chp = eqch%chc
 
-  acch%var%v = acch%var%v + ch%tc
-  acch%n = acch%n + 1
+  eqch%acch = eqch%acch + eqch%chc
+  eqch%n = eqch%n + 1
 
   ! sea bottom pressure (include pa) can be calculated by
   ! ( modification of 2.44 of Ou2016_phd,
@@ -285,16 +292,15 @@ subroutine int_trop (ch, upb, acch) !{{{1
 
 end subroutine int_trop
 
-subroutine int_clin (up, acuv, am) !{{{1
+subroutine int_clin (equv, am) !{{{1
   ! prediction of velocity of baroclinic mode
-  type (type_gvar_m3d) :: up(2)
-  type (type_accu_gm3d) :: acuv
+  type (type_eq_uv) :: equv
   real (kind=wp), dimension(ni,nj,nk) :: am
 
   type (type_mat), dimension(ni,nj,nk) :: u ! m/s, horizontal currents
   type (type_mat), dimension(ni,nj) :: &
     pgra, & ! pressure gradient, (grid 2, grid 4)
-    pup, & ! time tendency of up(:,:,k)
+    pup, & ! time tendency of u(:,:,k), v(:,:,k)
     wkmat
   real (kind=wp), dimension(ni,nj) :: &
     sch, & ! , square root of ch, grid 3
@@ -307,15 +313,15 @@ subroutine int_clin (up, acuv, am) !{{{1
   c_tpp =   5.0/12
 
   sch  = 1.0
-  call op_ter( wk, ch%bc, ch%hg, gu%hg, one )
+  call op_ter( wk, eqch%mch, eqch%hg, gu%hg, one )
   where ( gu%lev > 0 ) sch = sqrt(wk)
 
   do k = 1, nk
     ! pressure gradient
-    wk = gt%phih + ch%bc * adp%v(:,:,k)
+    wk = gt%phih + eqch%mch * adp%v(:,:,k)
     call op_gra( pgra, wk, gtj, gtj%ew, gtj%ns )
 
-    wk = ch%bc
+    wk = eqch%mch
     call op_gra( wkmat, wk, gtj, gtj%ew, gtj%ns )
 
     call op_ter( wk, alpha%v(:,:,k), gtj, gtj%ew ) 
@@ -324,25 +330,25 @@ subroutine int_clin (up, acuv, am) !{{{1
     pgra%x(2) = pgra%x(2) + wk*git%pr(k)*wkmat%x(2)
 
     call op_ter( wk, pgra%x(1), gtj%ew, guj )
-    pup%x(1) = - (wk + a0*grapa%x(1)%v)*sch
+    pup%x(1) = - (wk + a0*equv%pax)*sch
     call op_ter( wk, pgra%x(2), gtj%ns, guj )
-    pup%x(2) = - (wk + a0*grapa%x(2)%v)*sch
+    pup%x(2) = - (wk + a0*equv%pay)*sch
 
     ! advection
-    pup%x(1) = pup%x(1) - ( c_tc*adv(tc)%x(1)%v(:,:,k) + &
-                            c_tp*adv(tp)%x(1)%v(:,:,k) + &
-                            c_tpp*adv(tpp)%x(1)%v(:,:,k) )
-    pup%x(2) = pup%x(2) - ( c_tc*adv(tc)%x(2)%v(:,:,k) + &
-                            c_tp*adv(tp)%x(2)%v(:,:,k) + &
-                            c_tpp*adv(tpp)%x(2)%v(:,:,k) )
+    pup%x(1) = pup%x(1) - ( c_tc*equv%auc(:,:,k) + &
+                            c_tp*equv%aup(:,:,k) + &
+                            c_tpp*equv%aupp(:,:,k) )
+    pup%x(2) = pup%x(2) - ( c_tc*equv%avc(:,:,k) + &
+                            c_tp*equv%avp(:,:,k) + &
+                            c_tpp*equv%avpp(:,:,k) )
 
     ! friction
-    pup%x(1) = pup%x(1) + fri%x(1)%v(:,:,k)
-    pup%x(2) = pup%x(2) + fri%x(2)%v(:,:,k)
+    pup%x(1) = pup%x(1) + equv%fx(:,:,k)
+    pup%x(2) = pup%x(2) + equv%fy(:,:,k)
 
     ! Coriolis
-    pup%x(1) = pup%x(1) + cor%v * up(tc)%x(2)%v(:,:,k)
-    pup%x(2) = pup%x(2) - cor%v * up(tc)%x(1)%v(:,:,k)
+    pup%x(1) = pup%x(1) + cor%v * equv%vc(:,:,k)
+    pup%x(2) = pup%x(2) - cor%v * equv%uc(:,:,k)
 
     ! Coriolis adjustment
     wkmat = pup
@@ -353,37 +359,38 @@ subroutine int_clin (up, acuv, am) !{{{1
     pup%x(1) = pup%x(1)*gu%msk(:,:,k) / wk
     pup%x(2) = pup%x(2)*gu%msk(:,:,k) / wk
 
-    ! prognose of up
-    up(tc)%x(1)%v(:,:,k) = up(tp)%x(1)%v(:,:,k) + pup%x(1) * nm%bc
-    up(tc)%x(2)%v(:,:,k) = up(tp)%x(2)%v(:,:,k) + pup%x(2) * nm%bc
+    ! prognose of u
+    equv%uc(:,:,k) = equv%up(:,:,k) + pup%x(1) * nm%bc
+    equv%vc(:,:,k) = equv%vp(:,:,k) + pup%x(2) * nm%bc
   end do
 
  ! interaction between barotropic and baroclinic modes
 
-  call op_vint( wkmat%x(1), up(tc)%x(1)%v, up(tc)%x(1)%g )
-  call op_vint( wkmat%x(2), up(tc)%x(2)%v, up(tc)%x(2)%g )
+  call op_vint( wkmat%x(1), equv%uc, equv%g )
+  call op_vint( wkmat%x(2), equv%vc, equv%g )
 
   do k = 1, nk
     where ( gu%msk(:,:,k) > 0 )
-      up(tc)%x(1)%v(:,:,k) = up(tc)%x(1)%v(:,:,k) - wkmat%x(1) + upb(tc)%x(1)%v
-      up(tc)%x(2)%v(:,:,k) = up(tc)%x(2)%v(:,:,k) - wkmat%x(2) + upb(tc)%x(2)%v
+      equv%uc(:,:,k) = equv%uc(:,:,k) - wkmat%x(1) + equvb%uc
+      equv%vc(:,:,k) = equv%vc(:,:,k) - wkmat%x(2) + equvb%vc
     end where
   end do
-  up(tp) = up(tc)
+  equv%up = equv%uc
+  equv%vp = equv%vc
 
   ! diagnose unweighted 3d currents
-  call op_ter( wk, ch%bc2, ch%hg, gu%hg, one )
+  call op_ter( wk, eqch%mch2, eqch%hg, gu%hg, one )
   sch = sqrt(wk) ! why not set land to 1.0, as previous does?
 
   do k = 1, nk
-    u(:,:,k)%x(1) = up(tc)%x(1)%v(:,:,k) * sch / ch%bc2
-    u(:,:,k)%x(2) = up(tc)%x(2)%v(:,:,k) * sch / ch%bc2
+    u(:,:,k)%x(1) = equv%uc(:,:,k) * sch / eqch%mch2
+    u(:,:,k)%x(2) = equv%vc(:,:,k) * sch / eqch%mch2
   end do
 
   ! accumulate ouput fields for time-average output
-  acuv%var%x(1)%v = acuv%var%x(1)%v + u%x(1)
-  acuv%var%x(2)%v = acuv%var%x(2)%v + u%x(2)
-  acuv%n = acuv%n + 1
+  equv%acu = equv%acu + u%x(1)
+  equv%acv = equv%acv + u%x(2)
+  equv%n = equv%n + 1
 
 ! calculate new am by Smagorinsky Scheme
   call smag( am, u%x(1), u%x(2) )
@@ -429,11 +436,10 @@ subroutine smag( am, u, v ) !{{{2
 
 end subroutine smag
 
-subroutine int_ts (ts, acts, acrho, acw, wm) !{{{1
+subroutine int_ts (eqts, eqw, wm) !{{{1
   ! prognose of temperature and salinity
-  type (type_gvar_m3d) :: ts(2)
-  type (type_accu_gm3d) :: acts
-  type (type_accu_gr3d) :: acrho, acw
+  type (type_eq_ts) :: eqts
+  type (type_eq_w) :: eqw
   type (type_gvar_r3d) :: wm
 
   type (type_mat), dimension(ni,nj,nk) :: &
@@ -447,63 +453,61 @@ subroutine int_ts (ts, acts, acrho, acw, wm) !{{{1
 
   ! diagnostic the vertical velocity in z-coordinate
   do k = 1, nk
-    acw%var%v(:,:,k) = acw%var%v(:,:,k) + &
-      wm%v(:,:,k)*alpha%v(:,:,k) / (g*ch%bc2)
+    eqw%acw(:,:,k) = eqw%acw(:,:,k) + &
+      wm%v(:,:,k)*alpha%v(:,:,k) / (g*eqch%mch2)
   end do
-  acw%n = acw%n + 1
+  eqw%n = eqw%n + 1
 
-  call op_adv_ts( wkm%x(1), ts(tc)%x(1)%v, wm%v )
-  call op_adv_ts( wkm%x(2), ts(tc)%x(2)%v, wm%v )
+  call op_adv_ts( wkm%x(1), eqts%tc, wm%v )
+  call op_adv_ts( wkm%x(2), eqts%sc, wm%v )
   pts%x(1) = - wkm%x(1)
   pts%x(2) = - wkm%x(2)
 
-  call op_dif( wkm%x(1), ch%bc, ts(tp)%x(1)%v )
-  call op_dif( wkm%x(2), ch%bc, ts(tp)%x(2)%v )
+  call op_dif( wkm%x(1), eqch%mch, eqts%tp )
+  call op_dif( wkm%x(2), eqch%mch, eqts%sp )
   pts%x(1) = pts%x(1) + wkm%x(1)
   pts%x(2) = pts%x(2) + wkm%x(2)
 
   ! restored boundary condition
-  pbnd = gamma_t*( bnd%ts%x(1)%v - ts(tc)%x(1)%v(:,:,1) ) &
-         * ts(tc)%x(1)%g%msk(:,:,1) / ts(tc)%x(1)%g%vg%dpr(1) 
+  pbnd = gamma_t*( bnd%t%v - eqts%tc(:,:,1) ) &
+         * eqts%g%msk(:,:,1) / eqts%g%vg%dpr(1) 
   pts(:,:,1)%x(1) = pts(:,:,1)%x(1) + pbnd
 
-  pbnd = gamma_s*( bnd%ts%x(2)%v - ts(tc)%x(2)%v(:,:,1) ) &
-         * ts(tc)%x(2)%g%msk(:,:,1) * ch%bc
+  pbnd = gamma_s*( bnd%s%v - eqts%sc(:,:,1) ) &
+         * eqts%g%msk(:,:,1) * eqch%mch
   pts(:,:,1)%x(2) = pts(:,:,1)%x(2) + pbnd
 
   ! compute T&S at next time level
-  ts(tc)%x(1)%v = ts(tp)%x(1)%v + pts%x(1) * nm%bc * &
-                  ts(tc)%x(1)%g%msk / spread(ch%bc, 3, nk)
-  ts(tc)%x(2)%v = ts(tp)%x(2)%v + pts%x(2) * nm%bc * &
-                  ts(tc)%x(2)%g%msk / spread(ch%bc, 3, nk)
+  eqts%tc = eqts%tp + pts%x(1) * nm%bc * &
+                  eqts%g%msk / spread(eqch%mch, 3, nk)
+  eqts%sc = eqts%sp + pts%x(2) * nm%bc * &
+                  eqts%g%msk / spread(eqch%mch, 3, nk)
 
   ! set T > -1.5 temporarily since no seaice model
-  where ( ts(tc)%x(1)%g%msk > 0 .and. ts(tc)%x(1)%v < tice ) &
-    ts(tc)%x(1)%v = tice
+  where ( eqts%g%msk > 0 .and. eqts%tc < tice ) &
+    eqts%tc = tice
 
   ! convective adjustment
-  call convect( ts(tc) )
+  call convect( eqts )
 
-  ts(tp) = ts(tc)
+  eqts%tp = eqts%tc
+  eqts%sp = eqts%sc
 
   ! accumulate ouput fields for time-average output
-  acts%var%x(1)%v = acts%var%x(1)%v + ts(tc)%x(1)%v
-  acts%var%x(2)%v = acts%var%x(2)%v + ts(tc)%x(2)%v
-  acts%n = acts%n + 1
-
+  eqts%act = eqts%act + eqts%tc
+  eqts%acs = eqts%acs + eqts%sc
   ! calc. density 
-  call den_alpha (wk, ts(tp), ch%tc, gt%msk)
-  
-  acrho%var%v = acrho%var%v + 1.0/wk
-  acrho%n = acrho%n + 1 
+  call den_alpha (wk, eqts%tp, eqts%sp, eqch%chc, gt%msk)
+  eqts%acr = eqts%acr + 1.0/wk
+  eqts%n = eqts%n + 1
 
 end subroutine int_ts
 
-subroutine convect (tra) !{{{2
+subroutine convect (eqts) !{{{2
   ! convective adjustment if unstable stratification occurs
   ! a full convective adjustment scheme, based on GFDL's version
-  ! may be a new scheme can be adopt, like the one I think in my mind.
-  type (type_gvar_m3d) :: tra ! tracers (temperature and salinity)
+  ! 2 tracers (temperature and salinity)
+  type (type_eq_ts) :: eqts 
   real (kind=wp), dimension(nk) :: &
     rhoa, & ! density anomaly
     rhob ! same as roha, but reference to the level below
@@ -511,19 +515,19 @@ subroutine convect (tra) !{{{2
 
   do i = 1, ni
   do j = 1, nj
-    nlev = tra%x(1)%g%lev(i,j)
+    nlev = eqts%g%lev(i,j)
     if ( nlev > 1 ) then 
       rhoa = 0.0
       rhob = 0.0
-      rhoa(2:nlev)   = prho(i,j,2:nlev)%x(1)*tra%x(1)%v(i,j,2:nlev) + &
-                       prho(i,j,2:nlev)%x(2)*tra%x(2)%v(i,j,2:nlev)
-      rhob(1:nlev-1) = prho(i,j,2:nlev)%x(1)*tra%x(1)%v(i,j,1:nlev-1) + &
-                       prho(i,j,2:nlev)%x(2)*tra%x(2)%v(i,j,1:nlev-1)
+      rhoa(2:nlev)   = prho(i,j,2:nlev)%x(1)*eqts%tc(i,j,2:nlev) + &
+                       prho(i,j,2:nlev)%x(2)*eqts%sc(i,j,2:nlev)
+      rhob(1:nlev-1) = prho(i,j,2:nlev)%x(1)*eqts%tc(i,j,1:nlev-1) + &
+                       prho(i,j,2:nlev)%x(2)*eqts%sc(i,j,1:nlev-1)
       kcnt = 1
       do while ( kcnt < nlev )
         ! adjust the upper most pair of unstable layers
         if ( rhob(kcnt) > rhoa(kcnt+1) ) then
-          call adjust( tra, rhoa, rhob, kcnt, nlev, i, j )
+          call adjust( eqts, rhoa, rhob, kcnt, nlev, i, j )
         else
           kcnt = kcnt + 1
         end if
@@ -534,9 +538,9 @@ subroutine convect (tra) !{{{2
 
 end subroutine convect
 
-subroutine adjust( tra, rhoa, rhob, kcnt, nlev, i, j ) !{{{2
+subroutine adjust( eqts, rhoa, rhob, kcnt, nlev, i, j ) !{{{2
   ! mixing the (k, k+1) pair of water layers
-  type (type_gvar_m3d) :: tra
+  type (type_eq_ts) :: eqts
   real (kind=wp), dimension(:) :: rhoa, rhob
   integer :: kcnt
   integer, intent(in) :: nlev, i, j
@@ -546,18 +550,18 @@ subroutine adjust( tra, rhoa, rhob, kcnt, nlev, i, j ) !{{{2
   ! mix the two unstable layers
   na = kcnt
   nb = kcnt + 1
-  call mix( tra, rhoa, rhob, na, nb, i, j )
+  call mix( eqts%tc, eqts%sc, rhoa, rhob, na, nb, i, j )
 
   ! mix the lower layers if needed
   do while ( nb < nlev )
     if ( rhob(nb) > rhoa(nb+1) ) then
       nb = nb + 1
-      call mix( tra, rhoa, rhob, na, nb, i, j )
+      call mix( eqts%tc, eqts%sc, rhoa, rhob, na, nb, i, j )
     else
       if ( (na <= 1) .or. (rhob(na-1) <= rhoa(na)) ) exit
       ! mix the upper layer before checking the below layer again
       na = na - 1
-      call mix( tra, rhoa, rhob, na, nb, i, j )
+      call mix( eqts%tc, eqts%sc, rhoa, rhob, na, nb, i, j )
     end if
   end do
 
@@ -565,7 +569,7 @@ subroutine adjust( tra, rhoa, rhob, kcnt, nlev, i, j ) !{{{2
   do while ( na > 1 )
     if ( rhob(na-1) <= rhoa(na) ) exit
     na = na - 1
-    call mix( tra, rhoa, rhob, na, nb, i, j )
+    call mix( eqts%tc, eqts%sc, rhoa, rhob, na, nb, i, j )
   end do
 
   ! search downwards
@@ -573,23 +577,23 @@ subroutine adjust( tra, rhoa, rhob, kcnt, nlev, i, j ) !{{{2
 
 end subroutine adjust
 
-subroutine mix (tra, rhoa, rhob, na, nb, i, j) !{{{2
+subroutine mix (t, s, rhoa, rhob, na, nb, i, j) !{{{2
   ! mix water layers through the na th layer to the nb th layer
-  type (type_gvar_m3d) :: tra
+  real (kind=wp), dimension(:,:,:) :: t, s
   real (kind=wp), dimension(:) :: rhoa, rhob
   integer, intent(in) :: na, nb, i, j
 
-  tra%x(1)%v(i,j,na:nb) = sum( tra%x(1)%v(i,j,na:nb)*git%dpr(na:nb) ) / sum(git%dpr(na:nb))
-  tra%x(2)%v(i,j,na:nb) = sum( tra%x(2)%v(i,j,na:nb)*git%dpr(na:nb) ) / sum(git%dpr(na:nb))
+  t(i,j,na:nb) = sum( t(i,j,na:nb)*git%dpr(na:nb) ) / sum(git%dpr(na:nb))
+  s(i,j,na:nb) = sum( s(i,j,na:nb)*git%dpr(na:nb) ) / sum(git%dpr(na:nb))
 
-  rhoa(na:nb)   = prho(i,j,na:nb)%x(1)  *tra%x(1)%v(i,j,na:nb)   + &
-                  prho(i,j,na:nb)%x(2)  *tra%x(2)%v(i,j,na:nb)
-  rhob(na:nb-1) = prho(i,j,na+1:nb)%x(1)*tra%x(1)%v(i,j,na:nb-1) + &
-                  prho(i,j,na+1:nb)%x(2)*tra%x(2)%v(i,j,na:nb-1)
+  rhoa(na:nb)   = prho(i,j,na:nb)%x(1)  *t(i,j,na:nb)   + &
+                  prho(i,j,na:nb)%x(2)  *s(i,j,na:nb)
+  rhob(na:nb-1) = prho(i,j,na+1:nb)%x(1)*t(i,j,na:nb-1) + &
+                  prho(i,j,na+1:nb)%x(2)*s(i,j,na:nb-1)
 
   if ( nb < nk ) & 
-    rhob(nb) = prho(i,j,nb+1)%x(1)*tra%x(1)%v(i,j,nb) + &
-               prho(i,j,nb+1)%x(2)*tra%x(2)%v(i,j,nb)
+    rhob(nb) = prho(i,j,nb+1)%x(1)*t(i,j,nb) + &
+               prho(i,j,nb+1)%x(2)*s(i,j,nb)
 end subroutine mix
 
 subroutine int_ssh (acssh, alpha) !{{{1
@@ -601,12 +605,12 @@ subroutine int_ssh (acssh, alpha) !{{{1
   real (kind=wp), dimension(ni,nj) :: ssh
   integer :: i, j
 
-  ! calc. density with different ch and ts
-  call den_alpha (alpha, ts(tp), ch%bc, gt%msk)
+  ! calc. density with different ch and t, s
+  call den_alpha (alpha, eqts%tp, eqts%sp, eqch%mch, gt%msk)
 
   do j = 1, nj
   do i = 1, ni
-    ssh(i,j) = sum(alpha(i,j,:) * git%dpr*ch%bc(i,j) * gt%msk(i,j,:))/g
+    ssh(i,j) = sum(alpha(i,j,:) * git%dpr*eqch%mch(i,j) * gt%msk(i,j,:))/g
   end do
   end do
   ssh = gt%phih / g + ssh
@@ -626,9 +630,9 @@ subroutine upwelling( wm ) !{{{1
     wk2d
   integer :: k
 
-  call op_ter( sch, ch%tp, ch%hg, g32%hg )
+  call op_ter( sch, eqch%chp, eqch%hg, g32%hg )
   sch3d = spread( sqrt(sch), 3, nk )
-  call op_div( wk3d, sch3d*up(tc)%x(1)%v, sch3d*up(tc)%x(2)%v, &
+  call op_div( wk3d, sch3d*equv%uc, sch3d*equv%vc, &
                 guj, guj, wm%g%hg )
   call op_vint(wk2d, wk3d, g12)
   wk2d = - wk2d
@@ -668,15 +672,15 @@ subroutine int_bnd (bnd) !{{{1
     f = ( d - 15.0 )/( days - 15 + 15.0 )
   end if
 
-  bnd%tau%x(1)%v = ( frc%tau%x(1)%v(:,:,m2) - frc%tau%x(1)%v(:,:,m1) )*f &
-                   + frc%tau%x(1)%v(:,:,m1)
-  bnd%tau%x(2)%v = ( frc%tau%x(2)%v(:,:,m2) - frc%tau%x(2)%v(:,:,m1) )*f &
-                   + frc%tau%x(2)%v(:,:,m1)
+  bnd%taux%v = ( frc%taux%v(:,:,m2) - frc%taux%v(:,:,m1) )*f &
+                   + frc%taux%v(:,:,m1)
+  bnd%tauy%v = ( frc%tauy%v(:,:,m2) - frc%tauy%v(:,:,m1) )*f &
+                   + frc%tauy%v(:,:,m1)
 
-  bnd%ts%x(1)%v  = ( frc%ts%x(1)%v(:,:,m2) - frc%ts%x(1)%v(:,:,m1) )*f &
-                   + frc%ts%x(1)%v(:,:,m1)
-  bnd%ts%x(2)%v  = ( frc%ts%x(2)%v(:,:,m2) - frc%ts%x(2)%v(:,:,m1) )*f &
-                   + frc%ts%x(2)%v(:,:,m1)
+  bnd%t%v  = ( frc%t%v(:,:,m2) - frc%t%v(:,:,m1) )*f &
+                   + frc%t%v(:,:,m1)
+  bnd%s%v  = ( frc%s%v(:,:,m2) - frc%s%v(:,:,m1) )*f &
+                   + frc%s%v(:,:,m1)
 
   bnd%pa%v  = ( frc%pa%v(:,:,m2)  - frc%pa%v(:,:,m1)  )*f + frc%pa%v(:,:,m1)
   bnd%fw%v  = ( frc%fw%v(:,:,m2)  - frc%fw%v(:,:,m1)  )*f + frc%fw%v(:,:,m1)

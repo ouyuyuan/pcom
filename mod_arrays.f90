@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-26 15:40:39 BJT
-! Last Change: 2017-11-26 10:38:39 BJT
+! Last Change: 2017-12-02 10:19:52 BJT
 
 module mod_arrays
 
@@ -19,11 +19,12 @@ module mod_arrays
 
   use mod_type, only: &
     type_mat, &
-    type_accu_gr3d, type_accu_gr2d, &
+    type_accu_gr2d, &
     type_bnd, type_frc, type_bintgu, &
     type_gvar_r4d, type_gvar_r2d, type_gvar_r3d, &
-    type_gi, type_gj, type_gij, type_ch, &
-    type_eq_ts, type_eq_uv, type_eq_uvb
+    type_gi, type_gj, type_gij, &
+    type_eq_ts, type_eq_uv, type_eq_uvb, type_eq_w, &
+    type_eq_ch
 
   implicit none
   public
@@ -62,13 +63,17 @@ module mod_arrays
   ! accumulated variables, for time-average output !{{{1
   real (kind=wp), allocatable, dimension(:,:,:), target :: &
     act, acs, & ! accumulated (T, S)
-    acrho, & ! kg/m^3, density of sea water
-    acu, acv    ! m/s, unweighted horizontal velocity
-  type (type_accu_gr3d) :: &
+    acrho,    & ! kg/m^3, density of sea water
+    acu, acv, & ! m/s, unweighted horizontal velocity
     acw   ! m/s, vertical velocity, bottom is assume to be zero, so it is nk layers, not nkp layers
-  type (type_accu_gr2d) :: &
-    acssh, & ! m, sea surface height
+  real (kind=wp), allocatable, dimension(:,:), target :: &
     acch     !  , normalized sea bottom pressure
+  type (type_accu_gr2d) :: &
+    acssh ! m, sea surface height
+  
+  ! containers !{{{1
+  real (kind=wp), allocatable, dimension(:,:,:), target :: &
+    ch  ! bottom pressure, normalized by initial values, the third dimension is for subcontainers
 
   ! grid variables !{{{1
 
@@ -97,12 +102,13 @@ module mod_arrays
         ! grapay = ( pay*10/rrho_0 ) in pcom 1.0
   type (type_frc) :: frc
   type (type_bnd) :: bnd
-  type (type_ch) :: ch ! bottom pressure, normalized by initial values
 
   ! equation variables !{{{1
   type (type_eq_ts) :: eqts
   type (type_eq_uv) :: equv
   type (type_eq_uvb) :: equvb
+  type (type_eq_w) :: eqw
+  type (type_eq_ch) :: eqch
 
   ! other !{{{1
 
@@ -253,18 +259,14 @@ subroutine arrays_allocate () !{{{1
 
   call arrays_init( acu, ni,nj,nk, zero )
   call arrays_init( acv, ni,nj,nk, zero )
-
-  ! acw lies on g32 just for output, this is ad hoc
-  call arrays_init( acw%var, ni,nj,nk, zero, g32 )
-  acw%n = 0
+  call arrays_init( acw, ni,nj,nk, zero )
 
   call arrays_init( acrho, ni,nj,nk, zero )
 
   call arrays_init( acssh%var, ni,nj, zero, g1j )
   acssh%n = 0
 
-  call arrays_init( acch%var, ni,nj, zero, g1j )
-  acch%n = 0
+  call arrays_init( acch, ni,nj, zero )
 
   call arrays_init(temp, ni,nj,nk,2, zero, g12)
   call arrays_init(salt, ni,nj,nk,2, zero, g12)
@@ -308,11 +310,7 @@ subroutine arrays_allocate () !{{{1
   call arrays_init(grapax, ni,nj, zero, g3j)
   call arrays_init(grapay, ni,nj, zero, g3j)
 
-  ch%hg => g1j
-  call arrays_init(ch%tc, ni,nj, one)
-  call arrays_init(ch%tp, ni,nj, one)
-  call arrays_init(ch%bc, ni,nj, one)
-  call arrays_init(ch%bc2, ni,nj, one)
+  call arrays_init(ch, ni,nj,4, one)
 
   call arrays_init(cor, ni,nj, zero, g3j)
 
@@ -347,6 +345,10 @@ subroutine arrays_allocate () !{{{1
   call init_equv ()
 
   call init_equvb ()
+
+  call init_eqw ()
+
+  call init_eqch ()
 end subroutine arrays_allocate
 
 subroutine init_eqts ()!{{{1
@@ -413,6 +415,33 @@ subroutine init_equvb ()!{{{1
   equvb%hg => g3j
 
 end subroutine init_equvb
+
+subroutine init_eqw ()!{{{1
+  ! initialize dianostic equation for vertical velocity
+
+  eqw%acw => acw
+
+  eqw%g => g11
+
+  eqw%n = 0
+
+end subroutine init_eqw
+
+subroutine init_eqch ()!{{{1
+  ! initialize ch equation, i.e., the mass-conservation equation in PCOM
+
+  eqch%chc  => ch(:,:,1)
+  eqch%chp  => ch(:,:,2)
+  eqch%mch  => ch(:,:,3)
+  eqch%mch2 => ch(:,:,4)
+
+  eqch%acch => acch
+
+  eqch%hg => g1j
+
+  eqch%n = 0
+
+end subroutine init_eqch
 
 subroutine init_gvar_r4d (var, d1, d2, d3, d4, ini, g)!{{{1
   ! initialize grid variables

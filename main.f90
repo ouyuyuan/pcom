@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-11-26 10:27:05 BJT
+! Last Change: 2017-12-04 16:59:11 BJT
 
 program main
 
@@ -14,7 +14,7 @@ program main
     cv1, cv2, &
     g1j, g2j, g3j, g4j, gtj, guj, &
     gi1, gi2, git, giw, g12, g32, gt, gu, &
-    acw, acssh, acch, & 
+    acssh, & 
     am, arrays_allocate, &
     bnd, bphi, bgraphi, &
     frc, cor, &
@@ -23,8 +23,8 @@ program main
     km, kh, &
     lon, lat, &
     alpha, adp, &
-    ch, prho, &
-    eqts, equv, equvb, &
+    eqts, equv, equvb, eqw, eqch, &
+    prho, &
     wm, &
     z
     
@@ -60,14 +60,13 @@ program main
     tc, tp
 
   use mod_type, only: &
-    type_accu_gr3d, type_accu_gr2d, &
+    type_accu_gr2d, &
     type_gi, type_gj, type_gij, &
     type_str2time, type_time2str, type_str2sec, &
-    type_frc, tctr, type_tctr, &
+    type_frc, tctr, type_tctr, type_rst_info, &
     type_gvar_r2d, type_gvar_r3d, &
-    type_bintgu, &
     type_check_date, &
-    type_eq_ts, &
+    type_eq_ts, type_eq_ch, &
     operator (+), operator (<)
 
   ! local variables !{{{1
@@ -126,14 +125,18 @@ program main
   ! integration cycle !{{{1
 
   ! time prepare !{{{2
-  call init_tctr ()
+  tctr%ct = type_str2time (nm%bd)
+  tctr%pt = tctr%ct
+  tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(nm%bd) ) / nm%bc
+
+  ! restart from a moving ocean !{{{2
+  if (nm%rst == 1) call restart_init (tctr, rst_info, eqch, equv)
 
   ! baroclinic integrate !{{{2
 
   tctr%t1 = mpi_wtime () ! time count start
 
   do i = 1, tctr%nt
-
     tctr%i = i
     ! linear interpolate monthly forcing to daily values of bnd
     !   at the initial of integration, or when the 
@@ -144,7 +147,7 @@ program main
     end if
 
     ! calc. the specific volume, reciprocal of density
-    call den_alpha (alpha%v, eqts%tc, eqts%sc, ch%tc, gt%msk)
+    call den_alpha (alpha%v, eqts%tc, eqts%sc, eqch%chc, gt%msk)
 
     ! calc. pressure gradient forces
     call int_pgra (adp, bphi, bgraphi)
@@ -153,7 +156,7 @@ program main
     call int_readyc (equv, equvb, wm)
 
     ! integrate series time steps per baroclinic time step
-    call int_trop (ch, equvb, acch)
+    call int_trop (equvb, eqch)
 
     ! prediction of baroclinic mode
     call int_clin (equv, am%v)
@@ -162,7 +165,7 @@ program main
     call int_ssh (acssh, alpha%v)
 
     ! prediction of temperature and salinity
-    call int_ts (eqts, acw, wm)
+    call int_ts (eqts, eqw, wm)
 
     tctr%pt = tctr%ct
     tctr%ct = tctr%ct + nm%bc
@@ -172,7 +175,7 @@ program main
          ((tctr%ct%d/=tctr%pt%d).and.(nm%out_per.eq.'day'))   .or. &
          ((tctr%ct%m/=tctr%pt%m).and.(nm%out_per.eq.'month')) .or. &
          ((tctr%ct%y/=tctr%pt%y).and.(nm%out_per.eq.'year')) ) then
-      call output (acw, acssh, acch)
+      call output ()
     end if
   end do
 
@@ -257,7 +260,7 @@ subroutine init () !{{{1
 
 end subroutine init
 
-subroutine set_cf (km, kh) !{{{2
+subroutine set_cf (km, kh) !{{{1
   ! setting the profile of vertical momentum viscosity coefficient
   ! reading the datasets of kh (vertical turbulent mixing coefficients), 
   !  \ref{Zhang2014}
@@ -620,28 +623,93 @@ subroutine calc_cf (cv1, cv2) !{{{1
 
 end subroutine calc_cf
 
-subroutine init_tctr () !{{{1
-! initialize time control variable
+subroutine restart_init (tctr, rst_info, eqch, equv) !{{{1
+  type (type_tctr) :: tctr
+  type (type_rst_info) :: rst_info
+  type (type_eq_ch) :: eqch
+  type (type_eq_uv) :: equv
 
-  if (nm%rst == 1) then
-    if (myid == mid) then
-      call io_read (trim(rst_info%fname), 'cdate', rst_info%cdate)
-      call io_read (trim(rst_info%fname), 'pdate', rst_info%pdate)
-    end if
-    call mympi_bcast (rst_info%cdate)
-    call mympi_bcast (rst_info%pdate)
+  real (kind=wp), allocatable, dimension(:,:) :: &
+    glo_chc, glo_chp
+  real (kind=wp), allocatable, dimension(:,:,:) :: &
+    glo_tc, glo_sc, glo_tp, glo_sp, &
+    glo_uc, glo_vc, glo_up, glo_vp, &
+    glo_auc, glo_avc, glo_aup, glo_avp, glo_aupp, glo_avpp
 
-    tctr%ct = type_str2time (rst_info%cdate)
-    tctr%pt = type_str2time (rst_info%pdate)
-    tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(rst_info%cdate) ) / nm%bc
+  ! restart from a moving ocean
+  if (myid == mid) then
+    call arrays_init (glo_chc, glo_ni, glo_nj, zero)
+    call arrays_init (glo_chp, glo_ni, glo_nj, zero)
 
-  else 
-    tctr%ct = type_str2time (nm%bd)
-    tctr%pt = tctr%ct
-    tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(nm%bd) ) / nm%bc
+    call arrays_init (glo_tc, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_sc, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_tp, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_sp, glo_ni, glo_nj, nk, zero)
+
+    call arrays_init (glo_uc, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_vc, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_up, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_vp, glo_ni, glo_nj, nk, zero)
+
+    call arrays_init (glo_auc,  glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_avc,  glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_aup,  glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_avp,  glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_aupp, glo_ni, glo_nj, nk, zero)
+    call arrays_init (glo_avpp, glo_ni, glo_nj, nk, zero)
+
+    call io_read (rst_info%fname, 'cdate', rst_info%cdate)
+    call io_read (rst_info%fname, 'pdate', rst_info%pdate)
+
+    call io_read (rst_info%fname, 'chc', glo_chc)
+    call io_read (rst_info%fname, 'chp', glo_chp)
+
+    call io_read (rst_info%fname, 'tc', glo_tc)
+    call io_read (rst_info%fname, 'sc', glo_sc)
+    call io_read (rst_info%fname, 'tp', glo_tp)
+    call io_read (rst_info%fname, 'sp', glo_sp)
+
+    call io_read (rst_info%fname, 'uc', glo_uc)
+    call io_read (rst_info%fname, 'vc', glo_vc)
+    call io_read (rst_info%fname, 'up', glo_up)
+    call io_read (rst_info%fname, 'vp', glo_vp)
+
+    call io_read (rst_info%fname, 'auc', glo_auc)
+    call io_read (rst_info%fname, 'avc', glo_avc)
+    call io_read (rst_info%fname, 'aup', glo_aup)
+    call io_read (rst_info%fname, 'avp', glo_avp)
+    call io_read (rst_info%fname, 'aupp', glo_aupp)
+    call io_read (rst_info%fname, 'avpp', glo_avpp)
   end if
 
-end subroutine init_tctr
+  call mympi_bcast (rst_info%cdate)
+  call mympi_bcast (rst_info%pdate)
+
+  call mympi_div (glo_chc, eqch%chc)
+  call mympi_div (glo_chp, eqch%chp)
+
+  call mympi_div (glo_tc, eqts%tc)
+  call mympi_div (glo_sc, eqts%sc)
+  call mympi_div (glo_tp, eqts%tp)
+  call mympi_div (glo_sp, eqts%sp)
+
+  call mympi_div (glo_uc, equv%uc)
+  call mympi_div (glo_vc, equv%vc)
+  call mympi_div (glo_up, equv%up)
+  call mympi_div (glo_vp, equv%vp)
+
+  call mympi_div (glo_auc, equv%auc)
+  call mympi_div (glo_avc, equv%avc)
+  call mympi_div (glo_aup, equv%aup)
+  call mympi_div (glo_avp, equv%avp)
+  call mympi_div (glo_aupp, equv%aupp)
+  call mympi_div (glo_avpp, equv%avpp)
+
+  tctr%ct = type_str2time (rst_info%cdate)
+  tctr%pt = type_str2time (rst_info%pdate)
+  tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(rst_info%cdate) ) / nm%bc
+
+end subroutine restart_init
 
 subroutine inistat (eqts, frc, graphihx, graphihy) !{{{1
   ! prepare the initial state of the ocean
@@ -653,18 +721,6 @@ subroutine inistat (eqts, frc, graphihx, graphihy) !{{{1
   real (kind=wp), allocatable, dimension(:,:,:) :: glo_pt, glo_sa
   type (type_frc) :: glo_frc
 
-  ! initial info for restart run
-  if (nm%rst == 1)  then
-    if (myid == mid) then
-      rst_info%fname = trim(nm%od)//'restart.nc'
-      print *, "I'm going for a restart-run from "//trim(rst_info%fname)
-      call io_read (trim(rst_info%fname), 'cdate', rst_info%cdate)
-      call io_read (trim(rst_info%fname), 'pdate', rst_info%pdate)
-    end if
-
-    call mympi_bcast (rst_info%cdate)
-    call mympi_bcast (rst_info%pdate)
-  end if
 
   if ( myid == mid ) call get_init_frc (glo_pt, glo_sa, glo_frc)
 
@@ -704,39 +760,27 @@ subroutine get_init_frc (glo_pt, glo_sa, glo_frc) !{{{1
 ! get initial and forcing field from external file in mid
   real (kind=wp), allocatable, dimension(:,:,:) :: glo_pt, glo_sa
   type (type_frc) :: glo_frc
-  integer :: is
-  character (len=80) :: ncname
 
   ! 12 months forcing
   call arrays_init(glo_frc%taux, glo_ni,glo_nj,12, zero, frc%taux%g)
   call arrays_init(glo_frc%tauy, glo_ni,glo_nj,12, zero, frc%tauy%g)
-  call arrays_init(glo_frc%t,  glo_ni,glo_nj,12, zero, frc%t%g)
-  call arrays_init(glo_frc%s,  glo_ni,glo_nj,12, zero, frc%s%g)
-  call arrays_init(glo_frc%pa,       glo_ni,glo_nj,12, zero, frc%pa%g)
-  call arrays_init(glo_frc%fw,       glo_ni,glo_nj,12, zero, frc%fw%g)
+  call arrays_init(glo_frc%t,    glo_ni,glo_nj,12, zero, frc%t%g)
+  call arrays_init(glo_frc%s,    glo_ni,glo_nj,12, zero, frc%s%g)
+  call arrays_init(glo_frc%pa,   glo_ni,glo_nj,12, zero, frc%pa%g)
+  call arrays_init(glo_frc%fw,   glo_ni,glo_nj,12, zero, frc%fw%g)
 
-  allocate(glo_pt(glo_ni, glo_nj, nk), stat=is); call chk(is)
-  glo_pt = 0.0
-  allocate(glo_sa(glo_ni, glo_nj, nk), stat=is); call chk(is)
-  glo_sa = 0.0
+  call arrays_init(glo_pt, glo_ni, glo_nj, nk, zero)
+  call arrays_init(glo_sa, glo_ni, glo_nj, nk, zero)
 
-  ncname = nm%fi
-  if (nm%rst == 1) ncname = rst_info%fname
+  call io_read (nm%fi, 'pt',  glo_pt)
+  call io_read (nm%fi, 'sa',  glo_sa)
 
-  call io_read (ncname, 'pt',  glo_pt)
-  call io_read (ncname, 'sa',  glo_sa)
-
-  ncname = nm%ff
-
-  call io_read (ncname, 'taux', glo_frc%taux%v) 
-  call io_read (ncname, 'tauy', glo_frc%tauy%v) 
-
-  call io_read (ncname, 'bct', glo_frc%t%v) 
-  call io_read (ncname, 'bcs', glo_frc%s%v) 
-
-  call io_read (ncname, 'pa', glo_frc%pa%v) 
-
-  call io_read (ncname, 'fw', glo_frc%fw%v) 
+  call io_read (nm%ff, 'taux', glo_frc%taux%v) 
+  call io_read (nm%ff, 'tauy', glo_frc%tauy%v) 
+  call io_read (nm%ff, 'bct',  glo_frc%t%v) 
+  call io_read (nm%ff, 'bcs',  glo_frc%s%v) 
+  call io_read (nm%ff, 'pa',   glo_frc%pa%v) 
+  call io_read (nm%ff, 'fw',   glo_frc%fw%v) 
 
 end subroutine get_init_frc
 
@@ -781,10 +825,8 @@ subroutine write_dim_info (fid) !{{{1
 
 end subroutine write_dim_info
 
-subroutine output (acw, acssh, acch) !{{{1
+subroutine output () !{{{1
   ! time averaged model output
-  type (type_accu_gr3d) :: acw
-  type (type_accu_gr2d) :: acssh, acch
 
   integer, save :: nrec = 0
 
@@ -795,12 +837,18 @@ subroutine output (acw, acssh, acch) !{{{1
     if ( tctr%ct%d /= tctr%pt%d ) call print_time_per_day (tctr)
   end if
 
-  call mympi_output (equv)
-  call mympi_output (vars_info%w, acw, gu%msk)
+  call mympi_output (equv, eqw)
 
   call mympi_output (eqts)
 
-  call mympi_output (vars_info%ch, acch, gt%msk(:,:,1))
+  ! output ch
+  eqch%acch = eqch%acch / eqch%n
+  where (gt%msk(:,:,1) == 0)
+    eqch%acch = missing_float
+  end where
+  call mympi_output (vars_info%ch, eqch%acch)
+  eqch%acch  = 0.0 ! reset accumulated value
+  eqch%n     = 0 ! reset counter
 
   ! calc. fluctuation of ssh, minus global mean
   call mympi_output (vars_info%ssh, &
@@ -810,9 +858,25 @@ subroutine output (acw, acssh, acch) !{{{1
   ! output restart file
   if ( mod(nrec, nm%rst_per) == 0 ) then
     if ( myid == mid ) call io_create_rst ( rst_info )
-    call mympi_output ( rst_info%ch, ch%tc )
-    call mympi_output ( rst_info%pt, eqts%tc )
-    call mympi_output ( rst_info%sa, eqts%sc )
+    call mympi_output ( rst_info%chc, eqch%chc )
+    call mympi_output ( rst_info%chp, eqch%chp )
+
+    call mympi_output ( rst_info%tc, eqts%tc )
+    call mympi_output ( rst_info%sc, eqts%sc )
+    call mympi_output ( rst_info%tp, eqts%tp )
+    call mympi_output ( rst_info%sp, eqts%sp )
+
+    call mympi_output ( rst_info%uc, equv%uc )
+    call mympi_output ( rst_info%vc, equv%vc )
+    call mympi_output ( rst_info%up, equv%up )
+    call mympi_output ( rst_info%vp, equv%vp )
+
+    call mympi_output ( rst_info%auc, equv%auc )
+    call mympi_output ( rst_info%avc, equv%avc )
+    call mympi_output ( rst_info%aup, equv%aup )
+    call mympi_output ( rst_info%avp, equv%avp )
+    call mympi_output ( rst_info%aupp,equv%aupp )
+    call mympi_output ( rst_info%avpp,equv%avpp )
   end if
 
 end subroutine output

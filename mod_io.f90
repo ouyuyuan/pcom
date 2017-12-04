@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-11-10 10:04:38 BJT
+! Last Change: 2017-12-04 16:46:47 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -14,7 +14,8 @@ module mod_io !{{{1
   use mod_type, only: tctr, type_var_info, type_time2str, &
     type_rst_info
   use mod_param, only: glo_ni, glo_nj, nk, &
-    missing_int, missing_float, nm, vars_info, rst_info
+    missing_float, missing_double, &
+    nm, vars_info, rst_info
 
   use mod_arrays, only: glo_lon, glo_lat, z
 
@@ -43,6 +44,7 @@ module mod_io !{{{1
 
   interface io_read
     module procedure read_r3d
+    module procedure read_r2d
     module procedure read_r1d
     module procedure read_i3d
     module procedure read_i2d
@@ -75,9 +77,25 @@ subroutine io_create_rst ( rst_info ) !{{{1
   call put_glo_att ('pdate', rst_info%pdate)
 
   ! def vars
-  call def_var_r2d (rst_info%ch)
-  call def_var_r3d (rst_info%pt)
-  call def_var_r3d (rst_info%sa)
+  call def_var_r2d (rst_info%chc, 'double')
+  call def_var_r2d (rst_info%chp, 'double')
+
+  call def_var_r3d (rst_info%tc, 'double')
+  call def_var_r3d (rst_info%sc, 'double')
+  call def_var_r3d (rst_info%tp, 'double')
+  call def_var_r3d (rst_info%sp, 'double')
+
+  call def_var_r3d (rst_info%uc, 'double')
+  call def_var_r3d (rst_info%vc, 'double')
+  call def_var_r3d (rst_info%up, 'double')
+  call def_var_r3d (rst_info%vp, 'double')
+
+  call def_var_r3d (rst_info%auc, 'double')
+  call def_var_r3d (rst_info%avc, 'double')
+  call def_var_r3d (rst_info%aup, 'double')
+  call def_var_r3d (rst_info%avp, 'double')
+  call def_var_r3d (rst_info%aupp, 'double')
+  call def_var_r3d (rst_info%avpp, 'double')
 
   call check (nf90_enddef(ncid) )
 
@@ -170,6 +188,22 @@ subroutine read_r3d(ncname, varname, var) !{{{1
   write(*,'(a)') 'got '//trim(varname)// ' from '//trim(ncname)
 
 end subroutine read_r3d 
+
+subroutine read_r2d(ncname, varname, var) !{{{1
+  character (len=*), intent(in) :: ncname, varname
+  real (kind=wp) :: var(:,:)
+
+  call check (nf90_open(ncname, NF90_NOWRITE, ncid) )
+
+  call check (nf90_inq_varid(ncid, varname, varid) )
+
+  call check (nf90_get_var(ncid, varid, var) )
+
+  call check (nf90_close(ncid) )
+
+  write(*,'(a)') 'got '//trim(varname)// ' from '//trim(ncname)
+
+end subroutine read_r2d 
 
 subroutine read_r1d(ncname, varname, var) !{{{1
   character (len=*), intent(in) :: ncname, varname
@@ -324,39 +358,57 @@ subroutine def_dim_3d (id_lon, id_lat, id_z, id_time) !{{{1
 
 end subroutine def_dim_3d
 
-subroutine def_var_r2d (var_info) !{{{1
+subroutine def_var_r2d (var_info, data_type) !{{{1
   ! define a 2d variable
   type (type_var_info), intent(in) :: var_info
+  character (len=*), optional :: data_type
 
   integer :: dimids(3)
 
   dimids = (/id_lon, id_lat, id_time/)
 
-  call check ( nf90_def_var (ncid, var_info%name, &
-    nf90_float, dimids, varid) )
+  if (present(data_type) .and. data_type.eq. 'double') then
+    call check ( nf90_def_var (ncid, var_info%name, &
+      nf90_double, dimids, varid) )
+    call check ( nf90_put_att (ncid, varid, '_FillValue', &
+      missing_double) )
+  else
+    call check ( nf90_def_var (ncid, var_info%name, &
+      nf90_float, dimids, varid) )
+    call check ( nf90_put_att (ncid, varid, '_FillValue', &
+      missing_float) )
+  end if
+
   call check ( nf90_put_att (ncid, varid, 'long_name', &
     var_info%longname) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', &
-    missing_float) )
   call check ( nf90_put_att (ncid, varid, 'units', &
     var_info%units) )
 
 end subroutine def_var_r2d
 
-subroutine def_var_r3d (var_info) !{{{1
+subroutine def_var_r3d (var_info, data_type) !{{{1
   ! define a 2d variable
   type (type_var_info), intent(in) :: var_info
+  character (len=*), optional :: data_type
 
   integer :: dimids(4)
 
   dimids = (/id_lon, id_lat, id_z, id_time/)
 
-  call check ( nf90_def_var (ncid, var_info%name, &
-    nf90_float, dimids, varid) )
+  if (present(data_type) .and. data_type.eq. 'double') then
+    call check ( nf90_def_var (ncid, var_info%name, &
+      nf90_double, dimids, varid) )
+    call check ( nf90_put_att (ncid, varid, '_FillValue', &
+      missing_double) )
+  else
+    call check ( nf90_def_var (ncid, var_info%name, &
+      nf90_float, dimids, varid) )
+    call check ( nf90_put_att (ncid, varid, '_FillValue', &
+      missing_float) )
+  end if
+
   call check ( nf90_put_att (ncid, varid, 'long_name', &
     var_info%longname) )
-  call check ( nf90_put_att (ncid, varid, '_FillValue', &
-    missing_float) )
   call check ( nf90_put_att (ncid, varid, 'units', &
     var_info%units) )
 

@@ -3,13 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2017-11-26 09:23:17 BJT
+! Last Change: 2017-12-02 10:23:59 BJT
 
 module mod_den
 
   use mod_arrays, only: &
     gi2, git, &
-    eqts, ch
+    eqts, eqch
 
   use mod_con, only: deltat, deltas
 
@@ -135,7 +135,7 @@ subroutine den_prho( prho ) !{{{1
   if ( eqts%g%msk(i,j,k) > 0 ) then
     t = eqts%tc(i,j,k)
     s = eqts%sc(i,j,k)
-    p = ch%tc(i,j) * gi2%pr(k)
+    p = eqch%chc(i,j) * gi2%pr(k)
 
     rhoa = den_rho( t + deltat, s, p )
     rhob = den_rho( t - deltat, s, p )

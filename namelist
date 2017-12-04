@@ -16,5 +16,5 @@ fname_frc = 'input/forcing.nc',
 out_dir = 'output/',
 out_per = 'hour',
 restart_per = 2,
-restart_run = 0,
+restart_run = 1,
 /
