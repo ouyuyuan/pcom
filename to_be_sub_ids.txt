@@ -1,2 +1,3 @@
-ch_tc: chc
-ch_tp: chp
+debug_rst_r3d: output_txt_r3d
+debug_rst_r3d_n: output_txt_r3d_n
+debug_rst_r2d_n: output_txt_r2d_n

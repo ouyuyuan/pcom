@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-12-04 16:46:47 BJT
+! Last Change: 2017-12-31 16:10:58 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -77,25 +77,42 @@ subroutine io_create_rst ( rst_info ) !{{{1
   call put_glo_att ('pdate', rst_info%pdate)
 
   ! def vars
-  call def_var_r2d (rst_info%chc, 'double')
-  call def_var_r2d (rst_info%chp, 'double')
+  call def_var_r2d (rst_info%chc)
+  call def_var_r2d (rst_info%chp)
 
-  call def_var_r3d (rst_info%tc, 'double')
-  call def_var_r3d (rst_info%sc, 'double')
-  call def_var_r3d (rst_info%tp, 'double')
-  call def_var_r3d (rst_info%sp, 'double')
+  call def_var_r2d (rst_info%bnd_taux)
+  call def_var_r2d (rst_info%bnd_tauy)
+  call def_var_r2d (rst_info%bnd_t)
+  call def_var_r2d (rst_info%bnd_s)
+  call def_var_r2d (rst_info%bnd_pa)
+  call def_var_r2d (rst_info%bnd_fw)
 
-  call def_var_r3d (rst_info%uc, 'double')
-  call def_var_r3d (rst_info%vc, 'double')
-  call def_var_r3d (rst_info%up, 'double')
-  call def_var_r3d (rst_info%vp, 'double')
+  call def_var_r2d (rst_info%buc)
+  call def_var_r2d (rst_info%bvc)
+  call def_var_r2d (rst_info%bup)
+  call def_var_r2d (rst_info%bvp)
 
-  call def_var_r3d (rst_info%auc, 'double')
-  call def_var_r3d (rst_info%avc, 'double')
-  call def_var_r3d (rst_info%aup, 'double')
-  call def_var_r3d (rst_info%avp, 'double')
-  call def_var_r3d (rst_info%aupp, 'double')
-  call def_var_r3d (rst_info%avpp, 'double')
+  call def_var_r3d (rst_info%tc)
+  call def_var_r3d (rst_info%sc)
+  call def_var_r3d (rst_info%tp)
+  call def_var_r3d (rst_info%sp)
+
+  call def_var_r3d (rst_info%prpt)
+  call def_var_r3d (rst_info%prps)
+
+  call def_var_r3d (rst_info%uc)
+  call def_var_r3d (rst_info%vc)
+  call def_var_r3d (rst_info%up)
+  call def_var_r3d (rst_info%vp)
+
+  call def_var_r3d (rst_info%auc)
+  call def_var_r3d (rst_info%avc)
+  call def_var_r3d (rst_info%aup)
+  call def_var_r3d (rst_info%avp)
+  call def_var_r3d (rst_info%aupp)
+  call def_var_r3d (rst_info%avpp)
+
+  call def_var_r3d ( rst_info%am )
 
   call check (nf90_enddef(ncid) )
 
@@ -113,11 +130,7 @@ subroutine write_r3d(var_info, var) !{{{1
   character (len = 80) :: ncname
 
   ! determine nc filename
-  if (trim(var_info%vartype) .eq. 'restart') then
-    ncname = rst_info%fname
-  else
-    call get_ncname (var_info%name, ncname)
-  end if
+  call get_ncname (var_info, ncname)
 
   ! create nc file for every output
   if (trim(var_info%vartype) .ne. 'restart') then
@@ -147,11 +160,7 @@ subroutine write_r2d(var_info, var) !{{{1
   character (len = 80) :: ncname
 
   ! determine nc filename
-  if (trim(var_info%vartype) .eq. 'restart') then
-    ncname = rst_info%fname
-  else
-    call get_ncname (var_info%name, ncname)
-  end if
+  call get_ncname (var_info, ncname)
 
   ! create nc file for every output
   if (trim(var_info%vartype) .ne. 'restart') then
@@ -294,21 +303,26 @@ subroutine io_get_dim_len(ncname, dimname, var) !{{{1
 
 end subroutine io_get_dim_len
 
-subroutine get_ncname (varname, ncname) !{{{1
+subroutine get_ncname (var_info, ncname) !{{{1
 ! create nc file name per output time
-  character (len=*), intent (in) :: varname
+  type (type_var_info), intent (in) :: var_info
   character (len=*) :: ncname
 
   character (len = len('0000-00-00 00:00:00')) :: str
   integer :: idx
 
   str = trim(type_time2str(tctr%ct))
-
   idx = len('0000-00-00') + 1
   str (idx:idx) = '_'
-
   idx = len('0000-00-00_00:00')
-  ncname = trim(nm%od)//trim(varname)//'_'//str(1:idx)//'.nc'
+
+  if ( trim ( var_info%vartype ) .eq. 'restart') then
+    ncname = rst_info%fname
+  else if ( trim ( var_info%vartype ) .eq. 'debug') then
+    ncname = trim(nm%od)//"debug/"//trim(var_info%name)//'_'//str(1:idx)//'.nc'
+  else
+    ncname = trim(nm%od)//trim(var_info%name)//'_'//str(1:idx)//'.nc'
+  end if
 
 end subroutine get_ncname
 
@@ -358,25 +372,24 @@ subroutine def_dim_3d (id_lon, id_lat, id_z, id_time) !{{{1
 
 end subroutine def_dim_3d
 
-subroutine def_var_r2d (var_info, data_type) !{{{1
+subroutine def_var_r2d (var_info) !{{{1
   ! define a 2d variable
   type (type_var_info), intent(in) :: var_info
-  character (len=*), optional :: data_type
 
   integer :: dimids(3)
 
   dimids = (/id_lon, id_lat, id_time/)
 
-  if (present(data_type) .and. data_type.eq. 'double') then
-    call check ( nf90_def_var (ncid, var_info%name, &
-      nf90_double, dimids, varid) )
-    call check ( nf90_put_att (ncid, varid, '_FillValue', &
-      missing_double) )
-  else
+  if ( var_info%vartype == 'mean' ) then
     call check ( nf90_def_var (ncid, var_info%name, &
       nf90_float, dimids, varid) )
     call check ( nf90_put_att (ncid, varid, '_FillValue', &
       missing_float) )
+  else
+    call check ( nf90_def_var (ncid, var_info%name, &
+      nf90_double, dimids, varid) )
+    call check ( nf90_put_att (ncid, varid, '_FillValue', &
+      missing_double) )
   end if
 
   call check ( nf90_put_att (ncid, varid, 'long_name', &
@@ -386,25 +399,24 @@ subroutine def_var_r2d (var_info, data_type) !{{{1
 
 end subroutine def_var_r2d
 
-subroutine def_var_r3d (var_info, data_type) !{{{1
+subroutine def_var_r3d (var_info) !{{{1
   ! define a 2d variable
   type (type_var_info), intent(in) :: var_info
-  character (len=*), optional :: data_type
 
   integer :: dimids(4)
 
   dimids = (/id_lon, id_lat, id_z, id_time/)
 
-  if (present(data_type) .and. data_type.eq. 'double') then
-    call check ( nf90_def_var (ncid, var_info%name, &
-      nf90_double, dimids, varid) )
-    call check ( nf90_put_att (ncid, varid, '_FillValue', &
-      missing_double) )
-  else
+  if ( var_info%vartype == 'mean' ) then
     call check ( nf90_def_var (ncid, var_info%name, &
       nf90_float, dimids, varid) )
     call check ( nf90_put_att (ncid, varid, '_FillValue', &
       missing_float) )
+  else
+    call check ( nf90_def_var (ncid, var_info%name, &
+      nf90_double, dimids, varid) )
+    call check ( nf90_put_att (ncid, varid, '_FillValue', &
+      missing_double) )
   end if
 
   call check ( nf90_put_att (ncid, varid, 'long_name', &

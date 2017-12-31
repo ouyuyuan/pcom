@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-12-04 12:44:06 BJT
+! Last Change: 2017-12-31 16:10:36 BJT
 
 module mod_param
 
@@ -110,14 +110,27 @@ subroutine param_set_io ( ) !{{{1
   ! set restart infomations
   if (nm%rst == 1) then 
     rst_info%fname = trim(nm%od)//'restart.nc'
-    if (myid == mid) &
-      print *, "I'm going for a restart-run from "//trim(rst_info%fname)
   end if
 
   call set_var_info (rst_info%chc, 'chc', &
     vars_info%ch%longname, vars_info%ch%units, 'restart')
   call set_var_info (rst_info%chp, 'chp', &
     vars_info%ch%longname, vars_info%ch%units, 'restart')
+
+  call set_var_info (rst_info%bnd_taux , 'bnd_taux' , ' ' , ' ' , 'restart')
+  call set_var_info (rst_info%bnd_tauy , 'bnd_tauy' , ' ' , ' ' , 'restart')
+  call set_var_info (rst_info%bnd_t    , 'bnd_t'    , ' ' , ' ' , 'restart')
+  call set_var_info (rst_info%bnd_s    , 'bnd_s'    , ' ' , ' ' , 'restart')
+  call set_var_info (rst_info%bnd_pa   , 'bnd_pa'   , ' ' , ' ' , 'restart')
+  call set_var_info (rst_info%bnd_fw   , 'bnd_fw'   , ' ' , ' ' , 'restart')
+
+  call set_var_info (rst_info%buc, 'buc', ' ', ' ', 'restart')
+  call set_var_info (rst_info%bvc, 'bvc', ' ', ' ', 'restart')
+  call set_var_info (rst_info%bup, 'bup', ' ', ' ', 'restart')
+  call set_var_info (rst_info%bvp, 'bvp', ' ', ' ', 'restart')
+
+  call set_var_info (rst_info%prpt, 'prpt', ' ', ' ', 'restart')
+  call set_var_info (rst_info%prps, 'prps', ' ', ' ', 'restart')
 
   call set_var_info (rst_info%tc, 'tc', &
     vars_info%pt%longname, vars_info%pt%units, 'restart')
@@ -149,6 +162,9 @@ subroutine param_set_io ( ) !{{{1
     'advection of velocity', 'm/s^2', 'restart')
   call set_var_info (rst_info%avpp, 'avpp', &
     'advection of velocity', 'm/s^2', 'restart')
+
+  call set_var_info (rst_info%am, 'am', &
+    'horizontal mixing coeficient', '', 'restart')
 end subroutine param_set_io
 
 subroutine set_var_info ( var_info, varname, longname, units, vartype ) !{{{1

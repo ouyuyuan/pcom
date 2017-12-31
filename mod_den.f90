@@ -3,21 +3,22 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-03 07:41:56 BJT
-! Last Change: 2017-12-02 10:23:59 BJT
+! Last Change: 2017-12-29 10:55:16 BJT
 
 module mod_den
 
+  use mod_debug, only: debug_var
   use mod_arrays, only: &
     gi2, git, &
     eqts, eqch
 
   use mod_con, only: deltat, deltas
 
-  use mod_kind, only: wp
+  use mod_kind, only: wp, one
 
   use mod_param, only: ni, nj, nk, tc
 
-  use mod_type, only: type_mat
+  use mod_type, only: type_mat, tctr
 
   implicit none
   private
@@ -29,7 +30,7 @@ module mod_den
     
 contains !{{{1
 
-subroutine den_alpha (alpha, t, s, ch, mask)!{{{1
+subroutine den_alpha ( alpha, t, s, ch, mask )!{{{1
   ! dianose specific volume from (T, S) and 
   !   normalized bottom pressure ch
 

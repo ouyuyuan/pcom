@@ -9,27 +9,31 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-12-02 10:34:20 BJT
+! Last Change: 2017-12-21 15:10:37 BJT
 
 module mod_mympi
 
   ! imported variables !{{{1
-  use mod_io, only: io_write
+  use mod_arrays, only: equv, eqts, eqch
+  use mod_io, only: io_write, io_read, io_create_rst
 
-  use mod_kind, only: wp
+  use mod_kind, only: wp, one
 
   use mpi
 
   use mod_param, only: mid, myid, npro, &
     glo_nj, glo_ni, ni, nj, nk, &
     my, our, missing_float, type_my, &
-    vars_info
+    vars_info, rst_info, nm, type_nm, &
+    param_set_nm
 
   use mod_type, only: &
     type_mat, type_accu_gr2d, &
-    type_var_info, &
-    type_gvar_r3d, &
-    type_eq_ts, type_eq_uv, type_eq_w
+    type_var_info, type_gvar_r3d, &
+    type_frc, &
+    type_eq_ts, type_eq_uv, type_eq_w, type_eq_ch, &
+    type_rst_info, &
+    type_check_date
 
   implicit none
   private
@@ -42,6 +46,7 @@ module mod_mympi
     mympi_swpbnd, &
     mympi_bcast, &
     mympi_merge, &
+    mympi_input, &
     mympi_output
 
   interface mympi_bcast
@@ -51,8 +56,6 @@ module mod_mympi
   end interface
 
   interface mympi_div
-    module procedure div_gvar_r3d
-    module procedure div_r3d_gvar_r3d
     module procedure div_r3d
     module procedure div_r2d
     module procedure div_i3d
@@ -70,6 +73,7 @@ module mod_mympi
   end interface
 
   interface mympi_output
+    module procedure merge_out_rst
     module procedure merge_out_eqts
     module procedure merge_out_equvw
     module procedure merge_out_accu_gr2d_mask
@@ -77,6 +81,17 @@ module mod_mympi
     module procedure merge_out_r3d
     module procedure merge_out_r2d_mask
     module procedure merge_out_r2d
+  end interface
+
+  interface mympi_input
+    module procedure input_eqts
+    module procedure input_equv
+    module procedure input_eqch
+    module procedure input_frc
+    module procedure input_nm
+    module procedure divide_in_r3d
+    module procedure divide_in_r2d
+    module procedure bcast_in_string
   end interface
 
   interface mympi_merge
@@ -110,6 +125,34 @@ subroutine bcast_string (var)!{{{1
 
   call mpi_bcast(var, len(var), mpi_byte, mid, mpi_comm_world, err)
 end subroutine bcast_string
+
+subroutine merge_out_rst (rst_info) ! {{{1
+  ! output time-average variables of u,v eqation
+  type (type_rst_info) :: rst_info
+
+  if ( myid == mid ) call io_create_rst ( rst_info )
+
+  call merge_out_r2d ( rst_info%chc, eqch%chc )
+  call merge_out_r2d ( rst_info%chp, eqch%chp )
+
+  call merge_out_r3d ( rst_info%tc, eqts%tc )
+  call merge_out_r3d ( rst_info%sc, eqts%sc )
+  call merge_out_r3d ( rst_info%tp, eqts%tp )
+  call merge_out_r3d ( rst_info%sp, eqts%sp )
+
+  call merge_out_r3d ( rst_info%uc, equv%uc )
+  call merge_out_r3d ( rst_info%vc, equv%vc )
+  call merge_out_r3d ( rst_info%up, equv%up )
+  call merge_out_r3d ( rst_info%vp, equv%vp )
+
+  call merge_out_r3d ( rst_info%auc, equv%auc )
+  call merge_out_r3d ( rst_info%avc, equv%avc )
+  call merge_out_r3d ( rst_info%aup, equv%aup )
+  call merge_out_r3d ( rst_info%avp, equv%avp )
+  call merge_out_r3d ( rst_info%aupp,equv%aupp )
+  call merge_out_r3d ( rst_info%avpp,equv%avpp )
+
+end subroutine merge_out_rst
 
 subroutine merge_out_eqts (eqts) ! {{{1
   ! output time-average variables of t,s eqation
@@ -393,6 +436,148 @@ subroutine merge_r2d (glo_var, var) !{{{1
 
 end subroutine merge_r2d
 
+subroutine input_eqts (eqts) ! {{{1
+  ! input restart variables for t,s eqation
+  type (type_eq_ts) :: eqts
+
+  if (nm%rst == 1) then 
+    call divide_in_r3d (rst_info%fname, 'tc', eqts%tc)
+    call divide_in_r3d (rst_info%fname, 'sc', eqts%sc)
+    call divide_in_r3d (rst_info%fname, 'tp', eqts%tp)
+    call divide_in_r3d (rst_info%fname, 'sp', eqts%sp)
+  else
+    call divide_in_r3d (nm%fi, 'pt',  eqts%tc)
+    call divide_in_r3d (nm%fi, 'sa',  eqts%sc)
+    eqts%tp = eqts%tc
+    eqts%sp = eqts%sc
+  end if
+
+end subroutine input_eqts
+
+subroutine input_equv (equv) ! {{{1
+  ! input restart variables for u,v eqations
+  type (type_eq_uv) :: equv
+
+  call divide_in_r3d (rst_info%fname, 'uc', equv%uc)
+  call divide_in_r3d (rst_info%fname, 'vc', equv%vc)
+  call divide_in_r3d (rst_info%fname, 'up', equv%up)
+  call divide_in_r3d (rst_info%fname, 'vp', equv%vp)
+
+  call divide_in_r3d (rst_info%fname, 'auc', equv%auc)
+  call divide_in_r3d (rst_info%fname, 'avc', equv%avc)
+  call divide_in_r3d (rst_info%fname, 'aup', equv%aup)
+  call divide_in_r3d (rst_info%fname, 'avp', equv%avp)
+  call divide_in_r3d (rst_info%fname, 'aupp', equv%aupp)
+  call divide_in_r3d (rst_info%fname, 'avpp', equv%avpp)
+
+end subroutine input_equv
+
+subroutine input_eqch (eqch) ! {{{1
+  ! input restart variables for t,s eqation
+  type (type_eq_ch) :: eqch
+
+  call divide_in_r2d (rst_info%fname, 'chc', eqch%chc, one)
+  call divide_in_r2d (rst_info%fname, 'chp', eqch%chp, one)
+
+end subroutine input_eqch
+
+subroutine input_frc (frc) ! {{{1
+  ! input forcing fields
+  type (type_frc) :: frc
+
+  call divide_in_r3d (nm%ff, 'taux', frc%taux%v) 
+  call divide_in_r3d (nm%ff, 'tauy', frc%tauy%v) 
+  call divide_in_r3d (nm%ff, 'bct',  frc%t%v) 
+  call divide_in_r3d (nm%ff, 'bcs',  frc%s%v) 
+  call divide_in_r3d (nm%ff, 'pa',   frc%pa%v) 
+  call divide_in_r3d (nm%ff, 'fw',   frc%fw%v) 
+
+end subroutine input_frc
+
+subroutine input_nm (nm) ! {{{1
+  ! broad cast namelist from mid to all ids
+  type (type_nm) :: nm
+
+  ! although we can read in namelist in all processors, 
+  ! but it seems the namelist file may be destroyed by 
+  ! muliple-opening (happened once)
+  if ( myid == mid ) then
+    call param_set_nm (nm)
+    call type_check_date(nm%bd)
+    call type_check_date(nm%ed)
+  end if
+
+  call bcast_i (nm%px)
+  call bcast_i (nm%py)
+
+  call bcast_string (nm%bd)
+  call bcast_string (nm%ed)
+
+  call bcast_i (nm%bt)
+  call bcast_i (nm%bc)
+
+  call bcast_string (nm%fi)
+  call bcast_string (nm%ff)
+  call bcast_string (nm%od)
+
+  call bcast_string  (nm%out_per)
+  call bcast_i (nm%rst_per)
+  call bcast_i (nm%rst)
+
+end subroutine input_nm
+
+subroutine divide_in_r3d (fname, varname, var) !{{{1
+  ! read in global 3d array and divide it to other domains from mid
+  character (len=*), intent(in) :: fname, varname
+  real (kind=wp), dimension(:,:,:)  :: var
+
+  real (kind=wp), allocatable, dimension(:,:,:) :: glo_var
+  integer :: nd3
+
+  nd3 = size(var, 3)
+
+  if (myid == mid) then
+    allocate( glo_var(glo_ni, glo_nj, nd3), stat=is)
+    call chk(is); glo_var = 0.0
+    call io_read (fname, varname, glo_var)
+  end if
+
+  call div_r3d (glo_var, var) 
+
+  if (myid == mid) deallocate(glo_var)
+
+end subroutine divide_in_r3d
+
+subroutine divide_in_r2d (fname, varname, var, init_val) !{{{1
+  ! read in global 3d array and divide it to other domains from mid
+  character (len=*), intent(in) :: fname, varname
+  real (kind=wp), dimension(ni,nj) :: var
+  real (kind=wp), intent(in), optional :: init_val
+
+  real (kind=wp), allocatable, dimension(:,:) :: glo_var
+
+  if (myid == mid) then
+    allocate( glo_var(glo_ni, glo_nj), stat=is)
+    call chk(is); glo_var = 0.0
+    call io_read (fname, varname, glo_var)
+  end if
+
+  call div_r2d (glo_var, var, init_val) 
+
+  if (myid == mid) deallocate(glo_var)
+
+end subroutine divide_in_r2d
+
+subroutine bcast_in_string (fname, varname, var) !{{{1
+  ! read in string and broadcast it to other domains from mid
+  character (len=*), intent(in) :: fname, varname
+  character (len=*) :: var
+
+  if (myid == mid) call io_read (fname, varname, var)
+  call bcast_string (var)
+
+end subroutine bcast_in_string
+
 subroutine swpbnd_r3d (var) !{{{1
   ! horizontally swap the boundary of subdomain for 3d array
 
@@ -587,24 +772,6 @@ subroutine swpbnd_m2d (var) !{{{1
   call swpbnd_r2d( var%x(2) )
 end subroutine swpbnd_m2d
 
-subroutine div_gvar_r3d (va, vb) !{{{1
-  ! divide va from mid to vb of all ids
-  type (type_gvar_r3d), intent(in) :: va
-  type (type_gvar_r3d) :: vb
-
-  call div_r3d( va%v, vb%v )
-
-end subroutine div_gvar_r3d
-
-subroutine div_r3d_gvar_r3d (va, vb) !{{{1
-  ! divide va from mid to vb of all ids
-  real (kind=wp), dimension(:,:,:) :: va
-  type (type_gvar_r3d) :: vb
-
-  call div_r3d( va, vb%v )
-
-end subroutine div_r3d_gvar_r3d
-
 subroutine div_r3d (va, vb) !{{{1
   ! divide va from mid to vb of all ids
   real (kind=wp), intent(in) :: va(:,:,:)
@@ -641,17 +808,19 @@ subroutine div_r3d (va, vb) !{{{1
 
 end subroutine div_r3d
 
-subroutine div_r2d (va, vb) !{{{1
+subroutine div_r2d (va, vb, init_val) !{{{1
   ! divide va from mid to vb of all ids
 
   real (kind=wp), dimension(glo_ni,glo_nj), intent(in) :: va
   real (kind=wp), dimension(ni,nj) :: vb
+  real (kind=wp), intent(in), optional :: init_val
 
   integer, parameter :: tag = 90
   type (type_my) :: d
   integer :: n, leng
 
   vb = 0.0
+  if (present(init_val)) vb = init_val
 
   if (myid == mid) then
     do n = 1, npro

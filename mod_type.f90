@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2017-12-03 09:28:24 BJT
+! Last Change: 2017-12-31 16:09:11 BJT
 
 module mod_type
 
@@ -61,9 +61,13 @@ module mod_type
     character (len=80) :: fname, cdate, pdate
     type (type_var_info) :: &
       chc, chp, & ! normalized sea-bottom pressure of current/previous time step
+      bnd_taux, bnd_tauy, bnd_t, bnd_s, bnd_pa, bnd_fw, & ! boundary condition
+      buc, bvc, bup, bvp, & ! barotropic zonal/longitinal velocity
+      prpt, prps, & ! partial rho / partial (t, s)
       tc, sc, tp, sp, & ! temperature/salinity of current/previous time step
       uc, vc, up, vp, & ! zonal/longitinal velocity
-      auc, avc, aup, avp, aupp, avpp ! advection of u/v
+      auc, avc, aup, avp, aupp, avpp, & ! advection of u/v
+      am ! horizontal mixing coeficient
   end type type_rst_info
 
   ! matrix structure !{{{1
@@ -85,6 +89,7 @@ module mod_type
     real (kind=wp)   :: t1, t2 ! mpi time barrier
     integer (kind=lint) :: nt     ! total baroclinic time steps
     integer (kind=lint) :: i      ! current baroclinic time steps
+    integer (kind=lint) :: ist    ! begining baroclinic time steps
   end type
   type (type_tctr) :: tctr
 

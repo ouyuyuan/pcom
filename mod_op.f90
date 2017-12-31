@@ -3,11 +3,13 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-10-11 15:23:38 BJT
-! Last Change: 2017-12-02 15:46:42 BJT
+! Last Change: 2017-12-31 09:47:48 BJT
 
 module mod_op
 
   ! imported variables !{{{1
+  use mod_debug, only: debug_var
+
   use mod_arrays, only: &
     g32, gi1, gi2, &
     gt, gu, gtj, guj, git, giw, &
@@ -98,7 +100,7 @@ module mod_op
   end interface
 contains !{{{1
 
-subroutine fri_r3d (ans, sch, v, vp, vc, tau) !{{{1
+subroutine fri_r3d ( ans, sch, v, vp, vc, tau ) !{{{1
   ! horizontal frictional force
   ! ans is on the same grid as vp
   ! ans = 1/sch*div(ch*gra(v)) + cv1*vp + cv2*sch*(p vc/ p x1) + vert.

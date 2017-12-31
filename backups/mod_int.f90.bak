@@ -4,7 +4,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-12-02 15:54:52 BJT
+! Last Change: 2017-12-18 16:00:27 BJT
 
 module mod_int
 
@@ -114,18 +114,19 @@ subroutine int_readyc (equv, equvb, wm) !{{{1
   equv%avpp = equv%avp
   equv%aup  = equv%auc
   equv%avp  = equv%avc
-
   call op_adv( equv%auc, equv%uc, sch )
   call op_adv( equv%avc, equv%vc, sch )
 
-  if ( tctr%i == 1 ) then
-    equv%aupp = equv%auc
-    equv%avpp = equv%avc
-    equv%aup  = equv%auc
-    equv%avp  = equv%avc
-  else if ( tctr%i == 2 ) then
-    equv%aupp = equv%aup
-    equv%avpp = equv%avp
+  if (nm%rst == 0) then
+    if ( tctr%i == 1 ) then
+      equv%aupp = equv%auc
+      equv%avpp = equv%avc
+      equv%aup  = equv%auc
+      equv%avp  = equv%avc
+    else if ( tctr%i == 2 ) then
+      equv%aupp = equv%aup
+      equv%avpp = equv%avp
+    end if
   end if
 
   call op_fri( equv%fx, equv%fy, sch, bnd%taux%v, bnd%tauy%v )

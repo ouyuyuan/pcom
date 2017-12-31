@@ -4,9 +4,11 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-11-14 07:04:18 BJT
-! Last Change: 2017-12-02 20:14:37 BJT
+! Last Change: 2017-12-31 16:21:48 BJT
 
 module mod_int
+
+  use mod_debug, only: debug_var 
 
   use mod_den, only: den_alpha, den_rho
 
@@ -114,11 +116,10 @@ subroutine int_readyc (equv, equvb, wm) !{{{1
   equv%avpp = equv%avp
   equv%aup  = equv%auc
   equv%avp  = equv%avc
-
   call op_adv( equv%auc, equv%uc, sch )
   call op_adv( equv%avc, equv%vc, sch )
 
-  if (nm%rst == 0) then
+  if (nm%rst /= 1) then
     if ( tctr%i == 1 ) then
       equv%aupp = equv%auc
       equv%avpp = equv%avc
