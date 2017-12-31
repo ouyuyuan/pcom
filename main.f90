@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2017-12-31 16:29:09 BJT
+! Last Change: 2018-01-01 07:51:48 BJT
 
 program main
 
@@ -185,10 +185,12 @@ program main
     tctr%ct = tctr%ct + nm%bc
 
     ! output at proper time
-    if ( ((tctr%ct%h/=tctr%pt%h).and.(nm%out_per.eq.'hour'))  .or. &
-         ((tctr%ct%d/=tctr%pt%d).and.(nm%out_per.eq.'day'))   .or. &
-         ((tctr%ct%m/=tctr%pt%m).and.(nm%out_per.eq.'month')) .or. &
-         ((tctr%ct%y/=tctr%pt%y).and.(nm%out_per.eq.'year')) ) then
+    if ( ( (tctr%ct%h/=tctr%pt%h) .and. (nm%out_per.eq.'hour')  ) .or. &
+         ( (tctr%ct%d/=tctr%pt%d) .and. (nm%out_per.eq.'day')   ) .or. &
+         ( (tctr%ct%m/=tctr%pt%m) .and. (nm%out_per.eq.'month') ) .or. &
+         ( (tctr%ct%y/=tctr%pt%y) .and. (nm%out_per.eq.'year')  ) .or. &
+         ( (tctr%ct%y/=tctr%pt%y) .and. (mod(tctr%ct%y, 10) == 0) .and. &
+           (nm%out_per == 'decade') ) ) then
       call output ()
     end if
   end do
