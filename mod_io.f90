@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2018-01-22 10:09:34 BJT
+! Last Change: 2018-01-22 11:46:00 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -15,7 +15,7 @@ module mod_io !{{{1
     type_rst_info
   use mod_param, only: glo_ni, glo_nj, nk, &
     missing_float, missing_double, &
-    nm, vars_info, rst_info
+    nm, vars_info, rst_info, mid, myid
 
   use mod_arrays, only: glo_lon, glo_lat, z
 

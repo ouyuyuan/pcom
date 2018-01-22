@@ -4,8 +4,8 @@ npy = 1,
 /
 
 &time_ctrl
-bdate = '0001-01-01 00:00:00',
-edate = '0001-01-11 03:00:01',
+bdate = '1990-01-01 00:00:00',
+edate = '1990-01-06 00:00:00',
 dtbt = 60, 
 dtbc = 3600, 
 /
@@ -16,6 +16,6 @@ fname_frc    = 'input/forcing.nc',
 fname_frc_ws = 'input/forcing_windstress.nc',
 out_dir      = 'output/',
 out_per      = 'day',
-restart_per  = 2,
+restart_per  = 10,
 restart_run  = 1,
 /
