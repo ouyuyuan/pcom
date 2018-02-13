@@ -1,11 +1,11 @@
 &mpi_ctrl
 npx = 2, 
-npy = 1,
+npy = 2,
 /
 
 &time_ctrl
-bdate = '1990-01-01 00:00:00',
-edate = '1990-01-06 00:00:00',
+bdate = '0001-01-01 00:00:00',
+edate = '0001-01-12 00:00:00',
 dtbt = 60, 
 dtbc = 3600, 
 /
@@ -13,7 +13,7 @@ dtbc = 3600,
 &io_ctrl
 fname_ini    = 'input/initial.nc',
 fname_frc    = 'input/forcing.nc',
-fname_frc_ws = 'input/forcing_windstress.nc',
+fname_frc_ws = '',
 out_dir      = 'output/',
 out_per      = 'day',
 restart_per  = 10,
