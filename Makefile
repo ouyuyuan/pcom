@@ -1,7 +1,6 @@
 # the dir.where netcdf.mod exist
 NETCDF  = /usr/lib64/gfortran/modules
-MPI_LIB = /opt/local/lib/openmpi-devel-mp
-MPIRUN  = mpirun-openmpi-devel-mp
+MPIRUN  = /opt/openmpi/1.10.7/bin/mpirun
 
 FC   =  /opt/openmpi/1.10.7/bin/mpifort
 
@@ -36,7 +35,7 @@ compile: $(OBJS)
 	$(FC) $(FF) -c $<
 
 run:
-	$(MPIRUN) -n 2 ./$(EXE)
+	$(MPIRUN) -n 4 ./$(EXE)
 
 view:
 	ncview output/test.nc

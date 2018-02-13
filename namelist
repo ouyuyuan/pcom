@@ -17,5 +17,5 @@ fname_frc_ws = '',
 out_dir      = 'output/',
 out_per      = 'day',
 restart_per  = 10,
-restart_run  = 1,
+restart_run  = 0,
 /
