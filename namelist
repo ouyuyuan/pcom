@@ -1,6 +1,6 @@
 &mpi_ctrl
 npx = 2, 
-npy = 2,
+npy = 1,
 /
 
 &time_ctrl
