@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-03-06 10:38:13 BJT
-! Last Change: 2017-12-31 16:10:58 BJT
+! Last Change: 2018-01-22 11:46:00 BJT
 
 module mod_io !{{{1 
 !-------------------------------------------------------{{{1
@@ -15,7 +15,7 @@ module mod_io !{{{1
     type_rst_info
   use mod_param, only: glo_ni, glo_nj, nk, &
     missing_float, missing_double, &
-    nm, vars_info, rst_info
+    nm, vars_info, rst_info, mid, myid
 
   use mod_arrays, only: glo_lon, glo_lat, z
 
@@ -45,6 +45,7 @@ module mod_io !{{{1
   interface io_read
     module procedure read_r3d
     module procedure read_r2d
+    module procedure read_r2d_rec
     module procedure read_r1d
     module procedure read_i3d
     module procedure read_i2d
@@ -213,6 +214,31 @@ subroutine read_r2d(ncname, varname, var) !{{{1
   write(*,'(a)') 'got '//trim(varname)// ' from '//trim(ncname)
 
 end subroutine read_r2d 
+
+subroutine read_r2d_rec (ncname, varname, var, nrec) !{{{1
+  character (len=*), intent(in) :: ncname, varname
+  real (kind=wp) :: var(:,:)
+  integer, intent(in) :: nrec
+
+  integer :: stt(3), cnt(3)
+
+  ndim1 = size(var, 1)
+  ndim2 = size(var, 2)
+
+  stt  = (/1, 1, nrec/)
+  cnt  = (/ndim1, ndim2, 1/)
+
+  call check (nf90_open(ncname, NF90_NOWRITE, ncid) )
+
+  call check (nf90_inq_varid(ncid, varname, varid) )
+
+  call check (nf90_get_var(ncid, varid, var, start=stt, count=cnt) )
+
+  call check (nf90_close(ncid) )
+
+  write(*,'(a)') 'got '//trim(varname)// ' from '//trim(ncname)
+
+end subroutine read_r2d_rec
 
 subroutine read_r1d(ncname, varname, var) !{{{1
   character (len=*), intent(in) :: ncname, varname

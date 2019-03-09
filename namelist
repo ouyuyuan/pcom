@@ -1,20 +1,21 @@
 &mpi_ctrl
-npx = 8, 
-npy = 4,
+npx = 4, 
+npy = 2,
 /
 
 &time_ctrl
-bdate = '0321-01-01 00:00:00',
-edate = '0331-01-01 00:00:01',
+bdate = '0601-01-01 00:00:00',
+edate = '2001-01-12 00:00:00',
 dtbt = 60, 
 dtbc = 3600, 
 /
 
 &io_ctrl
-fname_ini = 'input/initial.nc',
-fname_frc = 'input/forcing.nc',
-out_dir = 'output_2.2.9/',
-out_per = 'month',
-restart_per = 120,
-restart_run = 1,
+fname_ini    = 'input/initial.nc',
+fname_frc    = 'input/forcing.nc',
+fname_frc_ws = '',
+out_dir      = 'output_2.2.9c/',
+out_per      = 'month',
+restart_per  = 120,
+restart_run  = 1,
 /

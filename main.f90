@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2018-01-01 07:51:48 BJT
+! Last Change: 2018-01-22 11:45:21 BJT
 
 program main
 
@@ -76,7 +76,7 @@ program main
 
   integer, parameter :: fid_dia = 10
 
-  integer :: err, leng, errorcode
+  integer :: err, leng, errorcode, nday
 
   integer (kind=lint) :: i
 
@@ -126,18 +126,24 @@ program main
   tctr%pt = tctr%ct
   tctr%nt = ( type_str2sec(nm%ed) - type_str2sec(nm%bd) ) / nm%bc
   tctr%ist= 1
+  nday = 0
 
   if (nm%rst == 1) then ! restart from a moving ocean !{{{2
     ! read in variables from restart file
     call mympi_input ( rst_info )
 
-    ! modify tctr
-    tctr%ct = type_str2time (rst_info%cdate)
-    tctr%pt = type_str2time (rst_info%pdate)
-    tctr%ist = ( type_str2sec(rst_info%cdate) - type_str2sec(nm%bd) ) / nm%bc + 1
-
-    if (myid == mid) print *, "I'm going for a restart-run from "//&
-      trim(rst_info%fname)//" at "//trim(rst_info%cdate)//"."
+    ! modify tctr, if restart file already contain some integration cycle
+    if ( tctr%ct < rst_info%cdate ) then
+      tctr%ct = type_str2time (rst_info%cdate)
+      tctr%pt = type_str2time (rst_info%pdate)
+      tctr%ist = ( type_str2sec(rst_info%cdate) - type_str2sec(nm%bd) ) / nm%bc + 1
+      if (myid == mid) print *, "I'm going for a restart-run from "//&
+        trim(rst_info%fname)//" at "//trim(rst_info%cdate)//"."
+    else
+      if (myid == mid) print *, "I'm using the status of "//&
+        trim(rst_info%cdate)//" from "//trim(rst_info%fname)//&
+        " as initial status of "//nm%bd
+    end if
   end if
 
   ! output sea bottom pressure of reference state !{{{2
@@ -157,6 +163,13 @@ program main
     !   integration enters a new day
     if ( ( i == 1 ) .or. (tctr%ct%d /= tctr%pt%d) ) then 
       call int_bnd ( bnd )
+
+      nday = nday + 1
+      if ( nm%ff_ws .ne. '' ) then ! read daily windstress forcing
+        call mympi_input ( nm%ff_ws, 'taux', bnd%taux%v, nday )
+        call mympi_input ( nm%ff_ws, 'tauy', bnd%tauy%v, nday )
+      end if
+
       call den_prho ( prho )
     end if
 

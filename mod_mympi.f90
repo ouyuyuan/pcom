@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2017-12-31 16:12:12 BJT
+! Last Change: 2018-01-22 11:44:46 BJT
 
 module mod_mympi
 
@@ -94,6 +94,7 @@ module mod_mympi
     module procedure input_nm
     module procedure divide_in_r3d
     module procedure divide_in_r2d
+    module procedure divide_in_r2d_rec
     module procedure bcast_in_string
   end interface
 
@@ -582,6 +583,7 @@ subroutine input_nm (nm) ! {{{1
 
   call bcast_string (nm%fi)
   call bcast_string (nm%ff)
+  call bcast_string (nm%ff_ws)
   call bcast_string (nm%od)
 
   call bcast_string  (nm%out_per)
@@ -630,6 +632,27 @@ subroutine divide_in_r2d (fname, varname, var) !{{{1
   if (myid == mid) deallocate(glo_var)
 
 end subroutine divide_in_r2d
+
+subroutine divide_in_r2d_rec (fname, varname, var, nrec) !{{{1
+  ! read in global 2d array or nth reccord,  and 
+  ! divide it to other domains from mid
+  character (len=*), intent(in) :: fname, varname
+  real (kind=wp), dimension(ni,nj) :: var
+  integer, intent(in) :: nrec
+
+  real (kind=wp), allocatable, dimension(:,:) :: glo_var
+
+  if (myid == mid) then
+    allocate( glo_var(glo_ni, glo_nj), stat=is)
+    call chk(is); glo_var = 0.0
+    call io_read (fname, varname, glo_var, nrec)
+  end if
+
+  call div_r2d (glo_var, var) 
+
+  if (myid == mid) deallocate(glo_var)
+
+end subroutine divide_in_r2d_rec
 
 subroutine bcast_in_string (fname, varname, var) !{{{1
   ! read in string and broadcast it to other domains from mid
