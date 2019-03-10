@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2018-01-22 11:45:21 BJT
+! Last Change: 2019-03-10 08:41:50 BJT
 
 program main
 
@@ -168,6 +168,9 @@ program main
       if ( nm%ff_ws .ne. '' ) then ! read daily windstress forcing
         call mympi_input ( nm%ff_ws, 'taux', bnd%taux%v, nday )
         call mympi_input ( nm%ff_ws, 'tauy', bnd%tauy%v, nday )
+      end if
+      if ( nm%ff_pa .ne. '' ) then ! read daily atmospheric pressure forcing
+        call mympi_input ( nm%ff_pa, 'pa', bnd%pa%v, nday )
       end if
 
       call den_prho ( prho )

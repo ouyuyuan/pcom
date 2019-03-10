@@ -4,8 +4,8 @@ npy = 2,
 /
 
 &time_ctrl
-bdate = '0601-01-01 00:00:00',
-edate = '2001-01-12 00:00:00',
+bdate = '0001-01-01 00:00:00',
+edate = '0001-02-12 00:00:00',
 dtbt = 60, 
 dtbc = 3600, 
 /
@@ -13,9 +13,10 @@ dtbc = 3600,
 &io_ctrl
 fname_ini    = 'input/initial.nc',
 fname_frc    = 'input/forcing.nc',
-fname_frc_ws = '',
-out_dir      = 'output_2.2.9c/',
-out_per      = 'month',
+fname_frc_ws = 'input/forcing_windstress.nc',
+fname_frc_pa = 'input/forcing_pa.nc',
+out_dir      = 'output_test/',
+out_per      = 'day',
 restart_per  = 120,
-restart_run  = 1,
+restart_run  = 0,
 /
