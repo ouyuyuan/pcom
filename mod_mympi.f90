@@ -9,7 +9,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-14 14:25:29 BJT
-! Last Change: 2019-03-10 08:45:07 BJT
+! Last Change: 2019-04-03 12:43:05 BJT
 
 module mod_mympi
 
@@ -585,6 +585,7 @@ subroutine input_nm (nm) ! {{{1
   call bcast_string (nm%ff)
   call bcast_string (nm%ff_ws)
   call bcast_string (nm%ff_pa)
+  call bcast_string (nm%ff_bct)
   call bcast_string (nm%od)
 
   call bcast_string  (nm%out_per)

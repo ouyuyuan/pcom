@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-09-13 08:14:52 BJT
-! Last Change: 2019-03-11 15:58:02 BJT
+! Last Change: 2019-04-03 20:37:06 BJT
 
 program main
 
@@ -172,8 +172,33 @@ program main
       if ( nm%ff_pa .ne. '' ) then ! read daily atmospheric pressure forcing
         call mympi_input ( nm%ff_pa, 'pa', bnd%pa%v, nday )
       end if
+      if ( nm%ff_bct .ne. '' ) then ! read daily 2-m temperate
+        call mympi_input ( nm%ff_bct, 'bct', bnd%t%v, nday )
+      end if
 
       call den_prho ( prho )
+    end if
+
+    ! special for 6-hourly output experiments
+    if ( nm%out_per.eq.'6hour' ) then
+    if ( ( i == 1 ) .or. &
+         ( (tctr%ct%h /= tctr%pt%h) .and. (mod(tctr%ct%h,6) == 0) ) ) then 
+
+      associate ( nrec => ( nday - 1 )*4 + tctr%ct%h / 6 + 1 )
+      if ( nm%ff_ws .ne. '' ) then ! read daily windstress forcing
+        call mympi_input ( nm%ff_ws, 'taux', bnd%taux%v, nrec )
+        call mympi_input ( nm%ff_ws, 'tauy', bnd%tauy%v, nrec )
+      end if
+      if ( nm%ff_pa .ne. '' ) then ! read daily atmospheric pressure forcing
+        call mympi_input ( nm%ff_pa, 'pa', bnd%pa%v, nrec )
+      end if
+      if ( nm%ff_bct .ne. '' ) then !  read 6-hourly 2-m air temperature ( for 'restored foricng' )
+        call mympi_input ( nm%ff_bct, 'bct', bnd%t%v, nrec )
+      end if
+      end associate
+
+      call den_prho ( prho )
+    end if
     end if
 
     ! calc. the specific volume, reciprocal of density
@@ -202,6 +227,7 @@ program main
 
     ! output at proper time
     if ( ( (tctr%ct%h/=tctr%pt%h) .and. (nm%out_per.eq.'hour')  ) .or. &
+         ( (tctr%ct%h/=tctr%pt%h) .and. (mod(tctr%ct%h,6)==0) .and. (nm%out_per.eq.'6hour')  ) .or. &
          ( (tctr%ct%d/=tctr%pt%d) .and. (nm%out_per.eq.'day')   ) .or. &
          ( (tctr%ct%m/=tctr%pt%m) .and. (nm%out_per.eq.'month') ) .or. &
          ( (tctr%ct%y/=tctr%pt%y) .and. (nm%out_per.eq.'year')  ) .or. &
@@ -703,10 +729,10 @@ subroutine output () !{{{1
   integer, save :: nrec = 0
 
   ! print elapsed time infos if neccessary
-  if ( nm%out_per.eq.'hour' ) then 
-    if ( tctr%ct%h /= tctr%pt%h ) call print_time_per_hour (tctr) 
+  if ( nm%out_per.eq.'hour' .or. nm%out_per.eq.'6hour' ) then 
+    call print_time_per_hour (tctr) 
   else 
-    if ( tctr%ct%d /= tctr%pt%d ) call print_time_per_day (tctr)
+    call print_time_per_day (tctr)
   end if
 
   call mympi_output (equv, eqw)
@@ -740,8 +766,8 @@ subroutine print_time_per_hour (tctr) !{{{1
 
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
-      'integrated for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ' ', tctr%ct%h, ':00:00,  used ', tctr%t2 - tctr%t1, &
+      'integrated to ', tctr%ct%y, '-', tctr%ct%m, &
+      '-', tctr%ct%d, ' ', tctr%ct%h, ':00:00,  used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2
@@ -754,8 +780,8 @@ subroutine print_time_per_day (tctr) !{{{1
 
     if ( myid==mid ) & 
       write(*, '(a, i0.4,a,i0.2,a,i0.2, a, f8.2, a, i3)') &
-      'integrated for ', tctr%pt%y, '-', tctr%pt%m, &
-      '-', tctr%pt%d, ', used ', tctr%t2 - tctr%t1, &
+      'integrated to ', tctr%ct%y, '-', tctr%ct%m, &
+      '-', tctr%ct%d, ', used ', tctr%t2 - tctr%t1, &
       ' seconds on processor ', myid
 
     tctr%t1 = tctr%t2

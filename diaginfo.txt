@@ -1,4 +1,1 @@
-glo_ni =  360 with  4 processors in the x-direction, and ni approximate  90 for the sub-domain.
-glo_nj =  162 with  2 processors in the y-direction, and nj approximate  81 for the sub-domain.
-nk =   60
- 
+glo_ni =  360 with  5 processors in the x-direction, and ni approximate  72 for the sub-domain.

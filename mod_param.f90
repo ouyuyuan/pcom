@@ -3,7 +3,7 @@
 !
 !      Author: OU Yuyuan <ouyuyuan@lasg.iap.ac.cn>
 !     Created: 2015-02-26 08:20:12 BJT
-! Last Change: 2019-03-11 11:50:03 BJT
+! Last Change: 2019-04-03 12:46:53 BJT
 
 module mod_param
 
@@ -52,7 +52,7 @@ module mod_param
 
     ! Filename of Initial/Forcing file
     ! directory name of output files
-    character (len=80) :: fi, ff, ff_ws, ff_pa, od
+    character (len=80) :: fi, ff, ff_ws, ff_pa, ff_bct, od
     ! output PER month or PER year 
     character (len=80) :: out_per
   end type type_nm
@@ -205,15 +205,17 @@ subroutine param_set_nm ( nm ) !{{{1
   character (len=80) :: bdate, edate
   integer :: dtbt, dtbc, restart_per, restart_run
 
-  character (len=80) :: fname_ini, fname_frc, fname_frc_ws, fname_frc_pa, out_dir, out_per
+  character (len=80) :: fname_ini, fname_frc, fname_frc_ws, &
+    fname_frc_pa, fname_frc_bct, out_dir, out_per
 
   ! it can't use the syntax % for namelist /.../ statesment
   !    so we redefine namelist parameters
 
   namelist /mpi_ctrl/ npy, npx
   namelist /time_ctrl/ bdate, edate, dtbt, dtbc
-  namelist /io_ctrl/ fname_ini, fname_frc, fname_frc_ws, fname_frc_pa, out_dir, out_per, &
-           restart_per, restart_run
+  namelist /io_ctrl/ fname_ini, fname_frc, fname_frc_ws, &
+    fname_frc_pa, fname_frc_bct, out_dir, out_per, &
+    restart_per, restart_run
 
   open(fid_nam, file='namelist')
   read(fid_nam, mpi_ctrl)
@@ -244,6 +246,7 @@ subroutine param_set_nm ( nm ) !{{{1
   nm%ff      = fname_frc
   nm%ff_ws   = fname_frc_ws
   nm%ff_pa   = fname_frc_pa
+  nm%ff_bct  = fname_frc_bct
   nm%od      = out_dir
   nm%out_per = out_per
   nm%rst_per = restart_per
